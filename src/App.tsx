@@ -3,36 +3,45 @@ import { FireInputs } from './types';
 import { defaultInputs } from './defaults';
 import { calculate } from './calculations';
 import { ClientProfile } from './profileTypes';
+import { supabase } from './services/supabaseClient';
 import {
   listProfiles,
   createProfile,
-  getProfile,
   saveProfile,
-  getActiveProfileId,
-  setActiveProfileId,
-} from './services/profileStorage';
+} from './services/profileStorageSupabase';
 import InputPanel from './components/InputPanel';
 import ChartPanel from './components/ChartPanel';
 import ProfileManager from './components/ProfileManager';
+import AuthGate from './components/AuthGate';
+import type { Session } from '@supabase/supabase-js';
 
-function App() {
+function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [loading, setLoading] = useState(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Load initial profile on mount
   useEffect(() => {
-    const profiles = listProfiles();
-    const activeId = getActiveProfileId();
-    let profile: ClientProfile | null = null;
+    const loadProfiles = async () => {
+      try {
+        const profiles = await listProfiles();
+        const lastActiveId = localStorage.getItem('fire-active-profile');
 
-    if (activeId) profile = getProfile(activeId);
-    if (!profile && profiles.length > 0) profile = profiles[0];
-    if (!profile) profile = createProfile('My First Client');
+        let profile: ClientProfile | null = null;
+        if (lastActiveId) profile = profiles.find(p => p.id === lastActiveId) || null;
+        if (!profile && profiles.length > 0) profile = profiles[0];
+        if (!profile) profile = await createProfile('My First Client');
 
-    setActiveProfile(profile);
-    setActiveProfileId(profile.id);
+        setActiveProfile(profile);
+        localStorage.setItem('fire-active-profile', profile.id);
+      } catch (e) {
+        console.error('Failed to load profiles:', e);
+      }
+      setLoading(false);
+    };
+    loadProfiles();
   }, []);
 
   const inputs = activeProfile?.inputs || defaultInputs;
@@ -47,24 +56,40 @@ function App() {
     setSaveStatus('saving');
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      saveProfile(updated);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    }, 500);
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await saveProfile(updated);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (e) {
+        console.error('Save failed:', e);
+        setSaveStatus('idle');
+      }
+    }, 800);
   }, [activeProfile]);
 
   const handleSelectProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
-    setActiveProfileId(profile.id);
+    localStorage.setItem('fire-active-profile', profile.id);
     setSaveStatus('idle');
   }, []);
 
   const handleNewProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
-    setActiveProfileId(profile.id);
+    localStorage.setItem('fire-active-profile', profile.id);
     setSaveStatus('idle');
   }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#111827', color: '#9ca3af' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔥</div>
+          <div>Loading your clients...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#111827', color: '#fff' }}>
@@ -124,6 +149,38 @@ function App() {
       <ChartPanel results={results} retirementAge={inputs.personal.retirementAge} />
     </div>
   );
+}
+
+function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setChecking(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#9ca3af' }}>
+        <div style={{ fontSize: 40 }}>🔥</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthGate onAuth={() => {}} />;
+  }
+
+  return <Dashboard />;
 }
 
 export default App;

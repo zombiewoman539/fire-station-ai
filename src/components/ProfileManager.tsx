@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ClientProfile } from '../profileTypes';
 import {
   listProfiles,
@@ -8,7 +8,8 @@ import {
   exportProfile,
   importProfile,
   duplicateProfile,
-} from '../services/profileStorage';
+} from '../services/profileStorageSupabase';
+import { supabase } from '../services/supabaseClient';
 
 interface Props {
   activeProfile: ClientProfile | null;
@@ -18,20 +19,33 @@ interface Props {
 }
 
 export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, saveStatus }: Props) {
-  const [profiles, setProfiles] = useState<ClientProfile[]>(listProfiles);
+  const [profiles, setProfiles] = useState<ClientProfile[]>([]);
   const [showMenu, setShowMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => setProfiles(listProfiles());
+  const refresh = useCallback(async () => {
+    try {
+      const list = await listProfiles();
+      setProfiles(list);
+    } catch (e) {
+      console.error('Failed to load profiles:', e);
+    }
+  }, []);
 
-  const handleNew = () => {
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const handleNew = async () => {
     const name = prompt('Client name:');
     if (!name?.trim()) return;
-    const p = createProfile(name.trim());
-    refresh();
-    onNewProfile(p);
+    try {
+      const p = await createProfile(name.trim());
+      await refresh();
+      onNewProfile(p);
+    } catch (e: any) {
+      alert('Failed to create profile: ' + e.message);
+    }
   };
 
   const handleSwitch = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -46,33 +60,45 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     setEditing(true);
   };
 
-  const commitRename = () => {
+  const commitRename = async () => {
     if (!activeProfile || !editName.trim()) { setEditing(false); return; }
-    renameProfile(activeProfile.id, editName.trim());
-    refresh();
-    onSelectProfile({ ...activeProfile, name: editName.trim() });
+    try {
+      await renameProfile(activeProfile.id, editName.trim());
+      await refresh();
+      onSelectProfile({ ...activeProfile, name: editName.trim() });
+    } catch (e: any) {
+      alert('Failed to rename: ' + e.message);
+    }
     setEditing(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!activeProfile) return;
     if (!window.confirm(`Delete "${activeProfile.name}"? This cannot be undone.`)) return;
-    deleteProfile(activeProfile.id);
-    const remaining = listProfiles();
-    refresh();
-    if (remaining.length > 0) {
-      onSelectProfile(remaining[0]);
-    } else {
-      const p = createProfile('New Client');
-      refresh();
-      onNewProfile(p);
+    try {
+      await deleteProfile(activeProfile.id);
+      const remaining = await listProfiles();
+      setProfiles(remaining);
+      if (remaining.length > 0) {
+        onSelectProfile(remaining[0]);
+      } else {
+        const p = await createProfile('New Client');
+        await refresh();
+        onNewProfile(p);
+      }
+    } catch (e: any) {
+      alert('Failed to delete: ' + e.message);
     }
   };
 
-  const handleDuplicate = () => {
+  const handleDuplicate = async () => {
     if (!activeProfile) return;
-    const p = duplicateProfile(activeProfile.id, `${activeProfile.name} (Copy)`);
-    if (p) { refresh(); onSelectProfile(p); }
+    try {
+      const p = await duplicateProfile(activeProfile.id, `${activeProfile.name} (Copy)`);
+      if (p) { await refresh(); onSelectProfile(p); }
+    } catch (e: any) {
+      alert('Failed to duplicate: ' + e.message);
+    }
   };
 
   const handleExport = () => {
@@ -89,14 +115,14 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
 
   const handleImport = () => fileInputRef.current?.click();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
-        const p = importProfile(reader.result as string);
-        refresh();
+        const p = await importProfile(reader.result as string);
+        await refresh();
         onSelectProfile(p);
       } catch {
         alert('Invalid file format.');
@@ -104,6 +130,11 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   const statusDot = saveStatus === 'saving' ? '#fbbf24' : saveStatus === 'saved' ? '#34d399' : '#6b7280';
@@ -176,6 +207,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                   { label: 'Export JSON', icon: '↓', action: handleExport },
                   { label: 'Import JSON', icon: '↑', action: handleImport },
                   { label: 'Delete', icon: '🗑', action: handleDelete, danger: true },
+                  { label: 'Sign Out', icon: '→', action: handleLogout, danger: false },
                 ].map(item => (
                   <button
                     key={item.label}
