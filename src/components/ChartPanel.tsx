@@ -3,6 +3,8 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  BarController,
+  LineController,
   BarElement,
   LineElement,
   PointElement,
@@ -16,7 +18,8 @@ import { FireResults } from '../types';
 import { formatSGD } from '../calculations';
 
 ChartJS.register(
-  CategoryScale, LinearScale, BarElement, LineElement, PointElement,
+  CategoryScale, LinearScale, BarController, LineController,
+  BarElement, LineElement, PointElement,
   Tooltip, Legend, Filler, annotationPlugin,
 );
 
