@@ -26,6 +26,7 @@ ChartJS.register(
 interface Props {
   results: FireResults;
   retirementAge: number;
+  toolbar?: React.ReactNode;
 }
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
@@ -37,7 +38,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge }: Props) {
+export default function ChartPanel({ results, retirementAge, toolbar }: Props) {
   const { yearlyData, wealthAtRetirement, fireNumber, yearsToBuild, onTrack } = results;
 
   const labels = yearlyData.map(d => String(d.age));
@@ -214,32 +215,41 @@ export default function ChartPanel({ results, retirementAge }: Props) {
 
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100vh', overflow: 'hidden' }}>
-      {/* Metrics row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 6, flexShrink: 0 }}>
-        <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
-        <MetricCard label="FIRE Number" value={formatSGD(fireNumber)} color="#60a5fa" />
-        <MetricCard label="Years to Build" value={`${yearsToBuild} yrs`} color="#fbbf24" />
-        {/* Status card */}
-        <div
-          className="rounded-lg flex items-center gap-2"
-          style={{
-            padding: '8px 12px',
-            background: onTrack ? 'rgba(6, 78, 59, 0.4)' : 'rgba(127, 29, 29, 0.4)',
-            border: `1px solid ${onTrack ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-          }}
-        >
-          <span style={{ fontSize: 14, flexShrink: 0 }}>{onTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
-          <div>
-            <div className="font-bold" style={{ color: onTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
-              {onTrack ? 'On Track!' : 'Shortfall'}
-            </div>
-            <div className="text-gray-400" style={{ fontSize: 10, lineHeight: 1.2 }}>
-              {onTrack
-                ? `+${formatSGD(wealthAtRetirement - fireNumber)}`
-                : `Need ${formatSGD(fireNumber - wealthAtRetirement)}`}
+      {/* Top row: metrics + toolbar */}
+      <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, flex: 1 }}>
+          <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
+          <MetricCard label="FIRE Number" value={formatSGD(fireNumber)} color="#60a5fa" />
+          <MetricCard label="Years to Build" value={`${yearsToBuild} yrs`} color="#fbbf24" />
+          {/* Status card */}
+          <div
+            className="rounded-lg flex items-center gap-2"
+            style={{
+              padding: '8px 12px',
+              background: onTrack ? 'rgba(6, 78, 59, 0.4)' : 'rgba(127, 29, 29, 0.4)',
+              border: `1px solid ${onTrack ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            }}
+          >
+            <span style={{ fontSize: 14, flexShrink: 0 }}>{onTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
+            <div>
+              <div className="font-bold" style={{ color: onTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
+                {onTrack ? 'On Track!' : 'Shortfall'}
+              </div>
+              <div className="text-gray-400" style={{ fontSize: 10, lineHeight: 1.2 }}>
+                {onTrack
+                  ? `+${formatSGD(wealthAtRetirement - fireNumber)}`
+                  : `Need ${formatSGD(fireNumber - wealthAtRetirement)}`}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Toolbar slot */}
+        {toolbar && (
+          <div className="flex items-center gap-2" style={{ flexShrink: 0, marginTop: 4 }}>
+            {toolbar}
+          </div>
+        )}
       </div>
 
       {/* Legend row */}

@@ -13,6 +13,10 @@ import InputPanel from './components/InputPanel';
 import ChartPanel from './components/ChartPanel';
 import ProfileManager from './components/ProfileManager';
 import AuthGate from './components/AuthGate';
+import InsightsPanel from './components/InsightsPanel';
+import MilestoneTracker from './components/MilestoneTracker';
+import PresentationMode from './components/PresentationMode';
+import ExportReport from './components/ExportReport';
 import type { Session } from '@supabase/supabase-js';
 
 function Dashboard() {
@@ -20,6 +24,7 @@ function Dashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [loading, setLoading] = useState(true);
+  const [presenting, setPresenting] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Load initial profile on mount
@@ -91,6 +96,43 @@ function Dashboard() {
     );
   }
 
+  // Presentation mode overlay
+  if (presenting) {
+    return (
+      <PresentationMode
+        inputs={inputs}
+        results={results}
+        clientName={activeProfile?.name || 'Client'}
+        onExit={() => setPresenting(false)}
+      />
+    );
+  }
+
+  // Toolbar buttons for chart panel
+  const chartToolbar = (
+    <>
+      <button
+        onClick={() => setPresenting(true)}
+        className="flex items-center gap-1.5"
+        style={{
+          background: '#1f2937', border: '1px solid #374151', borderRadius: 8,
+          color: '#d1d5db', padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        Present
+      </button>
+      <ExportReport
+        inputs={inputs}
+        results={results}
+        clientName={activeProfile?.name || 'Client'}
+      />
+    </>
+  );
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#111827', color: '#fff' }}>
       <div
@@ -146,7 +188,28 @@ function Dashboard() {
         </button>
       )}
 
-      <ChartPanel results={results} retirementAge={inputs.personal.retirementAge} />
+      {/* Right side: chart + bottom insights */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Chart panel */}
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <ChartPanel results={results} retirementAge={inputs.personal.retirementAge} toolbar={chartToolbar} />
+        </div>
+
+        {/* Bottom bar: insights + milestones side by side */}
+        <div style={{
+          display: 'flex', flexShrink: 0,
+          background: '#111827',
+          borderTop: '1px solid #1e293b',
+          maxHeight: 280,
+        }}>
+          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+            <InsightsPanel inputs={inputs} results={results} />
+          </div>
+          <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid #1e293b', overflowY: 'auto' }}>
+            <MilestoneTracker inputs={inputs} results={results} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
