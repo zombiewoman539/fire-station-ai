@@ -286,12 +286,19 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       const surplus = takeHomePay - totalExpenses;
 
       if (surplus > 0) {
-        investments += surplus * 0.7;
-        cash += surplus * 0.3;
+        // Top up cash buffer to 6 months expenses, rest goes to investments
+        const cashTarget = income.annualExpenses * 0.5;
+        const cashShortfall = Math.max(0, cashTarget - cash);
+        const toCash = Math.min(surplus, cashShortfall);
+        cash += toCash;
+        investments += surplus - toCash;
       } else {
-        cash += surplus;
-        if (cash < 0) {
-          investments += cash;
+        // Deficit: draw from cash first, then investments
+        const deficit = -surplus;
+        if (cash >= deficit) {
+          cash -= deficit;
+        } else {
+          investments -= (deficit - cash);
           cash = 0;
         }
         if (investments < 0) investments = 0;
@@ -313,9 +320,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
         cpfSA = 0;
       }
 
-      investments -= fromLiquid;
-      if (investments < 0) {
-        cash += investments;
+      if (investments >= fromLiquid) {
+        investments -= fromLiquid;
+      } else {
+        cash -= (fromLiquid - investments);
         investments = 0;
       }
       if (cash < 0) cash = 0;
