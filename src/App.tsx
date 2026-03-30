@@ -35,6 +35,23 @@ function Dashboard() {
   // Load initial profile on mount
   useEffect(() => {
     const loadProfiles = async () => {
+      // In local dev without auth session, use a local-only profile
+      if (isLocalDev) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          const localProfile: ClientProfile = {
+            id: 'local-dev',
+            name: 'Dev Client',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            inputs: defaultInputs,
+          };
+          setActiveProfile(localProfile);
+          setLoading(false);
+          return;
+        }
+      }
+
       try {
         const profiles = await listProfiles();
         const lastActiveId = localStorage.getItem('fire-active-profile');
@@ -293,6 +310,9 @@ function Dashboard() {
   );
 }
 
+// Skip auth on localhost for dev/preview testing
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
@@ -310,7 +330,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (checking) {
+  if (checking && !isLocalDev) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#9ca3af' }}>
         <div style={{ fontSize: 40 }}>🔥</div>
@@ -318,7 +338,7 @@ function App() {
     );
   }
 
-  if (!session) {
+  if (!session && !isLocalDev) {
     return <AuthGate onAuth={() => {}} />;
   }
 

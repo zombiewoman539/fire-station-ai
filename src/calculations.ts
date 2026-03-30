@@ -71,7 +71,6 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const hasScenario = scenario && scenario.type !== 'none';
   const scenarioAge = scenario?.ageAtEvent || currentAge;
   let scenarioPayoutApplied = false;
-  let scenarioIncomeReduced = false;
 
   // CI cost info
   const ciData = scenario?.type === 'critical-illness' && scenario.ciType
@@ -153,7 +152,6 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       // Income impact during recovery
       if (age >= scenarioAge && age < scenarioAge + Math.ceil(ciData.incomeImpactMonths / 12)) {
         incomeMultiplier = 0.2; // Can only work 20% capacity during treatment
-        scenarioIncomeReduced = true;
       } else if (age === scenarioAge + Math.ceil(ciData.incomeImpactMonths / 12)) {
         incomeMultiplier = 0.6; // Partial return to work
       }
