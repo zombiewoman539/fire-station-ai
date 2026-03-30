@@ -132,9 +132,20 @@ export default function InputPanel({ inputs, onChange }: Props) {
         {/* Assets */}
         <Section title="Assets" defaultOpen={false}>
           <NumberField label="Cash Savings" value={inputs.assets.cashSavings} prefix="S$" onChange={v => updateAssets('cashSavings', v)} />
+          <SliderField label="Cash Return Rate" value={inputs.assets.cashReturnRate} min={0} max={5} step={0.25} unit="%" onChange={v => updateAssets('cashReturnRate', v)} />
           <NumberField label="Investments / Equities" value={inputs.assets.investments} prefix="S$" onChange={v => updateAssets('investments', v)} />
-          <NumberField label="CPF OA + SA Balance" value={inputs.assets.cpfBalance} prefix="S$" onChange={v => updateAssets('cpfBalance', v)} />
           <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={15} step={0.5} unit="%" onChange={v => updateAssets('investmentReturnRate', v)} />
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CPF Balances</div>
+            <div className="grid grid-cols-3 gap-2">
+              <NumberField label="OA (2.5%)" value={inputs.assets.cpfOA} prefix="S$" onChange={v => updateAssets('cpfOA', v)} />
+              <NumberField label="SA (4%)" value={inputs.assets.cpfSA} prefix="S$" onChange={v => updateAssets('cpfSA', v)} />
+              <NumberField label="MA (4%)" value={inputs.assets.cpfMA} prefix="S$" onChange={v => updateAssets('cpfMA', v)} />
+            </div>
+            <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: 4 }}>
+              CPF interest rates are government-set. Extra interest applies on first S$60k combined. MA capped at BHS (S$79k in 2026), overflow goes to SA.
+            </div>
+          </div>
         </Section>
 
         {/* Insurance Policies */}

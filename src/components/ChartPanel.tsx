@@ -77,8 +77,17 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       },
       {
         type: 'bar' as const,
-        label: 'Cash + CPF',
-        data: yearlyData.map(d => d.cashCpf),
+        label: 'Cash Savings',
+        data: yearlyData.map(d => d.cash),
+        backgroundColor: 'rgba(148, 163, 184, 0.65)',
+        borderRadius: 2,
+        stack: 'stack',
+        order: 2,
+      },
+      {
+        type: 'bar' as const,
+        label: 'CPF OA + SA',
+        data: yearlyData.map(d => d.cpfOaSa),
         backgroundColor: 'rgba(96, 165, 250, 0.75)',
         borderRadius: 2,
         stack: 'stack',
@@ -223,7 +232,8 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
 
   const legendItems = [
     { color: 'rgba(52, 211, 153, 0.75)', label: 'Investments', type: 'box' },
-    { color: 'rgba(96, 165, 250, 0.75)', label: 'Cash + CPF', type: 'box' },
+    { color: 'rgba(148, 163, 184, 0.65)', label: 'Cash', type: 'box' },
+    { color: 'rgba(96, 165, 250, 0.75)', label: 'CPF OA+SA', type: 'box' },
     { color: 'rgba(251, 191, 36, 0.75)', label: 'Insurance', type: 'box' },
     { color: '#f472b6', label: 'Net Worth', type: 'line' },
     { color: 'rgba(251, 146, 60, 0.8)', label: 'Retirement', type: 'dash' },

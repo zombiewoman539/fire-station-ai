@@ -14,8 +14,11 @@ export interface IncomeExpenses {
 export interface Assets {
   cashSavings: number;
   investments: number;
-  cpfBalance: number;
-  investmentReturnRate: number;
+  cpfOA: number;
+  cpfSA: number;
+  cpfMA: number;
+  cashReturnRate: number;        // default 1%
+  investmentReturnRate: number;  // default 7%
 }
 
 export interface InsurancePolicy {
@@ -58,7 +61,8 @@ export interface FireInputs {
 export interface YearData {
   age: number;
   investments: number;
-  cashCpf: number;
+  cash: number;
+  cpfOaSa: number;
   insuranceValue: number;
   totalNetWorth: number;
   purchaseLabels: string[];

@@ -3,10 +3,21 @@ import { ClientProfile } from '../profileTypes';
 import { FireInputs, InsurancePolicy } from '../types';
 import { defaultInputs } from '../defaults';
 
-// Migrate old profiles that don't have the new insurance fields
-function migrateInputs(inputs: FireInputs): FireInputs {
+// Migrate old profiles to new schema
+function migrateInputs(inputs: any): FireInputs {
+  const assets = inputs.assets || {};
   return {
     ...inputs,
+    assets: {
+      cashSavings: assets.cashSavings ?? 0,
+      investments: assets.investments ?? 0,
+      // Migrate old single cpfBalance → split into OA/SA/MA
+      cpfOA: assets.cpfOA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.6) : 0),
+      cpfSA: assets.cpfSA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.3) : 0),
+      cpfMA: assets.cpfMA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.1) : 0),
+      cashReturnRate: assets.cashReturnRate ?? 1,
+      investmentReturnRate: assets.investmentReturnRate ?? 7,
+    },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
       ...p,
       deathSumAssured: p.deathSumAssured ?? 0,

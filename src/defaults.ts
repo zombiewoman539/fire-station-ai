@@ -28,8 +28,11 @@ export const defaultInputs: FireInputs = {
   assets: {
     cashSavings: 30000,
     investments: 50000,
-    cpfBalance: 40000,
-    investmentReturnRate: 6,
+    cpfOA: 25000,
+    cpfSA: 10000,
+    cpfMA: 5000,
+    cashReturnRate: 1,
+    investmentReturnRate: 7,
   },
   policies: [
     { id: uid(), name: 'Whole Life Policy', cashValue: 15000, annualGrowthRate: 3.5, deathSumAssured: 200000, tpdSumAssured: 200000, ciSumAssured: 100000 },
