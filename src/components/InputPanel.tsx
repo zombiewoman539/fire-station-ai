@@ -31,13 +31,27 @@ function SliderField({ label, value, min, max, step, unit, onChange }: {
 function NumberField({ label, value, prefix, onChange }: {
   label: string; value: number; prefix?: string; onChange: (v: number) => void;
 }) {
+  const [displayValue, setDisplayValue] = React.useState(String(value));
+  const [focused, setFocused] = React.useState(false);
+
+  // Sync display when value changes externally (not while editing)
+  React.useEffect(() => {
+    if (!focused) setDisplayValue(String(value));
+  }, [value, focused]);
+
   return (
     <div className="mb-3">
       <label className="text-xs text-gray-400 block mb-1">{label}</label>
       <div className="flex items-center bg-gray-700 rounded-lg px-3 py-2 border border-gray-600 focus-within:border-emerald-500 transition-colors">
         {prefix && <span className="text-gray-400 text-sm mr-2 font-medium">{prefix}</span>}
-        <input type="number" value={value}
-          onChange={e => onChange(Number(e.target.value) || 0)}
+        <input type="number" value={focused ? displayValue : value}
+          onFocus={() => { setFocused(true); setDisplayValue(String(value)); }}
+          onBlur={() => { setFocused(false); onChange(Number(displayValue) || 0); }}
+          onChange={e => {
+            setDisplayValue(e.target.value);
+            const num = Number(e.target.value);
+            if (!isNaN(num)) onChange(num);
+          }}
           className="bg-transparent text-white text-sm w-full outline-none" />
       </div>
     </div>
@@ -101,14 +115,14 @@ export default function InputPanel({ inputs, onChange }: Props) {
   return (
     <>
       {/* Personal Details */}
-        <Section title="Personal Details">
+        <Section title="Personal Details" defaultOpen={false}>
           <SliderField label="Current Age" value={inputs.personal.currentAge} min={18} max={70} onChange={v => updatePersonal('currentAge', v)} />
           <SliderField label="Retirement Age" value={inputs.personal.retirementAge} min={40} max={80} onChange={v => updatePersonal('retirementAge', v)} />
           <SliderField label="Life Expectancy" value={inputs.personal.lifeExpectancy} min={60} max={100} onChange={v => updatePersonal('lifeExpectancy', v)} />
         </Section>
 
         {/* Income & Expenses */}
-        <Section title="Income & Expenses">
+        <Section title="Income & Expenses" defaultOpen={false}>
           <NumberField label="Annual Income" value={inputs.income.annualIncome} prefix="S$" onChange={v => updateIncome('annualIncome', v)} />
           <NumberField label="Annual Expenses" value={inputs.income.annualExpenses} prefix="S$" onChange={v => updateIncome('annualExpenses', v)} />
           <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%" onChange={v => updateIncome('salaryGrowthRate', v)} />
@@ -116,7 +130,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
         </Section>
 
         {/* Assets */}
-        <Section title="Assets">
+        <Section title="Assets" defaultOpen={false}>
           <NumberField label="Cash Savings" value={inputs.assets.cashSavings} prefix="S$" onChange={v => updateAssets('cashSavings', v)} />
           <NumberField label="Investments / Equities" value={inputs.assets.investments} prefix="S$" onChange={v => updateAssets('investments', v)} />
           <NumberField label="CPF OA + SA Balance" value={inputs.assets.cpfBalance} prefix="S$" onChange={v => updateAssets('cpfBalance', v)} />
@@ -159,7 +173,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
         </Section>
 
         {/* Major Life Purchases */}
-        <Section title="Major Life Purchases">
+        <Section title="Major Life Purchases" defaultOpen={false}>
           {inputs.purchases.map(p => (
             <div key={p.id} className="bg-gray-900/50 rounded-lg p-3 mb-2 relative border border-gray-700/50">
               <button onClick={() => removePurchase(p.id)}
