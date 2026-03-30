@@ -1,7 +1,20 @@
 import { supabase } from './supabaseClient';
 import { ClientProfile } from '../profileTypes';
-import { FireInputs } from '../types';
+import { FireInputs, InsurancePolicy } from '../types';
 import { defaultInputs } from '../defaults';
+
+// Migrate old profiles that don't have the new insurance fields
+function migrateInputs(inputs: FireInputs): FireInputs {
+  return {
+    ...inputs,
+    policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
+      ...p,
+      deathSumAssured: p.deathSumAssured ?? 0,
+      tpdSumAssured: p.tpdSumAssured ?? 0,
+      ciSumAssured: p.ciSumAssured ?? 0,
+    })),
+  };
+}
 
 export async function listProfiles(): Promise<ClientProfile[]> {
   const { data, error } = await supabase
@@ -16,7 +29,7 @@ export async function listProfiles(): Promise<ClientProfile[]> {
     name: row.name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    inputs: row.inputs as FireInputs,
+    inputs: migrateInputs(row.inputs as FireInputs),
   }));
 }
 
@@ -34,7 +47,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
     name: data.name,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    inputs: data.inputs as FireInputs,
+    inputs: migrateInputs(data.inputs as FireInputs),
   };
 }
 
@@ -76,7 +89,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
     name: data.name,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    inputs: data.inputs as FireInputs,
+    inputs: migrateInputs(data.inputs as FireInputs),
   };
 }
 
