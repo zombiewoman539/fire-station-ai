@@ -25,6 +25,7 @@ function Dashboard() {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Load initial profile on mount
@@ -112,6 +113,23 @@ function Dashboard() {
   const chartToolbar = (
     <>
       <button
+        onClick={() => setShowInsights(v => !v)}
+        className="flex items-center gap-1.5"
+        style={{
+          background: showInsights ? 'rgba(16, 185, 129, 0.15)' : '#1f2937',
+          border: `1px solid ${showInsights ? 'rgba(16, 185, 129, 0.4)' : '#374151'}`,
+          borderRadius: 8,
+          color: showInsights ? '#34d399' : '#d1d5db',
+          padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+        Insights
+      </button>
+      <button
         onClick={() => setPresenting(true)}
         className="flex items-center gap-1.5"
         style={{
@@ -188,25 +206,28 @@ function Dashboard() {
         </button>
       )}
 
-      {/* Right side: chart + bottom insights */}
+      {/* Right side: chart + toggleable bottom insights */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Chart panel */}
         <div style={{ flex: 1, minHeight: 0 }}>
           <ChartPanel results={results} retirementAge={inputs.personal.retirementAge} toolbar={chartToolbar} />
         </div>
 
-        {/* Bottom bar: insights + milestones side by side */}
+        {/* Collapsible bottom drawer */}
         <div style={{
-          display: 'flex', flexShrink: 0,
-          background: '#111827',
-          borderTop: '1px solid #1e293b',
-          maxHeight: 280,
+          maxHeight: showInsights ? 300 : 0,
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease',
+          borderTop: showInsights ? '1px solid #1e293b' : 'none',
+          background: '#0f172a',
         }}>
-          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-            <InsightsPanel inputs={inputs} results={results} />
-          </div>
-          <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid #1e293b', overflowY: 'auto' }}>
-            <MilestoneTracker inputs={inputs} results={results} />
+          <div style={{ display: 'flex', height: 300 }}>
+            <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+              <InsightsPanel inputs={inputs} results={results} />
+            </div>
+            <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid #1e293b', overflowY: 'auto' }}>
+              <MilestoneTracker inputs={inputs} results={results} />
+            </div>
           </div>
         </div>
       </div>
