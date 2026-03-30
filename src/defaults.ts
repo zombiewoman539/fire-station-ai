@@ -32,7 +32,7 @@ export const defaultInputs: FireInputs = {
     investmentReturnRate: 6,
   },
   policies: [
-    { id: uid(), name: 'Whole Life Policy', cashValue: 15000, annualGrowthRate: 3.5 },
+    { id: uid(), name: 'Whole Life Policy', cashValue: 15000, annualGrowthRate: 3.5, deathSumAssured: 200000, tpdSumAssured: 200000, ciSumAssured: 100000 },
   ],
   purchases: defaultPurchases,
 };

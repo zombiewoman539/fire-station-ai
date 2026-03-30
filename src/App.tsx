@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { FireInputs } from './types';
+import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
 import { calculate } from './calculations';
 import { ClientProfile } from './profileTypes';
@@ -17,7 +17,10 @@ import InsightsPanel from './components/InsightsPanel';
 import MilestoneTracker from './components/MilestoneTracker';
 import PresentationMode from './components/PresentationMode';
 import ExportReport from './components/ExportReport';
+import ScenarioPanel from './components/ScenarioPanel';
 import type { Session } from '@supabase/supabase-js';
+
+type BottomTab = 'none' | 'insights' | 'scenarios';
 
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
@@ -25,7 +28,8 @@ function Dashboard() {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
-  const [showInsights, setShowInsights] = useState(false);
+  const [bottomTab, setBottomTab] = useState<BottomTab>('none');
+  const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Load initial profile on mount
@@ -52,6 +56,19 @@ function Dashboard() {
 
   const inputs = activeProfile?.inputs || defaultInputs;
   const results = useMemo(() => calculate(inputs), [inputs]);
+
+  // Scenario results (recalculated when scenario or inputs change)
+  const scenarioResults = useMemo(() => {
+    if (scenario.type === 'none') return null;
+    return calculate(inputs, scenario);
+  }, [inputs, scenario]);
+
+  // Keep scenario age in range when profile changes
+  useEffect(() => {
+    if (inputs.personal.currentAge > scenario.ageAtEvent) {
+      setScenario(s => ({ ...s, ageAtEvent: inputs.personal.currentAge + 5 }));
+    }
+  }, [inputs.personal.currentAge, scenario.ageAtEvent]);
 
   // Auto-save with debounce
   const handleInputChange = useCallback((newInputs: FireInputs) => {
@@ -109,17 +126,21 @@ function Dashboard() {
     );
   }
 
+  const toggleTab = (tab: BottomTab) => {
+    setBottomTab(prev => prev === tab ? 'none' : tab);
+  };
+
   // Toolbar buttons for chart panel
   const chartToolbar = (
     <>
       <button
-        onClick={() => setShowInsights(v => !v)}
+        onClick={() => toggleTab('insights')}
         className="flex items-center gap-1.5"
         style={{
-          background: showInsights ? 'rgba(16, 185, 129, 0.15)' : '#1f2937',
-          border: `1px solid ${showInsights ? 'rgba(16, 185, 129, 0.4)' : '#374151'}`,
+          background: bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.15)' : '#1f2937',
+          border: `1px solid ${bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.4)' : '#374151'}`,
           borderRadius: 8,
-          color: showInsights ? '#34d399' : '#d1d5db',
+          color: bottomTab === 'insights' ? '#34d399' : '#d1d5db',
           padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
@@ -128,6 +149,23 @@ function Dashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
         </svg>
         Insights
+      </button>
+      <button
+        onClick={() => toggleTab('scenarios')}
+        className="flex items-center gap-1.5"
+        style={{
+          background: bottomTab === 'scenarios' ? 'rgba(239, 68, 68, 0.15)' : '#1f2937',
+          border: `1px solid ${bottomTab === 'scenarios' ? 'rgba(239, 68, 68, 0.4)' : '#374151'}`,
+          borderRadius: 8,
+          color: bottomTab === 'scenarios' ? '#f87171' : '#d1d5db',
+          padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+        What If
       </button>
       <button
         onClick={() => setPresenting(true)}
@@ -150,6 +188,8 @@ function Dashboard() {
       />
     </>
   );
+
+  const isDrawerOpen = bottomTab !== 'none';
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#111827', color: '#fff' }}>
@@ -206,28 +246,46 @@ function Dashboard() {
         </button>
       )}
 
-      {/* Right side: chart + toggleable bottom insights */}
+      {/* Right side: chart + toggleable bottom panel */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Chart panel */}
         <div style={{ flex: 1, minHeight: 0 }}>
-          <ChartPanel results={results} retirementAge={inputs.personal.retirementAge} toolbar={chartToolbar} />
+          <ChartPanel
+            results={results}
+            retirementAge={inputs.personal.retirementAge}
+            toolbar={chartToolbar}
+            scenarioResults={scenarioResults}
+          />
         </div>
 
         {/* Collapsible bottom drawer */}
         <div style={{
-          maxHeight: showInsights ? 300 : 0,
+          maxHeight: isDrawerOpen ? 340 : 0,
           overflow: 'hidden',
           transition: 'max-height 0.3s ease',
-          borderTop: showInsights ? '1px solid #1e293b' : 'none',
+          borderTop: isDrawerOpen ? '1px solid #1e293b' : 'none',
           background: '#0f172a',
         }}>
-          <div style={{ display: 'flex', height: 300 }}>
-            <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-              <InsightsPanel inputs={inputs} results={results} />
-            </div>
-            <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid #1e293b', overflowY: 'auto' }}>
-              <MilestoneTracker inputs={inputs} results={results} />
-            </div>
+          <div style={{ height: 340, overflowY: 'auto' }}>
+            {bottomTab === 'insights' && (
+              <div style={{ display: 'flex', height: '100%' }}>
+                <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+                  <InsightsPanel inputs={inputs} results={results} />
+                </div>
+                <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid #1e293b', overflowY: 'auto' }}>
+                  <MilestoneTracker inputs={inputs} results={results} />
+                </div>
+              </div>
+            )}
+            {bottomTab === 'scenarios' && (
+              <ScenarioPanel
+                inputs={inputs}
+                results={results}
+                scenarioResults={scenarioResults}
+                scenario={scenario}
+                onScenarioChange={setScenario}
+              />
+            )}
           </div>
         </div>
       </div>

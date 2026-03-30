@@ -27,6 +27,7 @@ interface Props {
   results: FireResults;
   retirementAge: number;
   toolbar?: React.ReactNode;
+  scenarioResults?: FireResults | null;
 }
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
@@ -38,7 +39,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge, toolbar }: Props) {
+export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults }: Props) {
   const { yearlyData, wealthAtRetirement, fireNumber, yearsToBuild, onTrack } = results;
 
   const labels = yearlyData.map(d => String(d.age));
@@ -105,6 +106,21 @@ export default function ChartPanel({ results, retirementAge, toolbar }: Props) {
         fill: false,
         order: 1,
       },
+      // Scenario overlay line
+      ...(scenarioResults ? [{
+        type: 'line' as const,
+        label: 'Scenario Net Worth',
+        data: scenarioResults.yearlyData.map(d => d.totalNetWorth),
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.06)',
+        borderWidth: 2.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        fill: false,
+        order: 0,
+      }] : []),
     ],
   };
 
@@ -211,10 +227,11 @@ export default function ChartPanel({ results, retirementAge, toolbar }: Props) {
     { color: 'rgba(251, 191, 36, 0.75)', label: 'Insurance', type: 'box' },
     { color: '#f472b6', label: 'Net Worth', type: 'line' },
     { color: 'rgba(251, 146, 60, 0.8)', label: 'Retirement', type: 'dash' },
+    ...(scenarioResults ? [{ color: '#ef4444', label: 'Scenario', type: 'dash' as const }] : []),
   ];
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100%', overflow: 'hidden' }}>
       {/* Top row: metrics + toolbar */}
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, flex: 1 }}>

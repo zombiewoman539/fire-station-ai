@@ -23,6 +23,18 @@ export interface InsurancePolicy {
   name: string;
   cashValue: number;
   annualGrowthRate: number;
+  deathSumAssured: number;
+  tpdSumAssured: number;
+  ciSumAssured: number;
+}
+
+export type ScenarioType = 'none' | 'critical-illness' | 'tpd' | 'death';
+
+export interface Scenario {
+  type: ScenarioType;
+  ageAtEvent: number;
+  // CI-specific
+  ciType?: 'cancer' | 'heart' | 'stroke' | 'kidney';
 }
 
 export interface MajorPurchase {

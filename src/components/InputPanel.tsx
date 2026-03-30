@@ -76,7 +76,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
     update('assets', { ...inputs.assets, [field]: val });
 
   const addPolicy = () => {
-    update('policies', [...inputs.policies, { id: uid(), name: 'New Policy', cashValue: 0, annualGrowthRate: 3 }]);
+    update('policies', [...inputs.policies, { id: uid(), name: 'New Policy', cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0 }]);
   };
   const removePolicy = (id: string) => {
     update('policies', inputs.policies.filter(p => p.id !== id));
@@ -138,6 +138,17 @@ export default function InputPanel({ inputs, onChange }: Props) {
                   onChange={v => updatePolicy(p.id, 'cashValue', v)} />
                 <SliderField label="Growth Rate" value={p.annualGrowthRate} min={0} max={10} step={0.5} unit="%"
                   onChange={v => updatePolicy(p.id, 'annualGrowthRate', v)} />
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sum Assured</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <NumberField label="☠️ Death" value={p.deathSumAssured} prefix="S$"
+                    onChange={v => updatePolicy(p.id, 'deathSumAssured', v)} />
+                  <NumberField label="🦽 TPD" value={p.tpdSumAssured} prefix="S$"
+                    onChange={v => updatePolicy(p.id, 'tpdSumAssured', v)} />
+                  <NumberField label="🏥 CI" value={p.ciSumAssured} prefix="S$"
+                    onChange={v => updatePolicy(p.id, 'ciSumAssured', v)} />
+                </div>
               </div>
             </div>
           ))}
