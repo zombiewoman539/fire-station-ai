@@ -6,8 +6,14 @@ import { defaultInputs } from '../defaults';
 // Migrate old profiles to new schema
 function migrateInputs(inputs: any): FireInputs {
   const assets = inputs.assets || {};
+  const inc = inputs.income || {};
   return {
     ...inputs,
+    income: {
+      ...inc,
+      withdrawalRate: inc.withdrawalRate ?? 3.5,
+      cpfLifeMonthly: inc.cpfLifeMonthly ?? 1500,
+    },
     assets: {
       cashSavings: assets.cashSavings ?? 0,
       investments: assets.investments ?? 0,

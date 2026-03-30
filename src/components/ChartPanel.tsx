@@ -30,6 +30,15 @@ interface Props {
   scenarioResults?: FireResults | null;
 }
 
+function FireRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span style={{ color: '#94a3b8', fontSize: 10 }}>{label}</span>
+      <span style={{ color: color || '#e2e8f0', fontSize: 10, fontWeight: bold ? 700 : 500 }}>{value}</span>
+    </div>
+  );
+}
+
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700" style={{ padding: '8px 12px' }}>
@@ -40,7 +49,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 }
 
 export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults }: Props) {
-  const { yearlyData, wealthAtRetirement, fireNumber, yearsToBuild, onTrack } = results;
+  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack } = results;
 
   const labels = yearlyData.map(d => String(d.age));
 
@@ -246,7 +255,34 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, flex: 1 }}>
           <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
-          <MetricCard label="FIRE Number" value={formatSGD(fireNumber)} color="#60a5fa" />
+          {/* FIRE Number card with breakdown tooltip */}
+          <div
+            className="bg-gray-800 rounded-lg border border-gray-700 relative group"
+            style={{ padding: '8px 12px', cursor: 'help' }}
+          >
+            <div className="text-gray-500 uppercase tracking-wider font-medium" style={{ fontSize: 9, marginBottom: 1, lineHeight: 1.2 }}>FIRE Number</div>
+            <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(fireNumber)}</div>
+            <div style={{ fontSize: 9, color: '#4b5563', marginTop: 1 }}>{fireNumberBreakdown.withdrawalRate}% SWR</div>
+            {/* Tooltip */}
+            <div className="absolute z-50 hidden group-hover:block" style={{
+              bottom: '110%', left: 0, width: 240,
+              background: '#1e293b', border: '1px solid #334155',
+              borderRadius: 10, padding: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>How is this calculated?</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <FireRow label="Retirement expenses/yr" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
+                <FireRow label="− CPF LIFE payout/yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
+                <FireRow label="= Net portfolio drawdown/yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} />
+                <div style={{ borderTop: '1px solid #334155', margin: '4px 0' }} />
+                <FireRow label={`÷ ${fireNumberBreakdown.withdrawalRate}% SWR`} value={`= ${formatSGD(Math.round(fireNumberBreakdown.netDrawdownNeeded / (fireNumberBreakdown.withdrawalRate / 100)))}`} />
+                <FireRow label={`+ ${fireNumberBreakdown.inflationBuffer}% inflation buffer`} value={formatSGD(fireNumber)} color="#60a5fa" bold />
+              </div>
+              <div style={{ color: '#475569', fontSize: 9, marginTop: 8, lineHeight: 1.4 }}>
+                SWR = Safe Withdrawal Rate. Portfolio sustains indefinite withdrawals at this rate based on historical returns.
+              </div>
+            </div>
+          </div>
           <MetricCard label="Years to Build" value={`${yearsToBuild} yrs`} color="#fbbf24" />
           {/* Status card */}
           <div

@@ -9,6 +9,8 @@ export interface IncomeExpenses {
   annualExpenses: number;
   salaryGrowthRate: number;
   retirementExpenses: number;
+  withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
+  cpfLifeMonthly: number;   // Estimated CPF LIFE monthly payout at retirement
 }
 
 export interface Assets {
@@ -72,6 +74,13 @@ export interface FireResults {
   yearlyData: YearData[];
   wealthAtRetirement: number;
   fireNumber: number;
+  fireNumberBreakdown: {
+    grossRetirementExpenses: number;
+    cpfLifeAnnual: number;
+    netDrawdownNeeded: number;
+    withdrawalRate: number;
+    inflationBuffer: number;
+  };
   yearsToBuild: number;
   onTrack: boolean;
 }

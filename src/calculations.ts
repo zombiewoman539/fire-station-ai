@@ -398,8 +398,49 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     ? yearlyData[retirementIdx].totalNetWorth
     : 0;
 
-  const yearsInRetirement = lifeExpectancy - retirementAge;
-  const fireNumber = Math.round(income.retirementExpenses * yearsInRetirement * 1.2);
+  // === FIRE NUMBER: Safe Withdrawal Rate method ===
+  // Step 1: Gross annual expenses in retirement
+  const grossRetirementExpenses = income.retirementExpenses;
+
+  // Step 2: CPF LIFE provides a guaranteed monthly annuity from ~65
+  // This reduces how much the portfolio needs to cover
+  const cpfLifeAnnual = income.cpfLifeMonthly * 12;
+
+  // Step 3: Net drawdown the investment portfolio must cover
+  // CPF LIFE only kicks in at 65, so if retiring before 65, full expenses
+  // need to be covered by portfolio until then
+  const yearsBeforeCpfLife = Math.max(0, 65 - retirementAge);
+  const yearsWithCpfLife = Math.max(0, lifeExpectancy - Math.max(retirementAge, 65));
+
+  // We need the portfolio to sustain:
+  // - Full expenses from retirement to 65
+  // - (expenses - CPF LIFE) from 65 to life expectancy
+  // Using SWR: portfolio size = net annual drawdown / withdrawalRate
+  // We use the larger "worst case" drawdown (before CPF LIFE) as the SWR target
+  // then add PV of CPF LIFE gap for pre-65 years as a lump sum addition
+  const withdrawalRate = income.withdrawalRate / 100;
+  const netDrawdownNeeded = Math.max(0, grossRetirementExpenses - cpfLifeAnnual);
+
+  // Core portfolio needed to sustain post-65 drawdown indefinitely (SWR)
+  const portfolioForPostCpfLife = netDrawdownNeeded / withdrawalRate;
+
+  // Extra needed to bridge pre-65 gap (if retiring early, portfolio covers full expenses)
+  const preCpfLifeGap = Math.max(0, grossRetirementExpenses - cpfLifeAnnual);
+  const preCpfLifeBridge = yearsBeforeCpfLife > 0
+    ? (grossRetirementExpenses - netDrawdownNeeded) * yearsBeforeCpfLife
+    : 0;
+
+  // Inflation buffer: 10% on top to account for rising costs
+  const inflationBuffer = 0.10;
+  const fireNumber = Math.round((portfolioForPostCpfLife + preCpfLifeBridge) * (1 + inflationBuffer));
+
+  const fireNumberBreakdown = {
+    grossRetirementExpenses,
+    cpfLifeAnnual,
+    netDrawdownNeeded,
+    withdrawalRate: income.withdrawalRate,
+    inflationBuffer: inflationBuffer * 100,
+  };
 
   let yearsToBuild = retirementAge - currentAge;
   for (let i = 0; i < yearlyData.length; i++) {
@@ -413,6 +454,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     yearlyData,
     wealthAtRetirement,
     fireNumber,
+    fireNumberBreakdown,
     yearsToBuild,
     onTrack: wealthAtRetirement >= fireNumber,
   };

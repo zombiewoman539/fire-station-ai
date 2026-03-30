@@ -127,6 +127,17 @@ export default function InputPanel({ inputs, onChange }: Props) {
           <NumberField label="Annual Expenses" value={inputs.income.annualExpenses} prefix="S$" onChange={v => updateIncome('annualExpenses', v)} />
           <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%" onChange={v => updateIncome('salaryGrowthRate', v)} />
           <NumberField label="Retirement Expenses / Year" value={inputs.income.retirementExpenses} prefix="S$" onChange={v => updateIncome('retirementExpenses', v)} />
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FIRE Target Settings</div>
+            <SliderField label="Safe Withdrawal Rate" value={inputs.income.withdrawalRate} min={2} max={5} step={0.5} unit="%" onChange={v => updateIncome('withdrawalRate', v)} />
+            <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginBottom: 8 }}>
+              3.5% = conservative SG (longer lifespan). 4% = global standard (Trinity Study).
+            </div>
+            <NumberField label="CPF LIFE Monthly Payout (est.)" value={inputs.income.cpfLifeMonthly} prefix="S$" onChange={v => updateIncome('cpfLifeMonthly', v)} />
+            <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4 }}>
+              Estimated CPF LIFE annuity from age 65. Reduces portfolio drawdown needed. Check your CPF statement for projection.
+            </div>
+          </div>
         </Section>
 
         {/* Assets */}

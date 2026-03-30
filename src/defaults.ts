@@ -24,6 +24,8 @@ export const defaultInputs: FireInputs = {
     annualExpenses: 36000,
     salaryGrowthRate: 3,
     retirementExpenses: 48000,
+    withdrawalRate: 3.5,
+    cpfLifeMonthly: 1500,   // ~S$1,500/month CPF LIFE estimate at 65
   },
   assets: {
     cashSavings: 30000,
