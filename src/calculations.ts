@@ -100,18 +100,12 @@ function getBhsAtAge(currentAge: number, targetAge: number): number {
 
 // CPF Extra Interest calculation
 function getCpfExtraInterest(age: number, oa: number, sa: number, ma: number): { oaExtra: number; saExtra: number } {
-  // Extra interest earned on OA goes to SA/RA
-  const combinedBalance = oa + sa + ma;
-
   if (age < 55) {
     // 1% on first $60,000 combined, OA capped at $20,000
     const oaForExtra = Math.min(oa, 20000);
     const remainingCap = 60000 - oaForExtra;
     const samaForExtra = Math.min(sa + ma, remainingCap);
-    const extraOnOa = oaForExtra * 0.01;
-    const extraOnSaMa = samaForExtra * 0.01;
-    // Extra interest on OA goes to SA; extra on SA/MA stays in respective accounts
-    return { oaExtra: extraOnOa, saExtra: extraOnSaMa };
+    return { oaExtra: oaForExtra * 0.01, saExtra: samaForExtra * 0.01 };
   } else {
     // ≥55: 2% on first $30,000 + 1% on next $30,000, OA capped at $20,000
     const oaForExtra = Math.min(oa, 20000);
@@ -121,15 +115,12 @@ function getCpfExtraInterest(age: number, oa: number, sa: number, ma: number): {
     const tier1Oa = Math.min(oaForExtra, tier1Remaining);
     tier1Remaining -= tier1Oa;
     const tier1SaMa = Math.min(sa + ma, tier1Remaining);
-    const tier1Interest = (tier1Oa + tier1SaMa) * 0.02;
 
     // Next $30,000 tier (1%)
-    const usedInTier1 = tier1Oa + tier1SaMa;
     let tier2Remaining = 30000;
     const tier2Oa = Math.min(Math.max(oaForExtra - tier1Oa, 0), tier2Remaining);
     tier2Remaining -= tier2Oa;
     const tier2SaMa = Math.min(Math.max(sa + ma - tier1SaMa, 0), tier2Remaining);
-    const tier2Interest = (tier2Oa + tier2SaMa) * 0.01;
 
     // All extra interest on OA portion goes to SA/RA
     const oaExtra = tier1Oa * 0.02 + tier2Oa * 0.01;
