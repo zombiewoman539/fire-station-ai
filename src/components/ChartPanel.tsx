@@ -78,6 +78,10 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
 
   const labels = yearlyData.map(d => String(d.age));
 
+  // When a scenario is active, bars show scenario data so the visual impact is clear.
+  // The baseline net worth LINE stays fixed so the gap is obvious.
+  const activeYearlyData = scenarioResults ? scenarioResults.yearlyData : yearlyData;
+
   const purchaseAnnotations: Record<string, any> = {};
   yearlyData.forEach((d, i) => {
     if (d.purchaseLabels.length > 0) {
@@ -97,13 +101,17 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
     }
   });
 
+  // Baseline line is always dataset index 4 (after 4 bar datasets).
+  // Scenario line fills between itself (index 5) and the baseline (index 4).
+  const BASELINE_LINE_IDX = 4;
+
   const data = {
     labels,
     datasets: [
       {
         type: 'bar' as const,
         label: 'Investments',
-        data: yearlyData.map(d => d.investments),
+        data: activeYearlyData.map(d => d.investments),
         backgroundColor: 'rgba(52, 211, 153, 0.75)',
         borderRadius: 2,
         stack: 'stack',
@@ -112,7 +120,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'Cash Savings',
-        data: yearlyData.map(d => d.cash),
+        data: activeYearlyData.map(d => d.cash),
         backgroundColor: 'rgba(148, 163, 184, 0.65)',
         borderRadius: 2,
         stack: 'stack',
@@ -121,7 +129,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'CPF OA + SA',
-        data: yearlyData.map(d => d.cpfOaSa),
+        data: activeYearlyData.map(d => d.cpfOaSa),
         backgroundColor: 'rgba(96, 165, 250, 0.75)',
         borderRadius: 2,
         stack: 'stack',
@@ -130,7 +138,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'Insurance Cash Value',
-        data: yearlyData.map(d => d.insuranceValue),
+        data: activeYearlyData.map(d => d.insuranceValue),
         backgroundColor: 'rgba(251, 191, 36, 0.75)',
         borderRadius: 2,
         stack: 'stack',
@@ -138,30 +146,33 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       },
       {
         type: 'line' as const,
-        label: 'Total Net Worth',
+        label: scenarioResults ? 'Baseline (No Event)' : 'Total Net Worth',
         data: yearlyData.map(d => d.totalNetWorth),
         borderColor: '#f472b6',
         backgroundColor: 'rgba(244, 114, 182, 0.08)',
-        borderWidth: 2.5,
+        borderWidth: scenarioResults ? 1.5 : 2.5,
+        borderDash: scenarioResults ? [4, 3] : [],
         pointRadius: 0,
         pointHoverRadius: 5,
         tension: 0.3,
         fill: false,
         order: 1,
       },
-      // Scenario overlay line
+      // Scenario overlay line — fills shortfall gap between itself and the baseline line
       ...(scenarioResults ? [{
         type: 'line' as const,
-        label: 'Scenario Net Worth',
+        label: 'With Event',
         data: scenarioResults.yearlyData.map(d => d.totalNetWorth),
         borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 68, 68, 0.06)',
         borderWidth: 2.5,
-        borderDash: [6, 4],
         pointRadius: 0,
         pointHoverRadius: 5,
         tension: 0.3,
-        fill: false,
+        fill: {
+          target: BASELINE_LINE_IDX,
+          above: 'rgba(239, 68, 68, 0.0)',   // scenario above baseline (e.g. death payout spike) — no fill
+          below: 'rgba(239, 68, 68, 0.18)',  // scenario below baseline (shortfall) — red fill
+        },
         order: 0,
       }] : []),
     ],
@@ -222,6 +233,28 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       },
       annotation: {
         annotations: {
+          // When scenario is active, draw a bracket at retirement showing the gap
+          ...(scenarioResults ? {
+            shortfallBracket: {
+              type: 'line' as const,
+              xMin: String(retirementAge),
+              xMax: String(retirementAge),
+              yMin: Math.min(results.wealthAtRetirement, scenarioResults.wealthAtRetirement),
+              yMax: Math.max(results.wealthAtRetirement, scenarioResults.wealthAtRetirement),
+              borderColor: 'rgba(239, 68, 68, 0.9)',
+              borderWidth: 3,
+              label: {
+                display: true,
+                content: `Gap: −${formatSGD(Math.abs(results.wealthAtRetirement - scenarioResults.wealthAtRetirement))}`,
+                position: 'center' as const,
+                backgroundColor: 'rgba(185, 28, 28, 0.92)',
+                color: '#fff',
+                font: { size: 11, weight: 'bold' as const },
+                padding: { top: 4, bottom: 4, left: 8, right: 8 },
+                borderRadius: 4,
+              },
+            },
+          } : {}),
           retirementLine: {
             type: 'line' as const,
             xMin: String(retirementAge),
@@ -269,9 +302,9 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
     { color: 'rgba(148, 163, 184, 0.65)', label: 'Cash', type: 'box' },
     { color: 'rgba(96, 165, 250, 0.75)', label: 'CPF OA+SA', type: 'box' },
     { color: 'rgba(251, 191, 36, 0.75)', label: 'Insurance', type: 'box' },
-    { color: '#f472b6', label: 'Net Worth', type: 'line' },
+    { color: '#f472b6', label: scenarioResults ? 'Baseline (No Event)' : 'Net Worth', type: scenarioResults ? 'dash' as const : 'line' as const },
     { color: 'rgba(251, 146, 60, 0.8)', label: 'Retirement', type: 'dash' },
-    ...(scenarioResults ? [{ color: '#ef4444', label: 'Scenario', type: 'dash' as const }] : []),
+    ...(scenarioResults ? [{ color: '#ef4444', label: 'With Event', type: 'line' as const }] : []),
   ];
 
   return (
