@@ -34,6 +34,9 @@ function Dashboard() {
 
   // Load initial profile on mount
   useEffect(() => {
+    // Safety timeout: if Supabase hangs, unblock the loading screen after 6s
+    const timeout = setTimeout(() => setLoading(false), 6000);
+
     const loadProfiles = async () => {
       // In local dev without auth session, use a local-only profile
       if (isLocalDev) {
@@ -47,6 +50,7 @@ function Dashboard() {
             inputs: defaultInputs,
           };
           setActiveProfile(localProfile);
+          clearTimeout(timeout);
           setLoading(false);
           return;
         }
@@ -66,9 +70,11 @@ function Dashboard() {
       } catch (e) {
         console.error('Failed to load profiles:', e);
       }
+      clearTimeout(timeout);
       setLoading(false);
     };
     loadProfiles();
+    return () => clearTimeout(timeout);
   }, []);
 
   const inputs = activeProfile?.inputs || defaultInputs;
