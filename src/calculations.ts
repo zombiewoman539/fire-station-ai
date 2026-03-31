@@ -254,12 +254,16 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
     // === ACCUMULATION PHASE ===
     if (!isRetired) {
-      const grossSalary = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
+      // annualIncome is treated as take-home (post-CPF) pay.
+      // We derive gross salary from take-home to calculate CPF contributions.
+      const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
 
       const cpfRates = getCpfContributionRates(age);
       const cpfAlloc = getCpfAllocationRates(age);
 
-      const employeeContribution = grossSalary * cpfRates.employeeRate;
+      // Derive gross: takeHome = gross * (1 - employeeRate)  →  gross = takeHome / (1 - employeeRate)
+      const grossSalary = takeHomePay / (1 - cpfRates.employeeRate);
+      const employeeContribution = grossSalary * cpfRates.employeeRate; // same as takeHome * empRate/(1-empRate)
       const employerContribution = grossSalary * cpfRates.employerRate;
       const totalCpfContribution = employeeContribution + employerContribution;
 
@@ -280,8 +284,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
         cpfMA = bhs;
       }
 
-      // Take-home pay = gross - employee CPF
-      const takeHomePay = grossSalary - employeeContribution;
+      // Surplus = take-home minus expenses. All surplus flows to cash buffer / investments.
       const totalExpenses = income.annualExpenses + recurringPurchaseCosts;
       const surplus = takeHomePay - totalExpenses;
 

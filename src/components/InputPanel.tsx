@@ -123,7 +123,10 @@ export default function InputPanel({ inputs, onChange }: Props) {
 
         {/* Income & Expenses */}
         <Section title="Income & Expenses" defaultOpen={false}>
-          <NumberField label="Annual Income" value={inputs.income.annualIncome} prefix="S$" onChange={v => updateIncome('annualIncome', v)} />
+          <NumberField label="Annual Take-Home Income (after CPF)" value={inputs.income.annualIncome} prefix="S$" onChange={v => updateIncome('annualIncome', v)} />
+          <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: -8, marginBottom: 8 }}>
+            Enter your salary <strong style={{ color: '#6b7280' }}>after</strong> employee CPF deductions. Surplus (income − expenses) flows directly to investments. CPF contributions are calculated automatically from your gross salary.
+          </div>
           <NumberField label="Annual Expenses" value={inputs.income.annualExpenses} prefix="S$" onChange={v => updateIncome('annualExpenses', v)} />
           <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%" onChange={v => updateIncome('salaryGrowthRate', v)} />
           <NumberField label="Retirement Expenses / Year" value={inputs.income.retirementExpenses} prefix="S$" onChange={v => updateIncome('retirementExpenses', v)} />
