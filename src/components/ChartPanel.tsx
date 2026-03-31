@@ -52,7 +52,8 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
   const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
-  const [hideCpfCash, setHideCpfCash] = React.useState(false);
+  const [hideCpf, setHideCpf] = React.useState(false);
+  const [hideInsurance, setHideInsurance] = React.useState(false);
   const fireCardRef = React.useRef<HTMLDivElement>(null);
 
   // Close breakdown on click outside
@@ -121,7 +122,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'Cash Savings',
-        data: hideCpfCash ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cash),
+        data: activeYearlyData.map(d => d.cash),
         backgroundColor: 'rgba(148, 163, 184, 0.65)',
         borderRadius: 2,
         stack: 'stack',
@@ -130,7 +131,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'CPF OA + SA',
-        data: hideCpfCash ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfOaSa),
+        data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfOaSa),
         backgroundColor: 'rgba(96, 165, 250, 0.75)',
         borderRadius: 2,
         stack: 'stack',
@@ -139,7 +140,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'Insurance Cash Value',
-        data: activeYearlyData.map(d => d.insuranceValue),
+        data: hideInsurance ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.insuranceValue),
         backgroundColor: 'rgba(251, 191, 36, 0.75)',
         borderRadius: 2,
         stack: 'stack',
@@ -415,23 +416,40 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
             {item.label}
           </span>
         ))}
-        <button
-          onClick={() => setHideCpfCash(v => !v)}
-          style={{
-            marginLeft: 'auto',
-            background: hideCpfCash ? 'rgba(96, 165, 250, 0.15)' : 'transparent',
-            border: `1px solid ${hideCpfCash ? 'rgba(96, 165, 250, 0.4)' : '#374151'}`,
-            borderRadius: 6,
-            color: hideCpfCash ? '#93c5fd' : '#6b7280',
-            padding: '3px 10px',
-            fontSize: 10,
-            fontWeight: 600,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {hideCpfCash ? 'Show CPF + Cash' : 'Hide CPF + Cash'}
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          <button
+            onClick={() => setHideCpf(v => !v)}
+            style={{
+              background: hideCpf ? 'rgba(96, 165, 250, 0.15)' : 'transparent',
+              border: `1px solid ${hideCpf ? 'rgba(96, 165, 250, 0.4)' : '#374151'}`,
+              borderRadius: 6,
+              color: hideCpf ? '#93c5fd' : '#6b7280',
+              padding: '3px 8px',
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {hideCpf ? '+ CPF' : '− CPF'}
+          </button>
+          <button
+            onClick={() => setHideInsurance(v => !v)}
+            style={{
+              background: hideInsurance ? 'rgba(251, 191, 36, 0.15)' : 'transparent',
+              border: `1px solid ${hideInsurance ? 'rgba(251, 191, 36, 0.4)' : '#374151'}`,
+              borderRadius: 6,
+              color: hideInsurance ? '#fcd34d' : '#6b7280',
+              padding: '3px 8px',
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {hideInsurance ? '+ Insurance' : '− Insurance'}
+          </button>
+        </div>
       </div>
 
       {/* Chart */}
