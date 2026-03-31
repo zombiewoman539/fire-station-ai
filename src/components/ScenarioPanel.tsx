@@ -34,8 +34,13 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
 
   // Impact calculation
   const baseWealth = results.wealthAtRetirement;
-  const scenarioWealth = scenarioResults?.wealthAtRetirement || baseWealth;
+  const scenarioWealth = scenarioResults?.wealthAtRetirement ?? baseWealth;
   const impact = scenarioWealth - baseWealth;
+
+  // "On track" in a scenario means money lasts to life expectancy — not just wealthAtRetirement vs fireNumber
+  const scenarioSurvives = scenarioResults
+    ? scenarioResults.moneyRunsOutAge === undefined
+    : true;
 
   // Total CI cost over treatment period
   const totalCiCost = ciData
@@ -147,11 +152,11 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
               <div style={{ color: '#94a3b8', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
                 Impact on Retirement
               </div>
-              <div style={{ color: '#f87171', fontSize: 18, fontWeight: 700 }}>
-                {formatSGD(impact)}
+              <div style={{ color: impact >= 0 ? '#34d399' : '#f87171', fontSize: 18, fontWeight: 700 }}>
+                {impact >= 0 ? '+' : ''}{formatSGD(impact)}
               </div>
-              <div style={{ color: '#6b7280', fontSize: 10 }}>
-                {scenarioResults.onTrack ? 'Still on track' : 'FIRE target missed'}
+              <div style={{ color: scenarioSurvives ? '#34d399' : '#f87171', fontSize: 10, fontWeight: 600 }}>
+                {scenarioSurvives ? 'Funds last to life expectancy' : `Depleted at age ${scenarioResults.moneyRunsOutAge}`}
               </div>
             </div>
 

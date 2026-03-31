@@ -313,14 +313,14 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     } else {
       // === RETIREMENT PHASE: drawdown ===
       const totalDrawdown = income.retirementExpenses + recurringPurchaseCosts;
+      const totalAvailable = Math.max(0, investments) + Math.max(0, cash) + Math.max(0, cpfOA) + Math.max(0, cpfSA);
 
-      // Check if all assets are already depleted — no point drawing
-      const totalAvailable = investments + cash + cpfOA + cpfSA;
       if (totalAvailable <= 0) {
+        // Already depleted — record the first year it happens
         if (!moneyRunsOutAge) moneyRunsOutAge = age;
       } else {
-        // Draw: 40% from CPF OA/SA, 60% from investments/cash
-        const fromCpf = Math.min(totalDrawdown * 0.4, Math.max(0, cpfOA + cpfSA));
+        // Draw: 40% from CPF OA/SA, 60% from investments/cash (capped by what's available)
+        const fromCpf = Math.min(totalDrawdown * 0.4, Math.max(0, cpfOA) + Math.max(0, cpfSA));
         const fromLiquid = totalDrawdown - fromCpf;
 
         cpfOA -= fromCpf;
@@ -337,10 +337,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
           investments = 0;
         }
 
-        // If liquid assets are now exhausted, record the depletion age
         if (cash < 0) {
-          cash = 0;
+          // Liquid assets exhausted this year
           if (!moneyRunsOutAge) moneyRunsOutAge = age;
+          cash = 0;
         }
       }
     }
