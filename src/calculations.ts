@@ -139,6 +139,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const years = lifeExpectancy - currentAge;
 
   const yearlyData: YearData[] = [];
+  let moneyRunsOutAge: number | undefined;
 
   let cash = assets.cashSavings;
   let investments = assets.investments;
@@ -312,27 +313,36 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     } else {
       // === RETIREMENT PHASE: drawdown ===
       const totalDrawdown = income.retirementExpenses + recurringPurchaseCosts;
-      // Draw: 40% from CPF OA, 60% from investments/cash
-      const fromCpf = totalDrawdown * 0.4;
-      const fromLiquid = totalDrawdown * 0.6;
 
-      cpfOA -= fromCpf;
-      if (cpfOA < 0) {
-        cpfSA += cpfOA; // borrow from SA
-        cpfOA = 0;
-      }
-      if (cpfSA < 0) {
-        cash += cpfSA;
-        cpfSA = 0;
-      }
-
-      if (investments >= fromLiquid) {
-        investments -= fromLiquid;
+      // Check if all assets are already depleted — no point drawing
+      const totalAvailable = investments + cash + cpfOA + cpfSA;
+      if (totalAvailable <= 0) {
+        if (!moneyRunsOutAge) moneyRunsOutAge = age;
       } else {
-        cash -= (fromLiquid - investments);
-        investments = 0;
+        // Draw: 40% from CPF OA/SA, 60% from investments/cash
+        const fromCpf = Math.min(totalDrawdown * 0.4, Math.max(0, cpfOA + cpfSA));
+        const fromLiquid = totalDrawdown - fromCpf;
+
+        cpfOA -= fromCpf;
+        if (cpfOA < 0) {
+          cpfSA += cpfOA;
+          cpfOA = 0;
+        }
+        if (cpfSA < 0) cpfSA = 0;
+
+        if (investments >= fromLiquid) {
+          investments -= fromLiquid;
+        } else {
+          cash -= (fromLiquid - investments);
+          investments = 0;
+        }
+
+        // If liquid assets are now exhausted, record the depletion age
+        if (cash < 0) {
+          cash = 0;
+          if (!moneyRunsOutAge) moneyRunsOutAge = age;
+        }
       }
-      if (cash < 0) cash = 0;
     }
 
     // Scenario lump cost (CI initial treatment)
@@ -461,5 +471,6 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     fireNumberBreakdown,
     yearsToBuild,
     onTrack: wealthAtRetirement >= fireNumber,
+    moneyRunsOutAge,
   };
 }

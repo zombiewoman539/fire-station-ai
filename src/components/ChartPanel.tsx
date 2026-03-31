@@ -49,7 +49,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 }
 
 export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults }: Props) {
-  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack } = results;
+  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
   const [hideCpf, setHideCpf] = React.useState(false);
@@ -293,6 +293,27 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
               borderRadius: 3,
             },
           },
+          // Funds depletion marker
+          ...(moneyRunsOutAge ? {
+            depletionLine: {
+              type: 'line' as const,
+              xMin: String(moneyRunsOutAge),
+              xMax: String(moneyRunsOutAge),
+              borderColor: 'rgba(239, 68, 68, 0.9)',
+              borderWidth: 2,
+              borderDash: [4, 3],
+              label: {
+                display: true,
+                content: `Funds depleted (age ${moneyRunsOutAge})`,
+                position: 'end' as const,
+                backgroundColor: 'rgba(185, 28, 28, 0.92)',
+                color: '#fff',
+                font: { size: 10, weight: 'bold' as const },
+                padding: { top: 3, bottom: 3, left: 6, right: 6 },
+                borderRadius: 3,
+              },
+            },
+          } : {}),
           ...purchaseAnnotations,
         },
       },
@@ -381,12 +402,14 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
             <span style={{ fontSize: 14, flexShrink: 0 }}>{onTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
             <div>
               <div className="font-bold" style={{ color: onTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
-                {onTrack ? 'On Track!' : 'Shortfall'}
+                {onTrack ? 'On Track!' : moneyRunsOutAge ? `Depleted at ${moneyRunsOutAge}` : 'Shortfall'}
               </div>
               <div className="text-gray-400" style={{ fontSize: 10, lineHeight: 1.2 }}>
                 {onTrack
                   ? `+${formatSGD(wealthAtRetirement - fireNumber)}`
-                  : `Need ${formatSGD(fireNumber - wealthAtRetirement)}`}
+                  : moneyRunsOutAge
+                    ? `${moneyRunsOutAge - retirementAge} yrs short of life expectancy`
+                    : `Need ${formatSGD(fireNumber - wealthAtRetirement)}`}
               </div>
             </div>
           </div>
