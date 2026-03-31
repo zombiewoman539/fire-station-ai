@@ -254,17 +254,19 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
     // === ACCUMULATION PHASE ===
     if (!isRetired) {
-      // annualIncome is treated as take-home (post-CPF) pay.
-      // We derive gross salary from take-home to calculate CPF contributions.
-      const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
+      // annualIncome is gross salary. Employee CPF is deducted to get take-home.
+      // CPF contributions are capped at the Ordinary Wage (OW) ceiling: S$8,000/month = S$96,000/year (from 1 Jan 2026).
+      const CPF_OW_CEILING = 96000;
+
+      const grossSalary = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
 
       const cpfRates = getCpfContributionRates(age);
       const cpfAlloc = getCpfAllocationRates(age);
 
-      // Derive gross: takeHome = gross * (1 - employeeRate)  →  gross = takeHome / (1 - employeeRate)
-      const grossSalary = takeHomePay / (1 - cpfRates.employeeRate);
-      const employeeContribution = grossSalary * cpfRates.employeeRate; // same as takeHome * empRate/(1-empRate)
-      const employerContribution = grossSalary * cpfRates.employerRate;
+      // CPF contributions are only on wages up to the OW ceiling
+      const cpfLiableWage = Math.min(grossSalary, CPF_OW_CEILING);
+      const employeeContribution = cpfLiableWage * cpfRates.employeeRate;
+      const employerContribution = cpfLiableWage * cpfRates.employerRate;
       const totalCpfContribution = employeeContribution + employerContribution;
 
       // Allocate CPF contributions to OA, SA, MA
@@ -284,7 +286,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
         cpfMA = bhs;
       }
 
-      // Surplus = take-home minus expenses. All surplus flows to cash buffer / investments.
+      // Take-home = gross minus employee CPF. Surplus = take-home minus living expenses.
+      const takeHomePay = grossSalary - employeeContribution;
       const totalExpenses = income.annualExpenses + recurringPurchaseCosts;
       const surplus = takeHomePay - totalExpenses;
 

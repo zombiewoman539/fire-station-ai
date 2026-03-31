@@ -20,7 +20,7 @@ export const defaultInputs: FireInputs = {
     lifeExpectancy: 85,
   },
   income: {
-    annualIncome: 58000,
+    annualIncome: 72000,
     annualExpenses: 36000,
     salaryGrowthRate: 3,
     retirementExpenses: 48000,
