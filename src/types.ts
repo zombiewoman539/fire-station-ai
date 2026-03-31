@@ -83,4 +83,5 @@ export interface FireResults {
   };
   yearsToBuild: number;
   onTrack: boolean;
+  moneyRunsOutAge?: number; // age at which all liquid assets hit zero during retirement
 }
