@@ -324,19 +324,21 @@ function App() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Safety timeout: if getSession hangs (network issues, env vars), unblock after 4s
-    const timeout = setTimeout(() => setChecking(false), 4000);
+    // Safety timeout in case auth hangs entirely
+    const timeout = setTimeout(() => setChecking(false), 6000);
 
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setSession(session);
-        setChecking(false);
-      })
-      .catch(() => setChecking(false))
-      .finally(() => clearTimeout(timeout));
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Use onAuthStateChange as the single source of truth (Supabase v2 recommended approach).
+    // After Google OAuth, Supabase redirects back with #access_token in the URL.
+    // INITIAL_SESSION fires first (often with null), then SIGNED_IN fires once the hash
+    // is processed. If we unblock on INITIAL_SESSION=null while the hash is present,
+    // we briefly flash AuthGate before SIGNED_IN arrives — causing the loop.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' && !session && window.location.hash.includes('access_token')) {
+        // OAuth tokens are in the URL — SIGNED_IN is about to fire, keep showing the spinner
+        return;
+      }
       setSession(session);
+      clearTimeout(timeout);
       setChecking(false);
     });
 
