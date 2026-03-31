@@ -318,16 +318,23 @@ function App() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Safety timeout: if getSession hangs (network issues, env vars), unblock after 4s
+    const timeout = setTimeout(() => setChecking(false), 4000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setChecking(false);
+      })
+      .catch(() => setChecking(false))
+      .finally(() => clearTimeout(timeout));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setChecking(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   if (checking && !isLocalDev) {
