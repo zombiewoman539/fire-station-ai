@@ -50,6 +50,31 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 
 export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults }: Props) {
   const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack } = results;
+  const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
+  const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
+  const fireCardRef = React.useRef<HTMLDivElement>(null);
+
+  // Close breakdown on click outside
+  React.useEffect(() => {
+    if (!showFireBreakdown) return;
+    const handler = () => setShowFireBreakdown(false);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [showFireBreakdown]);
+
+  const handleFireCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showFireBreakdown && fireCardRef.current) {
+      const rect = fireCardRef.current.getBoundingClientRect();
+      const popupWidth = 280;
+      // Position below card, right-aligned but clamped to viewport
+      let left = rect.right - popupWidth;
+      if (left < 8) left = 8;
+      if (left + popupWidth > window.innerWidth - 8) left = window.innerWidth - popupWidth - 8;
+      setPopupPos({ top: rect.bottom + 8, left });
+    }
+    setShowFireBreakdown(v => !v);
+  };
 
   const labels = yearlyData.map(d => String(d.age));
 
@@ -250,38 +275,63 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
   ];
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100%', overflow: 'hidden' }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100%', overflow: 'visible' }}>
       {/* Top row: metrics + toolbar */}
-      <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, flex: 1 }}>
+      <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0, overflow: 'visible' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, flex: 1, overflow: 'visible' }}>
           <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
-          {/* FIRE Number card with breakdown tooltip */}
+          {/* FIRE Number card with breakdown popup */}
           <div
-            className="bg-gray-800 rounded-lg border border-gray-700 relative group"
-            style={{ padding: '8px 12px', cursor: 'help' }}
+            ref={fireCardRef}
+            className="bg-gray-800 rounded-lg"
+            style={{
+              padding: '8px 12px', cursor: 'pointer',
+              border: showFireBreakdown ? '1px solid rgba(96,165,250,0.5)' : '1px solid #374151',
+              position: 'relative',
+            }}
+            onClick={handleFireCardClick}
           >
             <div className="text-gray-500 uppercase tracking-wider font-medium" style={{ fontSize: 9, marginBottom: 1, lineHeight: 1.2 }}>FIRE Number</div>
             <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(fireNumber)}</div>
-            <div style={{ fontSize: 9, color: '#4b5563', marginTop: 1 }}>{fireNumberBreakdown.withdrawalRate}% SWR</div>
-            {/* Tooltip */}
-            <div className="absolute z-50 hidden group-hover:block" style={{
-              bottom: '110%', left: 0, width: 240,
-              background: '#1e293b', border: '1px solid #334155',
-              borderRadius: 10, padding: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-            }}>
-              <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>How is this calculated?</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <FireRow label="Retirement expenses/yr" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
-                <FireRow label="− CPF LIFE payout/yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
-                <FireRow label="= Net portfolio drawdown/yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} />
-                <div style={{ borderTop: '1px solid #334155', margin: '4px 0' }} />
-                <FireRow label={`÷ ${fireNumberBreakdown.withdrawalRate}% SWR`} value={`= ${formatSGD(Math.round(fireNumberBreakdown.netDrawdownNeeded / (fireNumberBreakdown.withdrawalRate / 100)))}`} />
-                <FireRow label={`+ ${fireNumberBreakdown.inflationBuffer}% inflation buffer`} value={formatSGD(fireNumber)} color="#60a5fa" bold />
-              </div>
-              <div style={{ color: '#475569', fontSize: 9, marginTop: 8, lineHeight: 1.4 }}>
-                SWR = Safe Withdrawal Rate. Portfolio sustains indefinite withdrawals at this rate based on historical returns.
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+              <span style={{ fontSize: 9, color: '#4b5563' }}>{fireNumberBreakdown.withdrawalRate}% SWR</span>
+              <span style={{ fontSize: 9, color: '#3b82f6' }}>ⓘ click</span>
             </div>
+            {/* Popup — absolute positioned below card, inside the metrics row overflow:visible */}
+            {showFireBreakdown && (
+              <div
+                style={{
+                  position: 'fixed', top: popupPos.top, left: popupPos.left, width: 280, zIndex: 9999,
+                  background: '#1e293b', border: '1px solid #3b82f6',
+                  borderRadius: 12, padding: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}>How is FIRE Number calculated?</span>
+                  <button onClick={() => setShowFireBreakdown(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <FireRow label="Retirement expenses / yr" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
+                  <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
+                  <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
+                  <div style={{ borderTop: '1px solid #334155', margin: '2px 0' }} />
+                  <FireRow
+                    label={`÷ ${fireNumberBreakdown.withdrawalRate}% Safe Withdrawal Rate`}
+                    value={formatSGD(Math.round(fireNumberBreakdown.netDrawdownNeeded / (fireNumberBreakdown.withdrawalRate / 100)))}
+                  />
+                  <FireRow
+                    label={`+ ${fireNumberBreakdown.inflationBuffer}% inflation buffer`}
+                    value={formatSGD(fireNumber)}
+                    color="#60a5fa"
+                    bold
+                  />
+                </div>
+                <div style={{ color: '#475569', fontSize: 10, marginTop: 10, lineHeight: 1.5, borderTop: '1px solid #334155', paddingTop: 8 }}>
+                  The <strong style={{ color: '#94a3b8' }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding. CPF LIFE reduces what the portfolio must cover from age 65.
+                </div>
+              </div>
+            )}
           </div>
           <MetricCard label="Years to Build" value={`${yearsToBuild} yrs`} color="#fbbf24" />
           {/* Status card */}

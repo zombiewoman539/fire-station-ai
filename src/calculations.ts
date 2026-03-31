@@ -410,7 +410,6 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   // CPF LIFE only kicks in at 65, so if retiring before 65, full expenses
   // need to be covered by portfolio until then
   const yearsBeforeCpfLife = Math.max(0, 65 - retirementAge);
-  const yearsWithCpfLife = Math.max(0, lifeExpectancy - Math.max(retirementAge, 65));
 
   // We need the portfolio to sustain:
   // - Full expenses from retirement to 65
@@ -425,7 +424,6 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const portfolioForPostCpfLife = netDrawdownNeeded / withdrawalRate;
 
   // Extra needed to bridge pre-65 gap (if retiring early, portfolio covers full expenses)
-  const preCpfLifeGap = Math.max(0, grossRetirementExpenses - cpfLifeAnnual);
   const preCpfLifeBridge = yearsBeforeCpfLife > 0
     ? (grossRetirementExpenses - netDrawdownNeeded) * yearsBeforeCpfLife
     : 0;
