@@ -311,8 +311,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       cpfOA += toOA_alloc;
       cpfMA += toMA;
 
-      if (age > 55) {
-        // Post-55: saOrRaRate portion → RA (up to FRS cap), overflow → OA
+      if (age >= 55) {
+        // Age 55+: SA is closed — saOrRaRate portion → RA (up to FRS cap), overflow → OA
         const frsCap = FRS_2026 * Math.pow(1 + RS_GROWTH_RATE, age - currentAge);
         const raHeadroom = Math.max(0, frsCap - cpfRA);
         const toRA = Math.min(toSaOrRa, raHeadroom);
@@ -322,11 +322,11 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
         cpfSA += toSaOrRa;
       }
 
-      // BHS overflow: MA excess → SA (pre-55) or OA (post-55, SA closed)
+      // BHS overflow: MA excess → SA (pre-55) or OA (55+, SA closed)
       const bhs = getBhsAtAge(currentAge, age);
       if (cpfMA > bhs) {
         const overflow = cpfMA - bhs;
-        if (age <= 55) { cpfSA += overflow; } else { cpfOA += overflow; }
+        if (age < 55) { cpfSA += overflow; } else { cpfOA += overflow; }
         cpfMA = bhs;
       }
 
