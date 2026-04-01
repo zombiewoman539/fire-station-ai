@@ -132,7 +132,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
         type: 'bar' as const,
         label: 'Investments',
         data: activeYearlyData.map(d => d.investments),
-        backgroundColor: 'rgba(52, 211, 153, 0.75)',
+        backgroundColor: 'rgba(52, 211, 153, 0.80)',   // emerald green
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -141,7 +141,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
         type: 'bar' as const,
         label: 'Cash Savings',
         data: activeYearlyData.map(d => d.cash),
-        backgroundColor: 'rgba(148, 163, 184, 0.65)',
+        backgroundColor: 'rgba(251, 191, 36, 0.75)',   // amber — warm, clearly distinct
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -150,7 +150,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
         type: 'bar' as const,
         label: 'CPF OA',
         data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfOA),
-        backgroundColor: 'rgba(96, 165, 250, 0.75)',
+        backgroundColor: 'rgba(56, 189, 248, 0.80)',   // sky blue — accessible CPF
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -159,7 +159,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
         type: 'bar' as const,
         label: 'CPF SA',
         data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfSA),
-        backgroundColor: 'rgba(59, 130, 246, 0.75)',
+        backgroundColor: 'rgba(99, 102, 241, 0.80)',   // indigo — locked pre-55
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -177,7 +177,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
         type: 'bar' as const,
         label: 'CPF MA',
         data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfMA),
-        backgroundColor: 'rgba(20, 184, 166, 0.75)',
+        backgroundColor: 'rgba(249, 115, 22, 0.75)',   // orange — healthcare/medisave
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -186,7 +186,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
         type: 'bar' as const,
         label: 'Insurance Cash Value',
         data: hideInsurance ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.insuranceValue),
-        backgroundColor: 'rgba(251, 191, 36, 0.75)',
+        backgroundColor: 'rgba(244, 114, 182, 0.70)',  // rose pink — protection layer
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -417,13 +417,13 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
   };
 
   const legendItems = [
-    { color: 'rgba(52, 211, 153, 0.75)', label: 'Investments', type: 'box' },
-    { color: 'rgba(148, 163, 184, 0.65)', label: 'Cash', type: 'box' },
-    { color: 'rgba(96, 165, 250, 0.75)', label: 'CPF OA', type: 'box' },
-    { color: 'rgba(59, 130, 246, 0.75)', label: 'CPF SA', type: 'box' },
-    { color: 'rgba(99, 102, 241, 0.65)', label: 'CPF RA 🔒', type: 'hatch' as const },
-    { color: 'rgba(20, 184, 166, 0.75)', label: 'CPF MA', type: 'box' },
-    { color: 'rgba(251, 191, 36, 0.75)', label: 'Insurance', type: 'box' },
+    { color: 'rgba(52, 211, 153, 0.80)',  label: 'Investments', type: 'box' },
+    { color: 'rgba(251, 191, 36, 0.75)',  label: 'Cash', type: 'box' },
+    { color: 'rgba(56, 189, 248, 0.80)',  label: 'CPF OA', type: 'box' },
+    { color: 'rgba(99, 102, 241, 0.80)',  label: 'CPF SA', type: 'box' },
+    { color: 'rgba(99, 102, 241, 0.65)',  label: 'CPF RA 🔒', type: 'hatch' as const },
+    { color: 'rgba(249, 115, 22, 0.75)',  label: 'CPF MA', type: 'box' },
+    { color: 'rgba(244, 114, 182, 0.70)', label: 'Insurance', type: 'box' },
     { color: '#f472b6', label: scenarioResults ? 'Baseline (No Event)' : 'Net Worth', type: scenarioResults ? 'dash' as const : 'line' as const },
     { color: 'rgba(251, 146, 60, 0.8)', label: 'Retirement', type: 'dash' as const },
     ...(scenarioResults ? [{ color: '#ef4444', label: 'With Event', type: 'line' as const }] : []),
