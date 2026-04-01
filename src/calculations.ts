@@ -110,9 +110,10 @@ function getCpfAllocationRates(age: number) {
 const CPF_OA_RATE = 0.025;
 const CPF_SA_RATE = 0.04;
 
-// BHS = $79,000 for 2026. Grows at ~5%/yr for members below 65. Fixed at 65.
+// BHS = $79,000 for 2026. Grows at ~2.5%/yr (conservative long-term; ensures cap is effective
+// since MA earns 4% interest — if BHS grew faster than 4%, the cap would never re-trigger).
 const BHS_2026 = 79000;
-const BHS_GROWTH_RATE = 0.05;
+const BHS_GROWTH_RATE = 0.025;
 
 function getBhsAtAge(currentAge: number, targetAge: number): number {
   if (targetAge >= 65) {
@@ -123,26 +124,34 @@ function getBhsAtAge(currentAge: number, targetAge: number): number {
   return BHS_2026 * Math.pow(1 + BHS_GROWTH_RATE, targetAge - currentAge);
 }
 
-// Extra interest on CPF balances
-function getCpfExtraInterest(age: number, oa: number, saOrRa: number, ma: number): { oaExtra: number; saOrRaExtra: number } {
+// Extra interest on CPF balances.
+// Per CPF Board rules: OA extra → credited to SA (pre-55) or RA (55+).
+// SA/RA extra → stays in SA/RA. MA extra → stays in MA.
+function getCpfExtraInterest(age: number, oa: number, saOrRa: number, ma: number): { oaExtra: number; saOrRaExtra: number; maExtra: number } {
   if (age < 55) {
     const oaForExtra = Math.min(oa, 20000);
-    const remainingCap = 60000 - oaForExtra;
-    const samaForExtra = Math.min(saOrRa + ma, remainingCap);
-    return { oaExtra: oaForExtra * 0.01, saOrRaExtra: samaForExtra * 0.01 };
+    let remaining = 60000 - oaForExtra;
+    const saForExtra = Math.min(saOrRa, remaining);
+    remaining -= saForExtra;
+    const maForExtra = Math.min(ma, remaining);
+    return { oaExtra: oaForExtra * 0.01, saOrRaExtra: saForExtra * 0.01, maExtra: maForExtra * 0.01 };
   } else {
     const oaForExtra = Math.min(oa, 20000);
-    let tier1Remaining = 30000;
-    const tier1Oa = Math.min(oaForExtra, tier1Remaining);
-    tier1Remaining -= tier1Oa;
-    const tier1SaRa = Math.min(saOrRa + ma, tier1Remaining);
-    let tier2Remaining = 30000;
-    const tier2Oa = Math.min(Math.max(oaForExtra - tier1Oa, 0), tier2Remaining);
-    tier2Remaining -= tier2Oa;
-    const tier2SaRa = Math.min(Math.max(saOrRa + ma - tier1SaRa, 0), tier2Remaining);
-    const oaExtra = tier1Oa * 0.02 + tier2Oa * 0.01;
-    const saOrRaExtra = tier1SaRa * 0.02 + tier2SaRa * 0.01;
-    return { oaExtra, saOrRaExtra };
+    // Tier 1: 2% on first $30k combined (OA capped at $20k, then RA, then MA)
+    let tier1Rem = 30000;
+    const tier1Oa  = Math.min(oaForExtra, tier1Rem);  tier1Rem -= tier1Oa;
+    const tier1Ra  = Math.min(saOrRa, tier1Rem);       tier1Rem -= tier1Ra;
+    const tier1Ma  = Math.min(ma, tier1Rem);
+    // Tier 2: 1% on next $30k combined
+    let tier2Rem = 30000;
+    const tier2Oa  = Math.min(Math.max(oaForExtra - tier1Oa, 0), tier2Rem);  tier2Rem -= tier2Oa;
+    const tier2Ra  = Math.min(Math.max(saOrRa - tier1Ra, 0), tier2Rem);       tier2Rem -= tier2Ra;
+    const tier2Ma  = Math.min(Math.max(ma - tier1Ma, 0), tier2Rem);
+    return {
+      oaExtra:     tier1Oa * 0.02 + tier2Oa * 0.01,
+      saOrRaExtra: tier1Ra * 0.02 + tier2Ra * 0.01,
+      maExtra:     tier1Ma * 0.02 + tier2Ma * 0.01,
+    };
   }
 }
 
@@ -164,8 +173,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   let investments = assets.investments;
   let cpfOA = assets.cpfOA;
   let cpfSA = assets.cpfSA;
-  let cpfMA = assets.cpfMA;
   let cpfRA = assets.cpfRA || 0;
+  // Cap initial MA to current BHS (user may have entered a value above today's cap)
+  const initialBhs = getBhsAtAge(currentAge, currentAge);
+  let cpfMA = Math.min(assets.cpfMA, initialBhs);
   let insuranceValue = policies.reduce((s, p) => s + p.cashValue, 0);
 
   const cashRate = assets.cashReturnRate / 100;
@@ -313,8 +324,11 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       cpfOA += toOA_alloc;
       cpfMA += toMA;
 
-      if (age >= 55) {
-        // Age 55+: SA is closed — saOrRaRate portion → RA (up to FRS cap), overflow → OA
+      if (age >= 65) {
+        // RA committed to CPF LIFE at 65 — all SA/RA portion goes to OA
+        cpfOA += toSaOrRa;
+      } else if (age >= 55) {
+        // SA closed at 55 — saOrRaRate portion → RA (up to projected FRS cap), overflow → OA
         const frsCap = FRS_2026 * Math.pow(1 + RS_GROWTH_RATE, age - currentAge);
         const raHeadroom = Math.max(0, frsCap - cpfRA);
         const toRA = Math.min(toSaOrRa, raHeadroom);
@@ -412,13 +426,15 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     if (cpfMA > 0) cpfMA *= (1 + CPF_SA_RATE);
     if (cpfRA > 0) cpfRA *= (1 + CPF_SA_RATE); // RA earns 4%
 
-    // Extra interest — use RA (not SA) for 55+ combined balance
+    // Extra interest — OA extra → SA/RA; SA/RA extra → stays in SA/RA; MA extra → stays in MA.
+    // Post-65: RA is committed to annuity, so OA/RA extra goes to OA instead.
     const saOrRaForExtra = age >= 55 ? cpfRA : cpfSA;
-    if (cpfOA > 0 || saOrRaForExtra > 0) {
-      const { oaExtra, saOrRaExtra } = getCpfExtraInterest(age, cpfOA, saOrRaForExtra, cpfMA);
-      // Extra interest on OA portion is credited to SA/RA per CPF rules (not retained in OA)
-      if (age >= 55) { cpfRA += oaExtra + saOrRaExtra; }
-      else           { cpfSA += oaExtra + saOrRaExtra; }
+    if (cpfOA > 0 || saOrRaForExtra > 0 || cpfMA > 0) {
+      const { oaExtra, saOrRaExtra, maExtra } = getCpfExtraInterest(age, cpfOA, saOrRaForExtra, cpfMA);
+      cpfMA += maExtra; // MA's extra always stays in MA
+      if (age >= 65)   { cpfOA += oaExtra + saOrRaExtra; } // RA gone — redirect to OA
+      else if (age >= 55) { cpfRA += oaExtra + saOrRaExtra; }
+      else                { cpfSA += oaExtra + saOrRaExtra; }
     }
 
     // BHS overflow post-interest — MA is always capped at BHS regardless of retirement status
