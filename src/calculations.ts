@@ -416,8 +416,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       else           { cpfSA += oaExtra + saOrRaExtra; }
     }
 
-    // BHS overflow post-interest (pre-55: → SA; post-55: → OA)
-    if (!isRetired) {
+    // BHS overflow post-interest — MA is always capped at BHS regardless of retirement status
+    {
       const bhs = getBhsAtAge(currentAge, age);
       if (cpfMA > bhs) {
         const overflow = cpfMA - bhs;
