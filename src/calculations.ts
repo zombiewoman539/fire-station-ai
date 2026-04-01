@@ -293,12 +293,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       const surplus = takeHomePay - totalExpenses;
 
       if (surplus > 0) {
-        // Top up cash buffer to 6 months expenses, rest goes to investments
-        const cashTarget = income.annualExpenses * 0.5;
-        const cashShortfall = Math.max(0, cashTarget - cash);
-        const toCash = Math.min(surplus, cashShortfall);
-        cash += toCash;
-        investments += surplus - toCash;
+        // Explicit investment contribution; anything left over goes to cash
+        const toInvest = Math.min(income.annualInvestmentContribution, surplus);
+        investments += toInvest;
+        cash += surplus - toInvest;
       } else {
         // Deficit: draw from cash first, then investments
         const deficit = -surplus;
