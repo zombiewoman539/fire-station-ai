@@ -10,19 +10,23 @@ function migrateInputs(inputs: any): FireInputs {
   return {
     ...inputs,
     income: {
-      ...inc,
-      annualInvestmentContribution: inc.annualInvestmentContribution ?? 12000,
-      withdrawalRate: inc.withdrawalRate ?? 3.5,
-      cpfLifeMonthly: inc.cpfLifeMonthly ?? 1500,
+      annualIncome:                  inc.annualIncome ?? 72000,
+      annualExpenses:                inc.annualExpenses ?? 36000,
+      annualInvestmentContribution:  inc.annualInvestmentContribution ?? 12000,
+      salaryGrowthRate:              inc.salaryGrowthRate ?? 3,
+      retirementExpenses:            inc.retirementExpenses ?? 48000,
+      withdrawalRate:                inc.withdrawalRate ?? 3.5,
+      cpfLifeOption:                 inc.cpfLifeOption ?? 'FRS',
+      // cpfLifeMonthly from old profiles is dropped — now computed from RA
     },
     assets: {
-      cashSavings: assets.cashSavings ?? 0,
-      investments: assets.investments ?? 0,
-      // Migrate old single cpfBalance → split into OA/SA/MA
-      cpfOA: assets.cpfOA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.6) : 0),
-      cpfSA: assets.cpfSA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.3) : 0),
-      cpfMA: assets.cpfMA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.1) : 0),
-      cashReturnRate: assets.cashReturnRate ?? 1,
+      cashSavings:         assets.cashSavings ?? 0,
+      investments:         assets.investments ?? 0,
+      cpfOA:               assets.cpfOA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.6) : 0),
+      cpfSA:               assets.cpfSA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.3) : 0),
+      cpfMA:               assets.cpfMA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.1) : 0),
+      cpfRA:               assets.cpfRA ?? 0,
+      cashReturnRate:      assets.cashReturnRate ?? 1,
       investmentReturnRate: assets.investmentReturnRate ?? 7,
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({

@@ -1,5 +1,6 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, MajorPurchase } from '../types';
+import { FireInputs, InsurancePolicy, MajorPurchase, CpfLifeOption } from '../types';
+import { CPF_LIFE_BASE_PAYOUTS, getProjectedMonthlyPayout, getProjectedRetirementSum, formatSGD, RS_GROWTH_RATE } from '../calculations';
 
 interface Props {
   inputs: FireInputs;
@@ -132,7 +133,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
 
   const updatePersonal = (field: string, val: number) =>
     update('personal', { ...inputs.personal, [field]: val });
-  const updateIncome = (field: string, val: number) =>
+  const updateIncome = (field: string, val: number | string) =>
     update('income', { ...inputs.income, [field]: val });
   const updateAssets = (field: string, val: number) =>
     update('assets', { ...inputs.assets, [field]: val });
@@ -218,13 +219,43 @@ export default function InputPanel({ inputs, onChange }: Props) {
             tip="The % of your portfolio you withdraw each year in retirement. FIRE Number = Retirement Expenses ÷ SWR. Lower = safer but needs more capital. 3.5% is conservative for Singapore (longer lifespan). 4% is the global Trinity Study standard."
             onChange={v => updateIncome('withdrawalRate', v)}
           />
-          <NumberField
-            label="CPF LIFE Monthly Payout (est.)"
-            value={inputs.income.cpfLifeMonthly}
-            prefix="S$"
-            tip="Estimated monthly CPF LIFE annuity you'll receive from age 65. This reduces the portfolio drawdown needed — the more CPF LIFE pays, the smaller your FIRE Number. Check your CPF statement for a projection, or estimate: Basic Plan ~S$1,200–1,600/month at Full Retirement Sum."
-            onChange={v => updateIncome('cpfLifeMonthly', v)}
-          />
+          {/* CPF LIFE Option selector */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+              CPF LIFE Option
+              <InfoTip text="Your CPF LIFE plan determines how much of your SA/OA is locked in the Retirement Account at age 55, and your monthly payout from age 65. FRS is the standard benchmark. BRS requires a property pledge. ERS is the maximum voluntary top-up." />
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['BRS', 'FRS', 'ERS'] as CpfLifeOption[]).map(opt => {
+                const projectedPayout = getProjectedMonthlyPayout(opt, inputs.personal.currentAge);
+                const projectedRA = Math.round(getProjectedRetirementSum(opt, inputs.personal.currentAge));
+                const isActive = inputs.income.cpfLifeOption === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => updateIncome('cpfLifeOption', opt)}
+                    style={{
+                      flex: 1,
+                      background: isActive ? 'rgba(96, 165, 250, 0.15)' : '#1e293b',
+                      border: `1px solid ${isActive ? 'rgba(96, 165, 250, 0.5)' : '#334155'}`,
+                      borderRadius: 8,
+                      padding: '8px 6px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ color: isActive ? '#93c5fd' : '#94a3b8', fontSize: 11, fontWeight: 700 }}>{opt}</div>
+                    <div style={{ color: isActive ? '#60a5fa' : '#4b5563', fontSize: 10, marginTop: 2 }}>~{formatSGD(projectedPayout)}/mo</div>
+                    <div style={{ color: '#374151', fontSize: 9, marginTop: 1 }}>RA: {formatSGD(projectedRA)}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 9, color: '#4b5563', marginTop: 4, lineHeight: 1.4 }}>
+              {CPF_LIFE_BASE_PAYOUTS[inputs.income.cpfLifeOption].desc}
+              {' '}Projections at age 55 grow at {(RS_GROWTH_RATE * 100).toFixed(1)}%/yr from 2026 base.
+            </div>
+          </div>
         </div>
       </Section>
 
@@ -255,17 +286,24 @@ export default function InputPanel({ inputs, onChange }: Props) {
           <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CPF Balances</div>
           <div className="grid grid-cols-3 gap-2">
             <NumberField label="OA (2.5%)" value={inputs.assets.cpfOA} prefix="S$"
-              tip="Ordinary Account — earns 2.5% p.a. Used for housing, education and investment. Contributions are capped at the OA Withdrawal Limit for housing. Extra 1% interest on first S$20k of OA (part of the S$60k combined cap)."
+              tip="Ordinary Account — earns 2.5% p.a. Used for housing, education and investment. Extra 1% interest on first S$20k of OA (part of the S$60k combined cap below 55)."
               onChange={v => updateAssets('cpfOA', v)} />
-            <NumberField label="SA (4%)" value={inputs.assets.cpfSA} prefix="S$"
-              tip="Special Account — earns 4% p.a. Primarily locked for retirement. Extra 1% interest applies on the combined S$60k cap (first S$20k from OA, rest from SA+MA). Excess MA contributions (above BHS) overflow to SA."
-              onChange={v => updateAssets('cpfSA', v)} />
+            {inputs.personal.currentAge < 55
+              ? <NumberField label="SA (4%)" value={inputs.assets.cpfSA} prefix="S$"
+                  tip="Special Account — earns 4% p.a. Locked for retirement. At age 55, SA is permanently closed and transferred to your Retirement Account (RA) to meet the FRS/BRS/ERS target you select above."
+                  onChange={v => updateAssets('cpfSA', v)} />
+              : <NumberField label="RA (4%) 🔒" value={inputs.assets.cpfRA} prefix="S$"
+                  tip="Retirement Account — formed at age 55 from SA and OA. Earns 4% p.a. Locked until CPF LIFE begins at age 65. Enter current RA balance if client is already 55+."
+                  onChange={v => updateAssets('cpfRA', v)} />
+            }
             <NumberField label="MA (4%)" value={inputs.assets.cpfMA} prefix="S$"
-              tip="MediSave Account — earns 4% p.a. Used for healthcare expenses and insurance premiums. Capped at the Basic Healthcare Sum (BHS): S$79,000 in 2026, growing ~3.5%/yr until you turn 65, then fixed. Any amount above BHS flows to SA."
+              tip="MediSave Account — earns 4% p.a. Capped at BHS: S$79,000 in 2026, growing ~5%/yr until age 65, then fixed. MA overflow above BHS → SA (pre-55) or OA (post-55)."
               onChange={v => updateAssets('cpfMA', v)} />
           </div>
           <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: 4 }}>
-            CPF interest rates are government-set. Extra 1% on first S$60k combined (OA capped at S$20k). All extra OA interest is credited to SA. MA capped at BHS — overflow → SA.
+            {inputs.personal.currentAge < 55
+              ? 'At 55: SA closes permanently, balance transfers to RA. Extra 1% on first S$60k combined (OA capped at S$20k). MA overflow → SA.'
+              : 'SA closed. RA locked until 65. Extra 2% on first S$30k + 1% on next S$30k combined (OA capped at S$20k). MA overflow → OA.'}
           </div>
         </div>
       </Section>
