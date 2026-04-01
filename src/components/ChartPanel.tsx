@@ -98,6 +98,13 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
 
   const labels = yearlyData.map(d => String(d.age));
 
+  const visibleTotal = (d: { investments: number; cash: number; cpfOA: number; cpfSA: number; cpfRA: number; cpfMA: number; insuranceValue: number }) => {
+    let t = d.investments + d.cash;
+    if (!hideCpf) t += d.cpfOA + d.cpfSA + d.cpfRA + d.cpfMA;
+    if (!hideInsurance) t += d.insuranceValue;
+    return t;
+  };
+
   // When a scenario is active, bars show scenario data so the visual impact is clear.
   // The baseline net worth LINE stays fixed so the gap is obvious.
   const activeYearlyData = scenarioResults ? scenarioResults.yearlyData : yearlyData;
@@ -194,7 +201,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'line' as const,
         label: scenarioResults ? 'Baseline (No Event)' : 'Total Net Worth',
-        data: yearlyData.map(d => d.totalNetWorth),
+        data: yearlyData.map(d => visibleTotal(d)),
         borderColor: '#f472b6',
         backgroundColor: 'rgba(244, 114, 182, 0.08)',
         borderWidth: scenarioResults ? 1.5 : 2.5,
@@ -208,7 +215,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       ...(scenarioResults ? [{
         type: 'line' as const,
         label: 'With Event',
-        data: scenarioResults.yearlyData.map(d => d.totalNetWorth),
+        data: scenarioResults.yearlyData.map(d => visibleTotal(d)),
         borderColor: '#ef4444',
         borderWidth: 2.5,
         pointRadius: 0,
