@@ -1,4 +1,4 @@
-import { FireInputs, YearData, FireResults, Scenario } from './types';
+import { FireInputs, YearData, FireResults, Scenario, CpfLifeOption } from './types';
 
 export function formatSGD(value: number): string {
   const abs = Math.abs(value);
@@ -53,10 +53,41 @@ export const CI_COST_DATA = {
 };
 
 // ========================================
+// CPF Retirement Sum Constants (2026 base)
+// ========================================
+export const FRS_2026 = 220400;
+export const BRS_2026 = 110200;
+export const ERS_2026 = 440800;
+export const RS_GROWTH_RATE = 0.035; // 3.5%/yr (2023–2027 CPF schedule)
+
+// CPF LIFE payout rate per dollar of RA (monthly payout / retirement sum at 2026)
+export const LIFE_PAYOUT_RATES: Record<CpfLifeOption, number> = {
+  BRS: 950 / 110200,
+  FRS: 1780 / 220400,
+  ERS: 3440 / 440800,
+};
+
+export const CPF_LIFE_BASE_PAYOUTS: Record<CpfLifeOption, { raTarget: number; monthlyPayout: number; label: string; desc: string }> = {
+  BRS: { raTarget: BRS_2026, monthlyPayout: 950,  label: 'Basic (BRS)',    desc: 'Property pledge required. Lower lock-up, more OA accessible.' },
+  FRS: { raTarget: FRS_2026, monthlyPayout: 1780, label: 'Full (FRS)',     desc: 'Standard planning benchmark. Most common option.' },
+  ERS: { raTarget: ERS_2026, monthlyPayout: 3440, label: 'Enhanced (ERS)', desc: 'Maximum voluntary top-up. Best longevity protection.' },
+};
+
+export function getProjectedRetirementSum(option: CpfLifeOption, currentAge: number): number {
+  const yearsTo55 = Math.max(0, 55 - currentAge);
+  const base = CPF_LIFE_BASE_PAYOUTS[option].raTarget;
+  return base * Math.pow(1 + RS_GROWTH_RATE, yearsTo55);
+}
+
+export function getProjectedMonthlyPayout(option: CpfLifeOption, currentAge: number): number {
+  const projectedRA = getProjectedRetirementSum(option, currentAge);
+  return Math.round(projectedRA * LIFE_PAYOUT_RATES[option]);
+}
+
+// ========================================
 // CPF Rates from 1 January 2026
 // ========================================
 
-// CPF Contribution Rates (% of wage)
 function getCpfContributionRates(age: number) {
   if (age <= 55) return { employerRate: 0.17, employeeRate: 0.20, totalRate: 0.37 };
   if (age <= 60) return { employerRate: 0.16, employeeRate: 0.18, totalRate: 0.34 };
@@ -65,7 +96,6 @@ function getCpfContributionRates(age: number) {
   return { employerRate: 0.075, employeeRate: 0.05, totalRate: 0.125 };
 }
 
-// CPF Allocation Rates (ratio of total contribution to each account)
 function getCpfAllocationRates(age: number) {
   if (age <= 35) return { oaRate: 0.6217, saOrRaRate: 0.1621, maRate: 0.2162 };
   if (age <= 45) return { oaRate: 0.5677, saOrRaRate: 0.1891, maRate: 0.2432 };
@@ -77,55 +107,42 @@ function getCpfAllocationRates(age: number) {
   return { oaRate: 0.08, saOrRaRate: 0.08, maRate: 0.84 };
 }
 
-// CPF Interest Rates (per annum)
-const CPF_OA_RATE = 0.025;    // 2.5%
-const CPF_SA_RATE = 0.04;     // 4% (SA, RA, MA)
+const CPF_OA_RATE = 0.025;
+const CPF_SA_RATE = 0.04;
 
-// BHS = $79,000 for 2026, assume ~3.5% annual growth for younger members
+// BHS = $79,000 for 2026. Grows at ~5%/yr for members below 65. Fixed at 65.
 const BHS_2026 = 79000;
-const BHS_GROWTH_RATE = 0.035;
+const BHS_GROWTH_RATE = 0.05;
 
 function getBhsAtAge(currentAge: number, targetAge: number): number {
-  // BHS is fixed once you turn 65
-  const yearsFromNow = targetAge - currentAge;
-  const bhsAtTarget = BHS_2026 * Math.pow(1 + BHS_GROWTH_RATE, yearsFromNow);
   if (targetAge >= 65) {
-    // Fixed at whatever the BHS is when they turn 65
     const yearsTo65 = 65 - currentAge;
-    if (yearsTo65 <= 0) return BHS_2026; // already 65+
+    if (yearsTo65 <= 0) return BHS_2026;
     return BHS_2026 * Math.pow(1 + BHS_GROWTH_RATE, yearsTo65);
   }
-  return bhsAtTarget;
+  return BHS_2026 * Math.pow(1 + BHS_GROWTH_RATE, targetAge - currentAge);
 }
 
-// CPF Extra Interest calculation
-function getCpfExtraInterest(age: number, oa: number, sa: number, ma: number): { oaExtra: number; saExtra: number } {
+// Extra interest on CPF balances
+function getCpfExtraInterest(age: number, oa: number, saOrRa: number, ma: number): { oaExtra: number; saOrRaExtra: number } {
   if (age < 55) {
-    // 1% on first $60,000 combined, OA capped at $20,000
     const oaForExtra = Math.min(oa, 20000);
     const remainingCap = 60000 - oaForExtra;
-    const samaForExtra = Math.min(sa + ma, remainingCap);
-    return { oaExtra: oaForExtra * 0.01, saExtra: samaForExtra * 0.01 };
+    const samaForExtra = Math.min(saOrRa + ma, remainingCap);
+    return { oaExtra: oaForExtra * 0.01, saOrRaExtra: samaForExtra * 0.01 };
   } else {
-    // ≥55: 2% on first $30,000 + 1% on next $30,000, OA capped at $20,000
     const oaForExtra = Math.min(oa, 20000);
-
-    // First $30,000 tier (2%)
     let tier1Remaining = 30000;
     const tier1Oa = Math.min(oaForExtra, tier1Remaining);
     tier1Remaining -= tier1Oa;
-    const tier1SaMa = Math.min(sa + ma, tier1Remaining);
-
-    // Next $30,000 tier (1%)
+    const tier1SaRa = Math.min(saOrRa + ma, tier1Remaining);
     let tier2Remaining = 30000;
     const tier2Oa = Math.min(Math.max(oaForExtra - tier1Oa, 0), tier2Remaining);
     tier2Remaining -= tier2Oa;
-    const tier2SaMa = Math.min(Math.max(sa + ma - tier1SaMa, 0), tier2Remaining);
-
-    // All extra interest on OA portion goes to SA/RA
+    const tier2SaRa = Math.min(Math.max(saOrRa + ma - tier1SaRa, 0), tier2Remaining);
     const oaExtra = tier1Oa * 0.02 + tier2Oa * 0.01;
-    const saExtra = tier1SaMa * 0.02 + tier2SaMa * 0.01;
-    return { oaExtra, saExtra };
+    const saOrRaExtra = tier1SaRa * 0.02 + tier2SaRa * 0.01;
+    return { oaExtra, saOrRaExtra };
   }
 }
 
@@ -140,17 +157,27 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
   const yearlyData: YearData[] = [];
   let moneyRunsOutAge: number | undefined;
+  let raAtAge65 = 0;
+  let cpfLifeMonthly = 0;
 
   let cash = assets.cashSavings;
   let investments = assets.investments;
   let cpfOA = assets.cpfOA;
   let cpfSA = assets.cpfSA;
   let cpfMA = assets.cpfMA;
+  let cpfRA = assets.cpfRA || 0;
   let insuranceValue = policies.reduce((s, p) => s + p.cashValue, 0);
 
   const cashRate = assets.cashReturnRate / 100;
   const investRate = assets.investmentReturnRate / 100;
   const salaryGrowth = income.salaryGrowthRate / 100;
+
+  // If client is already 55+, SA should be 0 (fold into RA if any exists)
+  let sa55Closed = currentAge >= 55;
+  if (sa55Closed && cpfSA > 0) {
+    cpfRA += cpfSA;
+    cpfSA = 0;
+  }
 
   // Scenario state
   const hasScenario = scenario && scenario.type !== 'none';
@@ -161,56 +188,73 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     ? CI_COST_DATA[scenario.ciType]
     : null;
 
-  // Helper: recurring costs at a given age
   const getRecurringCostAtAge = (age: number): number => {
     let total = 0;
     for (const p of purchases) {
       if (p.recurringCost > 0 && p.recurringYears > 0) {
-        if (age >= p.age && age < p.age + p.recurringYears) {
-          total += p.recurringCost;
-        }
+        if (age >= p.age && age < p.age + p.recurringYears) total += p.recurringCost;
       }
     }
     return total;
   };
 
-  // Helper: lump sums at a given age
   const getLumpSumAtAge = (age: number): { total: number; labels: string[] } => {
     let total = 0;
     const labels: string[] = [];
     for (const p of purchases) {
       if (p.lumpSum > 0) {
-        if (p.age === age) {
-          total += p.lumpSum;
-          labels.push(p.name);
-        }
+        if (p.age === age) { total += p.lumpSum; labels.push(p.name); }
         if (p.repeatEveryYears > 0 && age > p.age && (age - p.age) % p.repeatEveryYears === 0) {
-          total += p.lumpSum;
-          labels.push(p.name);
+          total += p.lumpSum; labels.push(p.name);
         }
       }
     }
     return { total, labels };
   };
 
-  // Helper: deduct from liquid assets (investments first, then cash)
   const deductFromLiquid = (amount: number) => {
     investments -= amount;
-    if (investments < 0) {
-      cash += investments;
-      investments = 0;
-    }
-    if (cash < 0) {
-      // Last resort: draw from CPF OA (housing/education allowed)
-      cpfOA += cash;
-      cash = 0;
-    }
+    if (investments < 0) { cash += investments; investments = 0; }
+    if (cash < 0) { cpfOA += cash; cash = 0; }
     if (cpfOA < 0) cpfOA = 0;
   };
 
   for (let i = 0; i <= years; i++) {
     const age = currentAge + i;
     const isRetired = age >= retirementAge;
+
+    // ============================================================
+    // AGE 55: SA CLOSURE — RA FORMATION
+    // ============================================================
+    if (age === 55 && !sa55Closed) {
+      sa55Closed = true;
+      const raTarget = getProjectedRetirementSum(income.cpfLifeOption, currentAge);
+
+      // Step A: SA → RA (up to raTarget)
+      const saToRa = Math.min(cpfSA, raTarget);
+      cpfRA += saToRa;
+      cpfSA -= saToRa;
+
+      // Step B: Top up RA from OA if still below target
+      const raShortfall = raTarget - cpfRA;
+      if (raShortfall > 0 && cpfOA > 0) {
+        const oaToRa = Math.min(cpfOA, raShortfall);
+        cpfRA += oaToRa;
+        cpfOA -= oaToRa;
+      }
+
+      // Step C: Any remaining SA (above raTarget) overflows to OA, SA closes permanently
+      if (cpfSA > 0) { cpfOA += cpfSA; cpfSA = 0; }
+    }
+
+    // ============================================================
+    // AGE 65: CPF LIFE BEGINS — RA COMMITTED TO ANNUITY
+    // ============================================================
+    if (age === 65 && raAtAge65 === 0 && cpfRA > 0) {
+      raAtAge65 = cpfRA;
+      cpfLifeMonthly = Math.round(raAtAge65 * LIFE_PAYOUT_RATES[income.cpfLifeOption]);
+      cpfRA = 0; // RA committed to CPF LIFE annuity — no longer on balance sheet
+    }
 
     let recurringPurchaseCosts = getRecurringCostAtAge(age);
 
@@ -220,189 +264,185 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
     if (hasScenario && age === scenarioAge && !scenarioPayoutApplied) {
       scenarioPayoutApplied = true;
-
       if (scenario!.type === 'death') {
-        const payout = policies.reduce((s, p) => s + p.deathSumAssured, 0);
-        cash += payout;
+        cash += policies.reduce((s, p) => s + p.deathSumAssured, 0);
         insuranceValue = 0;
       }
       if (scenario!.type === 'tpd') {
-        const payout = policies.reduce((s, p) => s + p.tpdSumAssured, 0);
-        cash += payout;
+        cash += policies.reduce((s, p) => s + p.tpdSumAssured, 0);
         insuranceValue = 0;
       }
       if (scenario!.type === 'critical-illness' && ciData) {
-        const payout = policies.reduce((s, p) => s + p.ciSumAssured, 0);
-        cash += payout;
+        cash += policies.reduce((s, p) => s + p.ciSumAssured, 0);
         scenarioLumpCost = ciData.initialTreatment;
       }
     }
 
     if (hasScenario && scenario!.type === 'critical-illness' && ciData) {
-      if (age > scenarioAge && age <= scenarioAge + ciData.ongoingYears) {
-        recurringPurchaseCosts += ciData.annualOngoing;
-      }
+      if (age > scenarioAge && age <= scenarioAge + ciData.ongoingYears) recurringPurchaseCosts += ciData.annualOngoing;
       if (age >= scenarioAge && age < scenarioAge + Math.ceil(ciData.incomeImpactMonths / 12)) {
         incomeMultiplier = 0.2;
       } else if (age === scenarioAge + Math.ceil(ciData.incomeImpactMonths / 12)) {
         incomeMultiplier = 0.6;
       }
     }
-
     if (hasScenario && (scenario!.type === 'tpd' || scenario!.type === 'death') && age >= scenarioAge) {
       incomeMultiplier = 0;
     }
 
-    // === ACCUMULATION PHASE ===
+    // ============================================================
+    // ACCUMULATION PHASE
+    // ============================================================
     if (!isRetired) {
-      // annualIncome is gross salary. Employee CPF is deducted to get take-home.
-      // CPF contributions are capped at the Ordinary Wage (OW) ceiling: S$8,000/month = S$96,000/year (from 1 Jan 2026).
       const CPF_OW_CEILING = 96000;
-
       const grossSalary = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
-
       const cpfRates = getCpfContributionRates(age);
       const cpfAlloc = getCpfAllocationRates(age);
 
-      // CPF contributions are only on wages up to the OW ceiling
       const cpfLiableWage = Math.min(grossSalary, CPF_OW_CEILING);
       const employeeContribution = cpfLiableWage * cpfRates.employeeRate;
       const employerContribution = cpfLiableWage * cpfRates.employerRate;
       const totalCpfContribution = employeeContribution + employerContribution;
 
-      // Allocate CPF contributions to OA, SA, MA
-      const toOA = totalCpfContribution * cpfAlloc.oaRate;
-      const toSA = totalCpfContribution * cpfAlloc.saOrRaRate;
-      const toMA = totalCpfContribution * cpfAlloc.maRate;
+      const toOA_alloc = totalCpfContribution * cpfAlloc.oaRate;
+      const toSaOrRa  = totalCpfContribution * cpfAlloc.saOrRaRate;
+      const toMA      = totalCpfContribution * cpfAlloc.maRate;
 
-      cpfOA += toOA;
-      cpfSA += toSA;
+      cpfOA += toOA_alloc;
       cpfMA += toMA;
 
-      // BHS overflow: if MA exceeds BHS, excess goes to SA/RA
+      if (age > 55) {
+        // Post-55: saOrRaRate portion → RA (up to FRS cap), overflow → OA
+        const frsCap = FRS_2026 * Math.pow(1 + RS_GROWTH_RATE, age - currentAge);
+        const raHeadroom = Math.max(0, frsCap - cpfRA);
+        const toRA = Math.min(toSaOrRa, raHeadroom);
+        cpfRA += toRA;
+        cpfOA += toSaOrRa - toRA;
+      } else {
+        cpfSA += toSaOrRa;
+      }
+
+      // BHS overflow: MA excess → SA (pre-55) or OA (post-55, SA closed)
       const bhs = getBhsAtAge(currentAge, age);
       if (cpfMA > bhs) {
         const overflow = cpfMA - bhs;
-        cpfSA += overflow;
+        if (age <= 55) { cpfSA += overflow; } else { cpfOA += overflow; }
         cpfMA = bhs;
       }
 
-      // Take-home = gross minus employee CPF. Surplus = take-home minus living expenses.
+      // Take-home = gross minus employee CPF
       const takeHomePay = grossSalary - employeeContribution;
       const totalExpenses = income.annualExpenses + recurringPurchaseCosts;
       const surplus = takeHomePay - totalExpenses;
 
       if (surplus > 0) {
-        // Explicit investment contribution; anything left over goes to cash
         const toInvest = Math.min(income.annualInvestmentContribution, surplus);
         investments += toInvest;
         cash += surplus - toInvest;
       } else {
-        // Deficit: draw from cash first, then investments
         const deficit = -surplus;
         if (cash >= deficit) {
           cash -= deficit;
         } else {
-          investments -= (deficit - cash);
+          investments -= deficit - cash;
           cash = 0;
         }
         if (investments < 0) investments = 0;
       }
+
+    // ============================================================
+    // RETIREMENT PHASE
+    // ============================================================
     } else {
-      // === RETIREMENT PHASE: drawdown ===
-      const totalDrawdown = income.retirementExpenses + recurringPurchaseCosts;
-      const totalAvailable = Math.max(0, investments) + Math.max(0, cash) + Math.max(0, cpfOA) + Math.max(0, cpfSA);
+      const grossDrawdown = income.retirementExpenses + recurringPurchaseCosts;
 
-      if (totalAvailable <= 0) {
-        // Already depleted — record the first year it happens
+      // CPF LIFE reduces drawdown after 65
+      const annuityIncome = age >= 65 ? cpfLifeMonthly * 12 : 0;
+      const totalDrawdown = Math.max(0, grossDrawdown - annuityIncome);
+
+      const totalAvailable = Math.max(0, investments) + Math.max(0, cash) + Math.max(0, cpfOA);
+      // Note: cpfRA is locked pre-65 and 0 post-65 (committed to annuity)
+
+      if (totalAvailable <= 0 && totalDrawdown > 0) {
         if (!moneyRunsOutAge) moneyRunsOutAge = age;
-      } else {
-        // Draw: 40% from CPF OA/SA, 60% from investments/cash (capped by what's available)
-        const fromCpf = Math.min(totalDrawdown * 0.4, Math.max(0, cpfOA) + Math.max(0, cpfSA));
-        const fromLiquid = totalDrawdown - fromCpf;
-
-        cpfOA -= fromCpf;
-        if (cpfOA < 0) {
-          cpfSA += cpfOA;
-          cpfOA = 0;
-        }
-        if (cpfSA < 0) cpfSA = 0;
+      } else if (totalDrawdown > 0) {
+        // Draw from OA first (up to 40% of needed), then liquid
+        const fromCpfOA = Math.min(totalDrawdown * 0.4, Math.max(0, cpfOA));
+        const fromLiquid = totalDrawdown - fromCpfOA;
+        cpfOA -= fromCpfOA;
+        if (cpfOA < 0) cpfOA = 0;
 
         if (investments >= fromLiquid) {
           investments -= fromLiquid;
         } else {
-          cash -= (fromLiquid - investments);
+          cash -= fromLiquid - investments;
           investments = 0;
         }
-
         if (cash < 0) {
-          // Liquid assets exhausted this year
           if (!moneyRunsOutAge) moneyRunsOutAge = age;
           cash = 0;
         }
       }
     }
 
-    // Scenario lump cost (CI initial treatment)
-    if (scenarioLumpCost > 0) {
-      deductFromLiquid(scenarioLumpCost);
-    }
+    // Scenario lump cost
+    if (scenarioLumpCost > 0) deductFromLiquid(scenarioLumpCost);
 
     // Regular lump sum purchases
     const { total: lumpSum, labels: purchaseLabels } = getLumpSumAtAge(age);
-    if (lumpSum > 0) {
-      deductFromLiquid(lumpSum);
-    }
+    if (lumpSum > 0) deductFromLiquid(lumpSum);
 
-    // === INTEREST / RETURNS ===
+    // ============================================================
+    // INTEREST / RETURNS
+    // ============================================================
+    if (cash > 0) cash *= (1 + cashRate);
 
-    // Cash savings interest
-    if (cash > 0) {
-      cash *= (1 + cashRate);
-    }
-
-    // Investment returns
     if (investments > 0) {
-      const effectiveRate = isRetired ? investRate * 0.7 : investRate; // more conservative in retirement
+      const effectiveRate = isRetired ? investRate * 0.7 : investRate;
       investments *= (1 + effectiveRate);
     }
 
-    // CPF interest: OA 2.5%, SA/RA 4%, MA 4%
     if (cpfOA > 0) cpfOA *= (1 + CPF_OA_RATE);
     if (cpfSA > 0) cpfSA *= (1 + CPF_SA_RATE);
-    if (cpfMA > 0) cpfMA *= (1 + CPF_SA_RATE); // MA also earns 4%
+    if (cpfMA > 0) cpfMA *= (1 + CPF_SA_RATE);
+    if (cpfRA > 0) cpfRA *= (1 + CPF_SA_RATE); // RA earns 4%
 
-    // CPF extra interest (goes to SA/RA)
-    if (cpfOA > 0 || cpfSA > 0) {
-      const { oaExtra, saExtra } = getCpfExtraInterest(age, cpfOA, cpfSA, cpfMA);
-      cpfSA += oaExtra + saExtra; // all extra interest credited to SA/RA
+    // Extra interest — use RA (not SA) for 55+ combined balance
+    const saOrRaForExtra = age >= 55 ? cpfRA : cpfSA;
+    if (cpfOA > 0 || saOrRaForExtra > 0) {
+      const { oaExtra, saOrRaExtra } = getCpfExtraInterest(age, cpfOA, saOrRaForExtra, cpfMA);
+      cpfOA; // oaExtra on OA goes to SA/RA per CPF rules
+      if (age >= 55) { cpfRA += oaExtra + saOrRaExtra; }
+      else           { cpfSA += oaExtra + saOrRaExtra; }
     }
 
-    // BHS check again after interest
+    // BHS overflow post-interest (pre-55: → SA; post-55: → OA)
     if (!isRetired) {
       const bhs = getBhsAtAge(currentAge, age);
       if (cpfMA > bhs) {
-        cpfSA += cpfMA - bhs;
+        const overflow = cpfMA - bhs;
+        if (age < 55) { cpfSA += overflow; } else { cpfOA += overflow; }
         cpfMA = bhs;
       }
     }
 
-    // Insurance cash value growth (only if not paid out)
+    // Insurance cash value growth
     if (insuranceValue > 0) {
       insuranceValue *= (1 + (policies.length > 0
         ? policies.reduce((s, p) => s + p.annualGrowthRate, 0) / policies.length / 100
         : 0));
     }
 
-    const cpfOaSa = Math.max(0, cpfOA) + Math.max(0, cpfSA);
-
     yearlyData.push({
       age,
-      investments: Math.max(0, Math.round(investments)),
-      cash: Math.max(0, Math.round(cash)),
-      cpfOaSa: Math.round(cpfOaSa),
-      insuranceValue: Math.round(Math.max(0, insuranceValue)),
-      totalNetWorth: Math.max(0, Math.round(investments + cash + cpfOaSa + insuranceValue)),
+      investments:    Math.max(0, Math.round(investments)),
+      cash:           Math.max(0, Math.round(cash)),
+      cpfOA:          Math.max(0, Math.round(cpfOA)),
+      cpfSA:          Math.max(0, Math.round(cpfSA)),
+      cpfRA:          Math.max(0, Math.round(cpfRA)),
+      cpfMA:          Math.max(0, Math.round(cpfMA)),
+      insuranceValue: Math.max(0, Math.round(insuranceValue)),
+      totalNetWorth:  Math.max(0, Math.round(investments + cash + cpfOA + cpfSA + cpfRA + cpfMA + insuranceValue)),
       purchaseLabels,
     });
   }
@@ -412,63 +452,41 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     ? yearlyData[retirementIdx].totalNetWorth
     : 0;
 
-  // === FIRE NUMBER: Safe Withdrawal Rate method ===
-  // Step 1: Gross annual expenses in retirement
+  // ============================================================
+  // FIRE NUMBER (SWR method with CPF LIFE offset)
+  // ============================================================
   const grossRetirementExpenses = income.retirementExpenses;
-
-  // Step 2: CPF LIFE provides a guaranteed monthly annuity from ~65
-  // This reduces how much the portfolio needs to cover
-  const cpfLifeAnnual = income.cpfLifeMonthly * 12;
-
-  // Step 3: Net drawdown the investment portfolio must cover
-  // CPF LIFE only kicks in at 65, so if retiring before 65, full expenses
-  // need to be covered by portfolio until then
+  const cpfLifeAnnual = cpfLifeMonthly * 12;
   const yearsBeforeCpfLife = Math.max(0, 65 - retirementAge);
-
-  // We need the portfolio to sustain:
-  // - Full expenses from retirement to 65
-  // - (expenses - CPF LIFE) from 65 to life expectancy
-  // Using SWR: portfolio size = net annual drawdown / withdrawalRate
-  // We use the larger "worst case" drawdown (before CPF LIFE) as the SWR target
-  // then add PV of CPF LIFE gap for pre-65 years as a lump sum addition
   const withdrawalRate = income.withdrawalRate / 100;
   const netDrawdownNeeded = Math.max(0, grossRetirementExpenses - cpfLifeAnnual);
-
-  // Core portfolio needed to sustain post-65 drawdown indefinitely (SWR)
   const portfolioForPostCpfLife = netDrawdownNeeded / withdrawalRate;
-
-  // Extra needed to bridge pre-65 gap (if retiring early, portfolio covers full expenses)
   const preCpfLifeBridge = yearsBeforeCpfLife > 0
     ? (grossRetirementExpenses - netDrawdownNeeded) * yearsBeforeCpfLife
     : 0;
-
-  // Inflation buffer: 10% on top to account for rising costs
   const inflationBuffer = 0.10;
   const fireNumber = Math.round((portfolioForPostCpfLife + preCpfLifeBridge) * (1 + inflationBuffer));
 
-  const fireNumberBreakdown = {
-    grossRetirementExpenses,
-    cpfLifeAnnual,
-    netDrawdownNeeded,
-    withdrawalRate: income.withdrawalRate,
-    inflationBuffer: inflationBuffer * 100,
-  };
-
   let yearsToBuild = retirementAge - currentAge;
   for (let i = 0; i < yearlyData.length; i++) {
-    if (yearlyData[i].totalNetWorth >= fireNumber) {
-      yearsToBuild = i;
-      break;
-    }
+    if (yearlyData[i].totalNetWorth >= fireNumber) { yearsToBuild = i; break; }
   }
 
   return {
     yearlyData,
     wealthAtRetirement,
     fireNumber,
-    fireNumberBreakdown,
+    fireNumberBreakdown: {
+      grossRetirementExpenses,
+      cpfLifeAnnual,
+      netDrawdownNeeded,
+      withdrawalRate: income.withdrawalRate,
+      inflationBuffer: inflationBuffer * 100,
+    },
     yearsToBuild,
     onTrack: wealthAtRetirement >= fireNumber,
     moneyRunsOutAge,
+    cpfLifeMonthly,
+    raAtAge65,
   };
 }

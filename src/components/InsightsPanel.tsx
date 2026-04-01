@@ -96,7 +96,7 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
   }
 
   // 4. CPF dependency check
-  const totalCpf = assets.cpfOA + assets.cpfSA + assets.cpfMA;
+  const totalCpf = assets.cpfOA + assets.cpfSA + assets.cpfMA + (assets.cpfRA ?? 0);
   const cpfRatio = totalCpf / (assets.cashSavings + assets.investments + totalCpf + 1);
   if (cpfRatio > 0.6) {
     insights.push({

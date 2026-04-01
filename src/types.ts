@@ -4,14 +4,16 @@ export interface PersonalDetails {
   lifeExpectancy: number;
 }
 
+export type CpfLifeOption = 'BRS' | 'FRS' | 'ERS';
+
 export interface IncomeExpenses {
   annualIncome: number;
   annualExpenses: number;
-  annualInvestmentContribution: number; // explicit amount invested per year; surplus goes to cash
+  annualInvestmentContribution: number;
   salaryGrowthRate: number;
   retirementExpenses: number;
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
-  cpfLifeMonthly: number;   // Estimated CPF LIFE monthly payout at retirement
+  cpfLifeOption: CpfLifeOption;
 }
 
 export interface Assets {
@@ -20,8 +22,9 @@ export interface Assets {
   cpfOA: number;
   cpfSA: number;
   cpfMA: number;
-  cashReturnRate: number;        // default 1%
-  investmentReturnRate: number;  // default 7%
+  cpfRA: number;             // Retirement Account — 0 for clients under 55
+  cashReturnRate: number;
+  investmentReturnRate: number;
 }
 
 export interface InsurancePolicy {
@@ -39,7 +42,6 @@ export type ScenarioType = 'none' | 'critical-illness' | 'tpd' | 'death';
 export interface Scenario {
   type: ScenarioType;
   ageAtEvent: number;
-  // CI-specific
   ciType?: 'cancer' | 'heart' | 'stroke' | 'kidney';
 }
 
@@ -65,7 +67,10 @@ export interface YearData {
   age: number;
   investments: number;
   cash: number;
-  cpfOaSa: number;
+  cpfOA: number;
+  cpfSA: number;    // 0 from age 55 onwards (SA permanently closed)
+  cpfRA: number;    // formed at 55, locked until 65, 0 after 65 (committed to CPF LIFE)
+  cpfMA: number;
   insuranceValue: number;
   totalNetWorth: number;
   purchaseLabels: string[];
@@ -84,5 +89,7 @@ export interface FireResults {
   };
   yearsToBuild: number;
   onTrack: boolean;
-  moneyRunsOutAge?: number; // age at which all liquid assets hit zero during retirement
+  moneyRunsOutAge?: number;
+  cpfLifeMonthly: number;   // projected monthly CPF LIFE payout (computed from RA at 65)
+  raAtAge65: number;        // RA balance when CPF LIFE starts
 }

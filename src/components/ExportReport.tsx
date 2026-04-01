@@ -26,7 +26,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
     return `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;${age === personal.retirementAge ? 'font-weight:700;color:#2563eb;' : ''}">${age}${age === personal.retirementAge ? ' (Retire)' : ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatSGD(d.investments)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatSGD(d.cash + d.cpfOaSa)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatSGD(d.cash + d.cpfOA + d.cpfSA + d.cpfRA + d.cpfMA)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatSGD(d.insuranceValue)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${formatSGD(d.totalNetWorth)}</td>
     </tr>`;
