@@ -227,7 +227,6 @@ export default function InputPanel({ inputs, onChange }: Props) {
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['BRS', 'FRS', 'ERS'] as CpfLifeOption[]).map(opt => {
-                const info = CPF_LIFE_BASE_PAYOUTS[opt];
                 const projectedPayout = getProjectedMonthlyPayout(opt, inputs.personal.currentAge);
                 const projectedRA = Math.round(getProjectedRetirementSum(opt, inputs.personal.currentAge));
                 const isActive = inputs.income.cpfLifeOption === opt;
