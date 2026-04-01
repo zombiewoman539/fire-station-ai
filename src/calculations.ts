@@ -411,7 +411,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     const saOrRaForExtra = age >= 55 ? cpfRA : cpfSA;
     if (cpfOA > 0 || saOrRaForExtra > 0) {
       const { oaExtra, saOrRaExtra } = getCpfExtraInterest(age, cpfOA, saOrRaForExtra, cpfMA);
-      cpfOA; // oaExtra on OA goes to SA/RA per CPF rules
+      // Extra interest on OA portion is credited to SA/RA per CPF rules (not retained in OA)
       if (age >= 55) { cpfRA += oaExtra + saOrRaExtra; }
       else           { cpfSA += oaExtra + saOrRaExtra; }
     }
