@@ -7,6 +7,7 @@ export interface PersonalDetails {
 export interface IncomeExpenses {
   annualIncome: number;
   annualExpenses: number;
+  annualInvestmentContribution: number; // explicit amount invested per year; surplus goes to cash
   salaryGrowthRate: number;
   retirementExpenses: number;
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%

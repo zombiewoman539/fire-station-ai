@@ -188,8 +188,15 @@ export default function InputPanel({ inputs, onChange }: Props) {
           label="Annual Living Expenses"
           value={inputs.income.annualExpenses}
           prefix="S$"
-          tip="Your total yearly spend — housing, food, transport, lifestyle. Surplus (take-home minus expenses) is split: first to a 6-month emergency cash buffer, then the rest goes to investments."
+          tip="Your total yearly spend — housing, food, transport, lifestyle. Surplus after expenses is split between investments (your contribution below) and cash savings."
           onChange={v => updateIncome('annualExpenses', v)}
+        />
+        <NumberField
+          label="Annual Investment Contribution"
+          value={inputs.income.annualInvestmentContribution}
+          prefix="S$"
+          tip="How much you actively invest each year from your take-home pay. Any remaining surplus goes to cash savings. Set to 0 if the client doesn't invest."
+          onChange={v => updateIncome('annualInvestmentContribution', v)}
         />
         <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%"
           tip="Expected annual salary increase. Singapore median is ~3–4%. Your gross salary compounds at this rate each year, increasing your CPF contributions and investable surplus over time."
