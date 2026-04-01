@@ -25,6 +25,7 @@ export const defaultInputs: FireInputs = {
     annualInvestmentContribution: 12000,
     salaryGrowthRate: 3,
     retirementExpenses: 48000,
+    inflationRate: 2.5,
     withdrawalRate: 3.5,
     cpfLifeOption: 'FRS' as const,
   },

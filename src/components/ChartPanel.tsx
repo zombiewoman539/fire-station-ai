@@ -476,7 +476,13 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
                   <button onClick={() => setShowFireBreakdown(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <FireRow label="Retirement expenses / yr" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
+                  <FireRow label="Retirement expenses today" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
+                  <FireRow
+                    label={`+ ${fireNumberBreakdown.inflationRate}% inflation × ${fireNumberBreakdown.yearsToRetirement} yrs`}
+                    value={formatSGD(fireNumberBreakdown.inflatedRetirementExpenses)}
+                    color="#fbbf24"
+                    bold
+                  />
                   <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
                   <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
                   <div style={{ borderTop: '1px solid #334155', margin: '2px 0' }} />

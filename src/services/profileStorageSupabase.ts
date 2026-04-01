@@ -15,6 +15,7 @@ function migrateInputs(inputs: any): FireInputs {
       annualInvestmentContribution:  inc.annualInvestmentContribution ?? 12000,
       salaryGrowthRate:              inc.salaryGrowthRate ?? 3,
       retirementExpenses:            inc.retirementExpenses ?? 48000,
+      inflationRate:                 inc.inflationRate ?? 2.5,
       withdrawalRate:                inc.withdrawalRate ?? 3.5,
       cpfLifeOption:                 inc.cpfLifeOption ?? 'FRS',
       // cpfLifeMonthly from old profiles is dropped — now computed from RA

@@ -12,6 +12,7 @@ export interface IncomeExpenses {
   annualInvestmentContribution: number;
   salaryGrowthRate: number;
   retirementExpenses: number;
+  inflationRate: number;     // Annual inflation rate (%), default 2.5 (Singapore avg)
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
   cpfLifeOption: CpfLifeOption;
 }
@@ -82,6 +83,9 @@ export interface FireResults {
   fireNumber: number;
   fireNumberBreakdown: {
     grossRetirementExpenses: number;
+    inflatedRetirementExpenses: number;
+    inflationRate: number;
+    yearsToRetirement: number;
     cpfLifeAnnual: number;
     netDrawdownNeeded: number;
     withdrawalRate: number;

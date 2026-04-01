@@ -213,6 +213,13 @@ export default function InputPanel({ inputs, onChange }: Props) {
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FIRE Target Settings</div>
           <SliderField
+            label="Inflation Rate"
+            value={inputs.income.inflationRate ?? 2.5}
+            min={0} max={6} step={0.5} unit="%"
+            tip="Annual inflation erodes purchasing power over time. Singapore's MAS core inflation target is ~2%. Historical average CPI is 2–3%. A higher rate increases your FIRE Number by inflating what retirement expenses will cost in future dollars."
+            onChange={v => updateIncome('inflationRate', v)}
+          />
+          <SliderField
             label="Safe Withdrawal Rate"
             value={inputs.income.withdrawalRate}
             min={2} max={5} step={0.5} unit="%"
