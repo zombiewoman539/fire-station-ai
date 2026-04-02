@@ -49,7 +49,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 }
 
 export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults }: Props) {
-  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge, cpfLifeMonthly, raAtAge65 } = results;
+  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, moneyRunsOutAge, cpfLifeMonthly, raAtAge65 } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
   const [hideCpf, setHideCpf] = React.useState(true);
