@@ -52,7 +52,8 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
   const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge, cpfLifeMonthly, raAtAge65 } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
-  const [hideCpf, setHideCpf] = React.useState(false);
+  const [hideCpf, setHideCpf] = React.useState(true);
+  const [hideCash, setHideCash] = React.useState(true);
   const [hideInsurance, setHideInsurance] = React.useState(false);
   const fireCardRef = React.useRef<HTMLDivElement>(null);
 
@@ -99,11 +100,25 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
   const labels = yearlyData.map(d => String(d.age));
 
   const visibleTotal = (d: { investments: number; cash: number; cpfOA: number; cpfSA: number; cpfRA: number; cpfMA: number; insuranceValue: number }) => {
-    let t = d.investments + d.cash;
+    let t = d.investments;
+    if (!hideCash) t += d.cash;
     if (!hideCpf) t += d.cpfOA + d.cpfSA + d.cpfRA + d.cpfMA;
     if (!hideInsurance) t += d.insuranceValue;
     return t;
   };
+
+  // When CPF is hidden, recalculate FIRE number without CPF LIFE offset (full expenses / SWR)
+  const adjustedFireNumber = hideCpf
+    ? Math.round(
+        (fireNumberBreakdown.inflatedRetirementExpenses / (fireNumberBreakdown.withdrawalRate / 100))
+        * (1 + fireNumberBreakdown.inflationBuffer / 100)
+      )
+    : fireNumber;
+
+  // Visible wealth at retirement and on-track status respect the hide toggles
+  const retirementData = yearlyData.find(d => d.age === retirementAge);
+  const displayWealthAtRetirement = retirementData ? visibleTotal(retirementData) : wealthAtRetirement;
+  const displayOnTrack = displayWealthAtRetirement >= adjustedFireNumber;
 
   // When a scenario is active, bars show scenario data so the visual impact is clear.
   // The baseline net worth LINE stays fixed so the gap is obvious.
@@ -147,7 +162,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {
         type: 'bar' as const,
         label: 'Cash Savings',
-        data: activeYearlyData.map(d => d.cash),
+        data: hideCash ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cash),
         backgroundColor: 'rgba(251, 191, 36, 0.75)',   // amber — warm, clearly distinct
         borderRadius: 2,
         stack: 'stack',
@@ -380,14 +395,14 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
           } : {}),
           fireLine: {
             type: 'line' as const,
-            yMin: fireNumber,
-            yMax: fireNumber,
+            yMin: adjustedFireNumber,
+            yMax: adjustedFireNumber,
             borderColor: 'rgba(239, 68, 68, 0.4)',
             borderWidth: 1.5,
             borderDash: [4, 4],
             label: {
               display: true,
-              content: `FIRE Target: ${formatSGD(fireNumber)}`,
+              content: hideCpf ? `FIRE Target (no CPF): ${formatSGD(adjustedFireNumber)}` : `FIRE Target: ${formatSGD(adjustedFireNumber)}`,
               position: 'end' as const,
               backgroundColor: 'rgba(239, 68, 68, 0.75)',
               color: '#fff',
@@ -441,9 +456,9 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       {/* Top row: metrics + toolbar */}
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0, overflow: 'visible' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, flex: 1, overflow: 'visible' }}>
-          <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
-          <MetricCard label="CPF LIFE / month" value={cpfLifeMonthly > 0 ? formatSGD(cpfLifeMonthly) : '—'} color="#34d399" />
-          <MetricCard label="RA at 65" value={raAtAge65 > 0 ? formatSGD(raAtAge65) : '—'} color="#a78bfa" />
+          <MetricCard label={hideCpf || hideCash ? 'Visible Wealth at Retire' : 'Wealth at Retirement'} value={formatSGD(displayWealthAtRetirement)} color="#34d399" />
+          <MetricCard label="CPF LIFE / month" value={!hideCpf && cpfLifeMonthly > 0 ? formatSGD(cpfLifeMonthly) : '—'} color="#34d399" />
+          <MetricCard label="RA at 65" value={!hideCpf && raAtAge65 > 0 ? formatSGD(raAtAge65) : '—'} color="#a78bfa" />
           {/* FIRE Number card with breakdown popup */}
           <div
             ref={fireCardRef}
@@ -455,8 +470,10 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
             }}
             onClick={handleFireCardClick}
           >
-            <div className="text-gray-500 uppercase tracking-wider font-medium" style={{ fontSize: 9, marginBottom: 1, lineHeight: 1.2 }}>FIRE Number</div>
-            <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(fireNumber)}</div>
+            <div className="text-gray-500 uppercase tracking-wider font-medium" style={{ fontSize: 9, marginBottom: 1, lineHeight: 1.2 }}>
+              {hideCpf ? 'FIRE Number (no CPF)' : 'FIRE Number'}
+            </div>
+            <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(adjustedFireNumber)}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
               <span style={{ fontSize: 9, color: '#4b5563' }}>{fireNumberBreakdown.withdrawalRate}% SWR</span>
               <span style={{ fontSize: 9, color: '#3b82f6' }}>ⓘ click</span>
@@ -483,16 +500,19 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
                     color="#fbbf24"
                     bold
                   />
-                  <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
-                  <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
+                  {hideCpf
+                    ? <FireRow label="CPF LIFE excluded (CPF hidden)" value="—" color="#6b7280" />
+                    : <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
+                  }
+                  <FireRow label="= Net drawdown needed / yr" value={formatSGD(hideCpf ? fireNumberBreakdown.inflatedRetirementExpenses : fireNumberBreakdown.netDrawdownNeeded)} bold />
                   <div style={{ borderTop: '1px solid #334155', margin: '2px 0' }} />
                   <FireRow
                     label={`÷ ${fireNumberBreakdown.withdrawalRate}% Safe Withdrawal Rate`}
-                    value={formatSGD(Math.round(fireNumberBreakdown.netDrawdownNeeded / (fireNumberBreakdown.withdrawalRate / 100)))}
+                    value={formatSGD(Math.round((hideCpf ? fireNumberBreakdown.inflatedRetirementExpenses : fireNumberBreakdown.netDrawdownNeeded) / (fireNumberBreakdown.withdrawalRate / 100)))}
                   />
                   <FireRow
                     label={`+ ${fireNumberBreakdown.inflationBuffer}% inflation buffer`}
-                    value={formatSGD(fireNumber)}
+                    value={formatSGD(adjustedFireNumber)}
                     color="#60a5fa"
                     bold
                   />
@@ -509,21 +529,21 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
             className="rounded-lg flex items-center gap-2"
             style={{
               padding: '8px 12px',
-              background: onTrack ? 'rgba(6, 78, 59, 0.4)' : 'rgba(127, 29, 29, 0.4)',
-              border: `1px solid ${onTrack ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              background: displayOnTrack ? 'rgba(6, 78, 59, 0.4)' : 'rgba(127, 29, 29, 0.4)',
+              border: `1px solid ${displayOnTrack ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
             }}
           >
-            <span style={{ fontSize: 14, flexShrink: 0 }}>{onTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>{displayOnTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
             <div>
-              <div className="font-bold" style={{ color: onTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
-                {onTrack ? 'On Track!' : moneyRunsOutAge ? `Depleted at ${moneyRunsOutAge}` : 'Shortfall'}
+              <div className="font-bold" style={{ color: displayOnTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
+                {displayOnTrack ? 'On Track!' : moneyRunsOutAge ? `Depleted at ${moneyRunsOutAge}` : 'Shortfall'}
               </div>
               <div className="text-gray-400" style={{ fontSize: 10, lineHeight: 1.2 }}>
-                {onTrack
-                  ? `+${formatSGD(wealthAtRetirement - fireNumber)}`
+                {displayOnTrack
+                  ? `+${formatSGD(displayWealthAtRetirement - adjustedFireNumber)}`
                   : moneyRunsOutAge
                     ? `${moneyRunsOutAge - retirementAge} yrs short of life expectancy`
-                    : `Need ${formatSGD(fireNumber - wealthAtRetirement)}`}
+                    : `Need ${formatSGD(adjustedFireNumber - displayWealthAtRetirement)}`}
               </div>
             </div>
           </div>
@@ -560,6 +580,22 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
           </span>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          <button
+            onClick={() => setHideCash(v => !v)}
+            style={{
+              background: hideCash ? 'rgba(251, 191, 36, 0.15)' : 'transparent',
+              border: `1px solid ${hideCash ? 'rgba(251, 191, 36, 0.4)' : '#374151'}`,
+              borderRadius: 6,
+              color: hideCash ? '#fcd34d' : '#6b7280',
+              padding: '3px 8px',
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {hideCash ? '+ Cash' : '− Cash'}
+          </button>
           <button
             onClick={() => setHideCpf(v => !v)}
             style={{
