@@ -126,18 +126,14 @@ function getCpfAllocationRates(age: number) {
 const CPF_OA_RATE = 0.025;
 const CPF_SA_RATE = 0.04;
 
-// BHS = $79,000 for 2026. Grows at ~2.5%/yr (conservative long-term; ensures cap is effective
-// since MA earns 4% interest — if BHS grew faster than 4%, the cap would never re-trigger).
+// BHS = S$79,000 (2026 value per cpf.gov.sg Section 6).
+// No projected growth rate — CPF Board sets BHS annually but no official future schedule exists.
+// MA is capped at S$79,000 and stays flat once it reaches the cap (4% interest overflows to OA).
+// After age 65 the member's BHS is fixed for life at that year's level (also S$79,000 here).
 const BHS_2026 = 79000;
-const BHS_GROWTH_RATE = 0.025;
 
-function getBhsAtAge(currentAge: number, targetAge: number): number {
-  if (targetAge >= 65) {
-    const yearsTo65 = 65 - currentAge;
-    if (yearsTo65 <= 0) return BHS_2026;
-    return BHS_2026 * Math.pow(1 + BHS_GROWTH_RATE, yearsTo65);
-  }
-  return BHS_2026 * Math.pow(1 + BHS_GROWTH_RATE, targetAge - currentAge);
+function getBhsAtAge(_currentAge: number, _targetAge: number): number {
+  return BHS_2026; // Fixed at current year's cap — no projection
 }
 
 // Extra interest on CPF balances.
