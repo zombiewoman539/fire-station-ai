@@ -241,23 +241,30 @@ export function calculate(inputs: FireInputs, scenario?: Scenario, options?: { i
     // ============================================================
     if (age === 55 && !sa55Closed) {
       sa55Closed = true;
-      const raTarget = getProjectedRetirementSum(income.cpfLifeOption, currentAge);
 
-      // Step A: SA → RA (up to raTarget)
-      const saToRa = Math.min(cpfSA, raTarget);
-      cpfRA += saToRa;
-      cpfSA -= saToRa;
+      if (options?.ignoreCpfLife) {
+        // No CPF LIFE mode: skip RA lock entirely — SA flows directly to OA
+        cpfOA += cpfSA;
+        cpfSA = 0;
+      } else {
+        const raTarget = getProjectedRetirementSum(income.cpfLifeOption, currentAge);
 
-      // Step B: Top up RA from OA if still below target
-      const raShortfall = raTarget - cpfRA;
-      if (raShortfall > 0 && cpfOA > 0) {
-        const oaToRa = Math.min(cpfOA, raShortfall);
-        cpfRA += oaToRa;
-        cpfOA -= oaToRa;
+        // Step A: SA → RA (up to raTarget)
+        const saToRa = Math.min(cpfSA, raTarget);
+        cpfRA += saToRa;
+        cpfSA -= saToRa;
+
+        // Step B: Top up RA from OA if still below target
+        const raShortfall = raTarget - cpfRA;
+        if (raShortfall > 0 && cpfOA > 0) {
+          const oaToRa = Math.min(cpfOA, raShortfall);
+          cpfRA += oaToRa;
+          cpfOA -= oaToRa;
+        }
+
+        // Step C: Any remaining SA (above raTarget) overflows to OA, SA closes permanently
+        if (cpfSA > 0) { cpfOA += cpfSA; cpfSA = 0; }
       }
-
-      // Step C: Any remaining SA (above raTarget) overflows to OA, SA closes permanently
-      if (cpfSA > 0) { cpfOA += cpfSA; cpfSA = 0; }
     }
 
     // ============================================================
@@ -326,8 +333,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario, options?: { i
       cpfOA += toOA_alloc;
       cpfMA += toMA;
 
-      if (age >= 65) {
-        // RA committed to CPF LIFE at 65 — all SA/RA portion goes to OA
+      if (age >= 65 || (age >= 55 && options?.ignoreCpfLife)) {
+        // Post-65 or no-CPF-LIFE mode: SA/RA portion goes straight to OA
         cpfOA += toSaOrRa;
       } else if (age >= 55) {
         // SA closed at 55 — saOrRaRate portion → RA (up to projected FRS cap), overflow → OA
