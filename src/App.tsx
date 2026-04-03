@@ -79,6 +79,7 @@ function Dashboard() {
 
   const inputs = activeProfile?.inputs || defaultInputs;
   const results = useMemo(() => calculate(inputs), [inputs]);
+  const noCpfResults = useMemo(() => calculate(inputs, undefined, { ignoreCpfLife: true }), [inputs]);
 
   // Scenario results (recalculated when scenario or inputs change)
   const scenarioResults = useMemo(() => {
@@ -275,6 +276,7 @@ function Dashboard() {
         <div style={{ flex: 1, minHeight: 0 }}>
           <ChartPanel
             results={results}
+            noCpfResults={noCpfResults}
             retirementAge={inputs.personal.retirementAge}
             toolbar={chartToolbar}
             scenarioResults={scenarioResults}

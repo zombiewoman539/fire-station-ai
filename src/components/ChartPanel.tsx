@@ -25,6 +25,7 @@ ChartJS.register(
 
 interface Props {
   results: FireResults;
+  noCpfResults: FireResults;
   retirementAge: number;
   toolbar?: React.ReactNode;
   scenarioResults?: FireResults | null;
@@ -48,8 +49,8 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults }: Props) {
-  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, moneyRunsOutAge, cpfLifeMonthly, raAtAge65 } = results;
+export default function ChartPanel({ results, noCpfResults, retirementAge, toolbar, scenarioResults }: Props) {
+  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, cpfLifeMonthly, raAtAge65 } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
   const [hideCpf, setHideCpf] = React.useState(true);
@@ -115,14 +116,18 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
       )
     : fireNumber;
 
+  // When CPF is hidden, use the noCpfLife simulation for accurate depletion tracking
+  const activeResults = hideCpf ? noCpfResults : results;
+  const activeMoneyRunsOutAge = hideCpf ? noCpfResults.moneyRunsOutAge : results.moneyRunsOutAge;
+
   // Visible wealth at retirement and on-track status respect the hide toggles
-  const retirementData = yearlyData.find(d => d.age === retirementAge);
+  const retirementData = activeResults.yearlyData.find(d => d.age === retirementAge);
   const displayWealthAtRetirement = retirementData ? visibleTotal(retirementData) : wealthAtRetirement;
   const displayOnTrack = displayWealthAtRetirement >= adjustedFireNumber;
 
   // When a scenario is active, bars show scenario data so the visual impact is clear.
   // The baseline net worth LINE stays fixed so the gap is obvious.
-  const activeYearlyData = scenarioResults ? scenarioResults.yearlyData : yearlyData;
+  const activeYearlyData = scenarioResults ? scenarioResults.yearlyData : activeResults.yearlyData;
 
   const purchaseAnnotations: Record<string, any> = {};
   yearlyData.forEach((d, i) => {
@@ -412,17 +417,17 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
             },
           },
           // Funds depletion marker
-          ...(moneyRunsOutAge ? {
+          ...(activeMoneyRunsOutAge ? {
             depletionLine: {
               type: 'line' as const,
-              xMin: String(moneyRunsOutAge),
-              xMax: String(moneyRunsOutAge),
+              xMin: String(activeMoneyRunsOutAge),
+              xMax: String(activeMoneyRunsOutAge),
               borderColor: 'rgba(239, 68, 68, 0.9)',
               borderWidth: 2,
               borderDash: [4, 3],
               label: {
                 display: true,
-                content: `Funds depleted (age ${moneyRunsOutAge})`,
+                content: `Funds depleted (age ${activeMoneyRunsOutAge})`,
                 position: 'end' as const,
                 backgroundColor: 'rgba(185, 28, 28, 0.92)',
                 color: '#fff',
@@ -536,13 +541,13 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
             <span style={{ fontSize: 14, flexShrink: 0 }}>{displayOnTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
             <div>
               <div className="font-bold" style={{ color: displayOnTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
-                {displayOnTrack ? 'On Track!' : moneyRunsOutAge ? `Depleted at ${moneyRunsOutAge}` : 'Shortfall'}
+                {displayOnTrack ? 'On Track!' : activeMoneyRunsOutAge ? `Depleted at ${activeMoneyRunsOutAge}` : 'Shortfall'}
               </div>
               <div className="text-gray-400" style={{ fontSize: 10, lineHeight: 1.2 }}>
                 {displayOnTrack
                   ? `+${formatSGD(displayWealthAtRetirement - adjustedFireNumber)}`
-                  : moneyRunsOutAge
-                    ? `${moneyRunsOutAge - retirementAge} yrs short of life expectancy`
+                  : activeMoneyRunsOutAge
+                    ? `${activeMoneyRunsOutAge - retirementAge} yrs short of life expectancy`
                     : `Need ${formatSGD(adjustedFireNumber - displayWealthAtRetirement)}`}
               </div>
             </div>

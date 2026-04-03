@@ -159,7 +159,7 @@ function getCpfExtraInterest(age: number, oa: number, saOrRa: number, ma: number
 // Main Calculation
 // ========================================
 
-export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults {
+export function calculate(inputs: FireInputs, scenario?: Scenario, options?: { ignoreCpfLife?: boolean }): FireResults {
   const { personal, income, assets, policies, purchases } = inputs;
   const { currentAge, retirementAge, lifeExpectancy } = personal;
   const years = lifeExpectancy - currentAge;
@@ -265,7 +265,9 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     // ============================================================
     if (age === 65 && raAtAge65 === 0 && cpfRA > 0) {
       raAtAge65 = cpfRA;
-      cpfLifeMonthly = Math.round(raAtAge65 * LIFE_PAYOUT_RATES[income.cpfLifeOption]);
+      if (!options?.ignoreCpfLife) {
+        cpfLifeMonthly = Math.round(raAtAge65 * LIFE_PAYOUT_RATES[income.cpfLifeOption]);
+      }
       cpfRA = 0; // RA committed to CPF LIFE annuity — no longer on balance sheet
     }
 
