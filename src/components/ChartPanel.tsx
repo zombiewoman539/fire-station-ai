@@ -221,7 +221,7 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
       {
         type: 'line' as const,
         label: scenarioResults ? 'Baseline (No Event)' : 'Total Net Worth',
-        data: yearlyData.map(d => visibleTotal(d)),
+        data: activeResults.yearlyData.map(d => visibleTotal(d)),
         borderColor: '#f472b6',
         backgroundColor: 'rgba(244, 114, 182, 0.08)',
         borderWidth: scenarioResults ? 1.5 : 2.5,
