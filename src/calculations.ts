@@ -85,15 +85,31 @@ export function getProjectedMonthlyPayout(option: CpfLifeOption, currentAge: num
 }
 
 // ========================================
-// CPF Rates from 1 January 2026
+// CPF Rates (per cpf.gov.sg Jan 2026 + Budget 2026 announcements)
 // ========================================
 
-function getCpfContributionRates(age: number) {
-  if (age <= 55) return { employerRate: 0.17, employeeRate: 0.20, totalRate: 0.37 };
-  if (age <= 60) return { employerRate: 0.16, employeeRate: 0.18, totalRate: 0.34 };
-  if (age <= 65) return { employerRate: 0.125, employeeRate: 0.125, totalRate: 0.25 };
-  if (age <= 70) return { employerRate: 0.09, employeeRate: 0.075, totalRate: 0.165 };
-  return { employerRate: 0.075, employeeRate: 0.05, totalRate: 0.125 };
+// OW monthly ceiling: S$8,000 (from Jan 2026, final step of phased increase).
+// Annual OW ceiling = S$8,000 × 12 = S$96,000. Annual salary ceiling = S$102,000 (incl. AW).
+// CPF Annual Limit = S$37,740 (not binding for pure OW income at any age group).
+export const CURRENT_YEAR = 2026;
+
+// Budget 2026 announced further rate hikes effective 1 Jan 2027 (Section 7b):
+//   Age 55–60: +1.5pp total (employer +0.5, employee +1.0) → 35.5% total
+//   Age 60–65: +1.0pp total (employer +0.5, employee +0.5) → 26% total
+function getCpfContributionRates(age: number, simulationYear: number) {
+  if (simulationYear >= 2027) {
+    if (age <= 55) return { employerRate: 0.170, employeeRate: 0.200, totalRate: 0.370 };
+    if (age <= 60) return { employerRate: 0.165, employeeRate: 0.190, totalRate: 0.355 }; // +1.5pp vs 2026
+    if (age <= 65) return { employerRate: 0.130, employeeRate: 0.135, totalRate: 0.265 }; // +1.0pp vs 2026
+    if (age <= 70) return { employerRate: 0.090, employeeRate: 0.075, totalRate: 0.165 };
+    return { employerRate: 0.075, employeeRate: 0.050, totalRate: 0.125 };
+  }
+  // 2026 rates
+  if (age <= 55) return { employerRate: 0.170, employeeRate: 0.200, totalRate: 0.370 };
+  if (age <= 60) return { employerRate: 0.160, employeeRate: 0.180, totalRate: 0.340 };
+  if (age <= 65) return { employerRate: 0.125, employeeRate: 0.125, totalRate: 0.250 };
+  if (age <= 70) return { employerRate: 0.090, employeeRate: 0.075, totalRate: 0.165 };
+  return { employerRate: 0.075, employeeRate: 0.050, totalRate: 0.125 };
 }
 
 function getCpfAllocationRates(age: number) {
@@ -316,9 +332,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario, options?: { i
     // ACCUMULATION PHASE
     // ============================================================
     if (!isRetired) {
-      const CPF_OW_CEILING = 96000;
+      const CPF_OW_CEILING = 96000; // S$8,000/month × 12 (Jan 2026 ceiling)
+      const simulationYear = CURRENT_YEAR + i;
       const grossSalary = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
-      const cpfRates = getCpfContributionRates(age);
+      const cpfRates = getCpfContributionRates(age, simulationYear);
       const cpfAlloc = getCpfAllocationRates(age);
 
       const cpfLiableWage = Math.min(grossSalary, CPF_OW_CEILING);
