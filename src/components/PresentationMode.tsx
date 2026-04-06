@@ -1,6 +1,6 @@
 import React from 'react';
 import { FireInputs, FireResults } from '../types';
-import { formatSGD, calculate } from '../calculations';
+import { formatSGD } from '../calculations';
 import ChartPanel from './ChartPanel';
 
 interface Props {
@@ -13,7 +13,6 @@ interface Props {
 export default function PresentationMode({ inputs, results, clientName, onExit }: Props) {
   const { wealthAtRetirement, fireNumber, yearsToBuild, onTrack } = results;
   const { personal, income } = inputs;
-  const noCpfResults = React.useMemo(() => calculate(inputs, undefined, { ignoreCpfLife: true }), [inputs]);
   const yearsInRetirement = personal.lifeExpectancy - personal.retirementAge;
   const gap = fireNumber - wealthAtRetirement;
   const savingsRate = income.annualIncome > 0
@@ -153,7 +152,7 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
 
         {/* Right: Chart */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <ChartPanel results={results} noCpfResults={noCpfResults} retirementAge={personal.retirementAge} />
+          <ChartPanel results={results} retirementAge={personal.retirementAge} cpfLifeMonthlyPayout={inputs.income.cpfLifeMonthlyPayout} />
         </div>
       </div>
     </div>

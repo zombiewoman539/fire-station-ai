@@ -25,8 +25,8 @@ ChartJS.register(
 
 interface Props {
   results: FireResults;
-  noCpfResults: FireResults;
   retirementAge: number;
+  cpfLifeMonthlyPayout?: number;
   toolbar?: React.ReactNode;
   scenarioResults?: FireResults | null;
 }
@@ -49,32 +49,13 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, noCpfResults, retirementAge, toolbar, scenarioResults }: Props) {
-  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, cpfLifeMonthly, raAtAge65 } = results;
+export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayout = 0, toolbar, scenarioResults }: Props) {
+  const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
-  const [hideCpf, setHideCpf] = React.useState(true);
   const [hideCash, setHideCash] = React.useState(true);
   const [hideInsurance, setHideInsurance] = React.useState(false);
   const fireCardRef = React.useRef<HTMLDivElement>(null);
-
-  // Diagonal hatch pattern for locked RA bar
-  const raHatchPattern = React.useMemo<CanvasPattern | string>(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 8; canvas.height = 8;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return 'rgba(99, 102, 241, 0.5)';
-    ctx.fillStyle = 'rgba(55, 48, 163, 0.4)';
-    ctx.fillRect(0, 0, 8, 8);
-    ctx.strokeStyle = 'rgba(129, 140, 248, 0.85)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, 8); ctx.lineTo(8, 0);
-    ctx.moveTo(-2, 6); ctx.lineTo(6, -2);
-    ctx.moveTo(2, 10); ctx.lineTo(10, 2);
-    ctx.stroke();
-    return ctx.createPattern(canvas, 'repeat') ?? 'rgba(99, 102, 241, 0.5)';
-  }, []);
 
   // Close breakdown on click outside
   React.useEffect(() => {
@@ -89,7 +70,6 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
     if (!showFireBreakdown && fireCardRef.current) {
       const rect = fireCardRef.current.getBoundingClientRect();
       const popupWidth = 280;
-      // Position below card, right-aligned but clamped to viewport
       let left = rect.right - popupWidth;
       if (left < 8) left = 8;
       if (left + popupWidth > window.innerWidth - 8) left = window.innerWidth - popupWidth - 8;
@@ -100,34 +80,19 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
 
   const labels = yearlyData.map(d => String(d.age));
 
-  const visibleTotal = (d: { investments: number; cash: number; cpfOA: number; cpfSA: number; cpfRA: number; cpfMA: number; insuranceValue: number }) => {
+  const visibleTotal = (d: { investments: number; cash: number; insuranceValue: number }) => {
     let t = d.investments;
     if (!hideCash) t += d.cash;
-    if (!hideCpf) t += d.cpfOA + d.cpfSA + d.cpfRA + d.cpfMA;
     if (!hideInsurance) t += d.insuranceValue;
     return t;
   };
 
-  // When CPF is hidden, recalculate FIRE number without CPF LIFE offset (full expenses / SWR)
-  const adjustedFireNumber = hideCpf
-    ? Math.round(
-        (fireNumberBreakdown.inflatedRetirementExpenses / (fireNumberBreakdown.withdrawalRate / 100))
-        * (1 + fireNumberBreakdown.inflationBuffer / 100)
-      )
-    : fireNumber;
+  // Bars show scenario data when active; baseline line stays on results
+  const activeYearlyData = scenarioResults ? scenarioResults.yearlyData : yearlyData;
 
-  // When CPF is hidden, use the noCpfLife simulation for accurate depletion tracking
-  const activeResults = hideCpf ? noCpfResults : results;
-  const activeMoneyRunsOutAge = hideCpf ? noCpfResults.moneyRunsOutAge : results.moneyRunsOutAge;
-
-  // Visible wealth at retirement and on-track status respect the hide toggles
-  const retirementData = activeResults.yearlyData.find(d => d.age === retirementAge);
-  const displayWealthAtRetirement = retirementData ? visibleTotal(retirementData) : wealthAtRetirement;
-  const displayOnTrack = displayWealthAtRetirement >= adjustedFireNumber;
-
-  // When a scenario is active, bars show scenario data so the visual impact is clear.
-  // The baseline net worth LINE stays fixed so the gap is obvious.
-  const activeYearlyData = scenarioResults ? scenarioResults.yearlyData : activeResults.yearlyData;
+  // Bar datasets: Investments, Cash, Insurance = 3 bars
+  // Baseline net worth line is dataset index 3
+  const BASELINE_LINE_IDX = 3;
 
   const purchaseAnnotations: Record<string, any> = {};
   yearlyData.forEach((d, i) => {
@@ -148,10 +113,6 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
     }
   });
 
-  // Bar datasets: Investments, Cash, CPF OA, CPF SA, CPF RA, CPF MA, Insurance = 7 bars
-  // Baseline line is dataset index 7
-  const BASELINE_LINE_IDX = 7;
-
   const data = {
     labels,
     datasets: [
@@ -159,7 +120,7 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
         type: 'bar' as const,
         label: 'Investments',
         data: activeYearlyData.map(d => d.investments),
-        backgroundColor: 'rgba(52, 211, 153, 0.80)',   // emerald green
+        backgroundColor: 'rgba(52, 211, 153, 0.80)',
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -168,43 +129,7 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
         type: 'bar' as const,
         label: 'Cash Savings',
         data: hideCash ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cash),
-        backgroundColor: 'rgba(251, 191, 36, 0.75)',   // amber — warm, clearly distinct
-        borderRadius: 2,
-        stack: 'stack',
-        order: 2,
-      },
-      {
-        type: 'bar' as const,
-        label: 'CPF OA',
-        data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfOA),
-        backgroundColor: 'rgba(56, 189, 248, 0.80)',   // sky blue — accessible CPF
-        borderRadius: 2,
-        stack: 'stack',
-        order: 2,
-      },
-      {
-        type: 'bar' as const,
-        label: 'CPF SA',
-        data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfSA),
-        backgroundColor: 'rgba(99, 102, 241, 0.80)',   // indigo — locked pre-55
-        borderRadius: 2,
-        stack: 'stack',
-        order: 2,
-      },
-      {
-        type: 'bar' as const,
-        label: 'CPF RA (locked)',
-        data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfRA),
-        backgroundColor: raHatchPattern as any,
-        borderRadius: 2,
-        stack: 'stack',
-        order: 2,
-      },
-      {
-        type: 'bar' as const,
-        label: 'CPF MA',
-        data: hideCpf ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.cpfMA),
-        backgroundColor: 'rgba(249, 115, 22, 0.75)',   // orange — healthcare/medisave
+        backgroundColor: 'rgba(251, 191, 36, 0.75)',
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -213,7 +138,7 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
         type: 'bar' as const,
         label: 'Insurance Cash Value',
         data: hideInsurance ? activeYearlyData.map(() => 0) : activeYearlyData.map(d => d.insuranceValue),
-        backgroundColor: 'rgba(244, 114, 182, 0.70)',  // rose pink — protection layer
+        backgroundColor: 'rgba(244, 114, 182, 0.70)',
         borderRadius: 2,
         stack: 'stack',
         order: 2,
@@ -221,7 +146,7 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
       {
         type: 'line' as const,
         label: scenarioResults ? 'Baseline (No Event)' : 'Total Net Worth',
-        data: activeResults.yearlyData.map(d => visibleTotal(d)),
+        data: yearlyData.map(d => visibleTotal(d)),
         borderColor: '#f472b6',
         backgroundColor: 'rgba(244, 114, 182, 0.08)',
         borderWidth: scenarioResults ? 1.5 : 2.5,
@@ -295,19 +220,14 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
           title: (ctx: any[]) => `Age ${ctx[0].label}`,
           label: (ctx: any) => {
             if (ctx.parsed.y === 0) return null;
-            const label = ctx.dataset.label;
-            const d = activeYearlyData[ctx.dataIndex];
-            if (label === 'CPF RA (locked)' && d && d.cpfRA > 0 && d.age < 65) {
-              return `  CPF RA 🔒 (locked until 65): ${formatSGD(ctx.parsed.y)}`;
-            }
-            return `  ${label}: ${formatSGD(ctx.parsed.y)}`;
+            return `  ${ctx.dataset.label}: ${formatSGD(ctx.parsed.y)}`;
           },
           afterBody: (ctx: any[]) => {
             const idx = ctx[0].dataIndex;
             const d = yearlyData[idx];
             const lines: string[] = [];
-            if (d.age >= 65 && cpfLifeMonthly > 0) {
-              lines.push(``, `  CPF LIFE annuity: +${formatSGD(cpfLifeMonthly)}/month`);
+            if (d.age >= 65 && cpfLifeMonthlyPayout > 0) {
+              lines.push('', `  CPF LIFE income: +${formatSGD(cpfLifeMonthlyPayout)}/month`);
             }
             if (d.purchaseLabels.length > 0) {
               lines.push('', '  ' + d.purchaseLabels.join(', '));
@@ -318,7 +238,6 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
       },
       annotation: {
         annotations: {
-          // When scenario is active, draw a bracket at retirement showing the gap
           ...(scenarioResults ? {
             shortfallBracket: {
               type: 'line' as const,
@@ -358,56 +277,16 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
               borderRadius: 4,
             },
           },
-          // Age 55: SA closes, RA formed
-          ...(yearlyData.some(d => d.age === 55) ? {
-            age55Line: {
-              type: 'line' as const,
-              xMin: '55', xMax: '55',
-              borderColor: 'rgba(167, 139, 250, 0.6)',
-              borderWidth: 1.5,
-              borderDash: [5, 4],
-              label: {
-                display: true,
-                content: 'SA closes — RA formed',
-                position: 'end' as const,
-                backgroundColor: 'rgba(109, 40, 217, 0.8)',
-                color: '#fff',
-                font: { size: 10, weight: 'bold' as const },
-                padding: { top: 3, bottom: 3, left: 6, right: 6 },
-                borderRadius: 3,
-              },
-            },
-          } : {}),
-          // Age 65: CPF LIFE begins
-          ...(yearlyData.some(d => d.age === 65) ? {
-            age65Line: {
-              type: 'line' as const,
-              xMin: '65', xMax: '65',
-              borderColor: 'rgba(52, 211, 153, 0.7)',
-              borderWidth: 2,
-              borderDash: [],
-              label: {
-                display: true,
-                content: `CPF LIFE begins (+${formatSGD(cpfLifeMonthly)}/mo)`,
-                position: 'end' as const,
-                backgroundColor: 'rgba(6, 95, 70, 0.85)',
-                color: '#fff',
-                font: { size: 10, weight: 'bold' as const },
-                padding: { top: 3, bottom: 3, left: 6, right: 6 },
-                borderRadius: 3,
-              },
-            },
-          } : {}),
           fireLine: {
             type: 'line' as const,
-            yMin: adjustedFireNumber,
-            yMax: adjustedFireNumber,
+            yMin: fireNumber,
+            yMax: fireNumber,
             borderColor: 'rgba(239, 68, 68, 0.4)',
             borderWidth: 1.5,
             borderDash: [4, 4],
             label: {
               display: true,
-              content: hideCpf ? `FIRE Target (no CPF): ${formatSGD(adjustedFireNumber)}` : `FIRE Target: ${formatSGD(adjustedFireNumber)}`,
+              content: `FIRE Target: ${formatSGD(fireNumber)}`,
               position: 'end' as const,
               backgroundColor: 'rgba(239, 68, 68, 0.75)',
               color: '#fff',
@@ -416,18 +295,17 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
               borderRadius: 3,
             },
           },
-          // Funds depletion marker
-          ...(activeMoneyRunsOutAge ? {
+          ...(moneyRunsOutAge ? {
             depletionLine: {
               type: 'line' as const,
-              xMin: String(activeMoneyRunsOutAge),
-              xMax: String(activeMoneyRunsOutAge),
+              xMin: String(moneyRunsOutAge),
+              xMax: String(moneyRunsOutAge),
               borderColor: 'rgba(239, 68, 68, 0.9)',
               borderWidth: 2,
               borderDash: [4, 3],
               label: {
                 display: true,
-                content: `Funds depleted (age ${activeMoneyRunsOutAge})`,
+                content: `Funds depleted (age ${moneyRunsOutAge})`,
                 position: 'end' as const,
                 backgroundColor: 'rgba(185, 28, 28, 0.92)',
                 color: '#fff',
@@ -446,24 +324,23 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
   const legendItems = [
     { color: 'rgba(52, 211, 153, 0.80)',  label: 'Investments', type: 'box' },
     { color: 'rgba(251, 191, 36, 0.75)',  label: 'Cash', type: 'box' },
-    { color: 'rgba(56, 189, 248, 0.80)',  label: 'CPF OA', type: 'box' },
-    { color: 'rgba(99, 102, 241, 0.80)',  label: 'CPF SA', type: 'box' },
-    { color: 'rgba(99, 102, 241, 0.65)',  label: 'CPF RA 🔒', type: 'hatch' as const },
-    { color: 'rgba(249, 115, 22, 0.75)',  label: 'CPF MA', type: 'box' },
     { color: 'rgba(244, 114, 182, 0.70)', label: 'Insurance', type: 'box' },
     { color: '#f472b6', label: scenarioResults ? 'Baseline (No Event)' : 'Net Worth', type: scenarioResults ? 'dash' as const : 'line' as const },
     { color: 'rgba(251, 146, 60, 0.8)', label: 'Retirement', type: 'dash' as const },
     ...(scenarioResults ? [{ color: '#ef4444', label: 'With Event', type: 'line' as const }] : []),
   ];
 
+  const numMetricCols = cpfLifeMonthlyPayout > 0 ? 5 : 4;
+
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100%', overflow: 'visible' }}>
       {/* Top row: metrics + toolbar */}
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0, overflow: 'visible' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, flex: 1, overflow: 'visible' }}>
-          <MetricCard label={hideCpf || hideCash ? 'Visible Wealth at Retire' : 'Wealth at Retirement'} value={formatSGD(displayWealthAtRetirement)} color="#34d399" />
-          <MetricCard label="CPF LIFE / month" value={!hideCpf && cpfLifeMonthly > 0 ? formatSGD(cpfLifeMonthly) : '—'} color="#34d399" />
-          <MetricCard label="RA at 65" value={!hideCpf && raAtAge65 > 0 ? formatSGD(raAtAge65) : '—'} color="#a78bfa" />
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${numMetricCols}, 1fr)`, gap: 8, flex: 1, overflow: 'visible' }}>
+          <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
+          {cpfLifeMonthlyPayout > 0 && (
+            <MetricCard label="CPF LIFE / month" value={formatSGD(cpfLifeMonthlyPayout)} color="#34d399" />
+          )}
           {/* FIRE Number card with breakdown popup */}
           <div
             ref={fireCardRef}
@@ -476,14 +353,13 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
             onClick={handleFireCardClick}
           >
             <div className="text-gray-500 uppercase tracking-wider font-medium" style={{ fontSize: 9, marginBottom: 1, lineHeight: 1.2 }}>
-              {hideCpf ? 'FIRE Number (no CPF)' : 'FIRE Number'}
+              FIRE Number
             </div>
-            <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(adjustedFireNumber)}</div>
+            <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(fireNumber)}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
               <span style={{ fontSize: 9, color: '#4b5563' }}>{fireNumberBreakdown.withdrawalRate}% SWR</span>
               <span style={{ fontSize: 9, color: '#3b82f6' }}>ⓘ click</span>
             </div>
-            {/* Popup — absolute positioned below card, inside the metrics row overflow:visible */}
             {showFireBreakdown && (
               <div
                 style={{
@@ -505,25 +381,24 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
                     color="#fbbf24"
                     bold
                   />
-                  {hideCpf
-                    ? <FireRow label="CPF LIFE excluded (CPF hidden)" value="—" color="#6b7280" />
-                    : <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
-                  }
-                  <FireRow label="= Net drawdown needed / yr" value={formatSGD(hideCpf ? fireNumberBreakdown.inflatedRetirementExpenses : fireNumberBreakdown.netDrawdownNeeded)} bold />
+                  {fireNumberBreakdown.cpfLifeAnnual > 0 && (
+                    <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
+                  )}
+                  <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
                   <div style={{ borderTop: '1px solid #334155', margin: '2px 0' }} />
                   <FireRow
                     label={`÷ ${fireNumberBreakdown.withdrawalRate}% Safe Withdrawal Rate`}
-                    value={formatSGD(Math.round((hideCpf ? fireNumberBreakdown.inflatedRetirementExpenses : fireNumberBreakdown.netDrawdownNeeded) / (fireNumberBreakdown.withdrawalRate / 100)))}
+                    value={formatSGD(Math.round(fireNumberBreakdown.netDrawdownNeeded / (fireNumberBreakdown.withdrawalRate / 100)))}
                   />
                   <FireRow
                     label={`+ ${fireNumberBreakdown.inflationBuffer}% inflation buffer`}
-                    value={formatSGD(adjustedFireNumber)}
+                    value={formatSGD(fireNumber)}
                     color="#60a5fa"
                     bold
                   />
                 </div>
                 <div style={{ color: '#475569', fontSize: 10, marginTop: 10, lineHeight: 1.5, borderTop: '1px solid #334155', paddingTop: 8 }}>
-                  The <strong style={{ color: '#94a3b8' }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding. CPF LIFE reduces what the portfolio must cover from age 65.
+                  The <strong style={{ color: '#94a3b8' }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding.{cpfLifeMonthlyPayout > 0 ? ' CPF LIFE reduces what the portfolio must cover from age 65.' : ''}
                 </div>
               </div>
             )}
@@ -534,21 +409,21 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
             className="rounded-lg flex items-center gap-2"
             style={{
               padding: '8px 12px',
-              background: displayOnTrack ? 'rgba(6, 78, 59, 0.4)' : 'rgba(127, 29, 29, 0.4)',
-              border: `1px solid ${displayOnTrack ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              background: onTrack ? 'rgba(6, 78, 59, 0.4)' : 'rgba(127, 29, 29, 0.4)',
+              border: `1px solid ${onTrack ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
             }}
           >
-            <span style={{ fontSize: 14, flexShrink: 0 }}>{displayOnTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>{onTrack ? '\u2705' : '\u26A0\uFE0F'}</span>
             <div>
-              <div className="font-bold" style={{ color: displayOnTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
-                {displayOnTrack ? 'On Track!' : activeMoneyRunsOutAge ? `Depleted at ${activeMoneyRunsOutAge}` : 'Shortfall'}
+              <div className="font-bold" style={{ color: onTrack ? '#34d399' : '#f87171', fontSize: 12, lineHeight: 1.2 }}>
+                {onTrack ? 'On Track!' : moneyRunsOutAge ? `Depleted at ${moneyRunsOutAge}` : 'Shortfall'}
               </div>
               <div className="text-gray-400" style={{ fontSize: 10, lineHeight: 1.2 }}>
-                {displayOnTrack
-                  ? `+${formatSGD(displayWealthAtRetirement - adjustedFireNumber)}`
-                  : activeMoneyRunsOutAge
-                    ? `${activeMoneyRunsOutAge - retirementAge} yrs short of life expectancy`
-                    : `Need ${formatSGD(adjustedFireNumber - displayWealthAtRetirement)}`}
+                {onTrack
+                  ? `+${formatSGD(wealthAtRetirement - fireNumber)}`
+                  : moneyRunsOutAge
+                    ? `${moneyRunsOutAge - retirementAge} yrs short of life expectancy`
+                    : `Need ${formatSGD(fireNumber - wealthAtRetirement)}`}
               </div>
             </div>
           </div>
@@ -568,12 +443,6 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
           <span key={item.label} className="flex items-center gap-1 text-gray-400" style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
             {item.type === 'box' && (
               <span style={{ width: 10, height: 10, borderRadius: 2, background: item.color, display: 'inline-block' }} />
-            )}
-            {item.type === 'hatch' && (
-              <span style={{
-                width: 10, height: 10, borderRadius: 2, display: 'inline-block',
-                background: 'repeating-linear-gradient(135deg, rgba(99,102,241,0.8) 0px, rgba(99,102,241,0.8) 1.5px, rgba(55,48,163,0.4) 1.5px, rgba(55,48,163,0.4) 5px)',
-              }} />
             )}
             {item.type === 'line' && (
               <span style={{ width: 14, height: 3, borderRadius: 2, background: item.color, display: 'inline-block' }} />
@@ -600,22 +469,6 @@ export default function ChartPanel({ results, noCpfResults, retirementAge, toolb
             }}
           >
             {hideCash ? '+ Cash' : '− Cash'}
-          </button>
-          <button
-            onClick={() => setHideCpf(v => !v)}
-            style={{
-              background: hideCpf ? 'rgba(96, 165, 250, 0.15)' : 'transparent',
-              border: `1px solid ${hideCpf ? 'rgba(96, 165, 250, 0.4)' : '#374151'}`,
-              borderRadius: 6,
-              color: hideCpf ? '#93c5fd' : '#6b7280',
-              padding: '3px 8px',
-              fontSize: 10,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {hideCpf ? '+ CPF' : '− CPF'}
           </button>
           <button
             onClick={() => setHideInsurance(v => !v)}
