@@ -17,7 +17,7 @@ interface Insight {
 
 function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
   const insights: Insight[] = [];
-  const { personal, income, assets, policies, purchases } = inputs;
+  const { personal, income, policies, purchases } = inputs;
   const { wealthAtRetirement, fireNumber, onTrack, yearlyData } = results;
 
   const yearsToRetirement = personal.retirementAge - personal.currentAge;
@@ -95,20 +95,7 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
     });
   }
 
-  // 4. CPF dependency check
-  const totalCpf = assets.cpfOA + assets.cpfSA + assets.cpfMA + (assets.cpfRA ?? 0);
-  const cpfRatio = totalCpf / (assets.cashSavings + assets.investments + totalCpf + 1);
-  if (cpfRatio > 0.6) {
-    insights.push({
-      type: 'warning',
-      icon: '🏛️',
-      title: `${(cpfRatio * 100).toFixed(0)}% of assets locked in CPF`,
-      detail: `CPF is only accessible at 55 (OA) with withdrawal limits. Heavy CPF reliance limits pre-retirement flexibility.`,
-      action: 'Build up liquid investments alongside CPF for financial flexibility before 55.',
-    });
-  }
-
-  // 5. Major purchase impact
+  // 4. Major purchase impact
   const totalPurchaseCost = purchases.reduce((s, p) => {
     let cost = p.lumpSum;
     cost += p.recurringCost * p.recurringYears;
@@ -126,11 +113,11 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
   }
 
   // 6. Investment return rate check
-  if (assets.investmentReturnRate < 4) {
+  if (inputs.assets.investmentReturnRate < 4) {
     insights.push({
       type: 'warning',
       icon: '📈',
-      title: `Conservative ${assets.investmentReturnRate}% return assumption`,
+      title: `Conservative ${inputs.assets.investmentReturnRate}% return assumption`,
       detail: `At this rate, investments grow slowly. The historical S&P 500 averages 7-10% nominal.`,
       action: 'Consider a diversified equity-heavy portfolio for the accumulation phase.',
     });

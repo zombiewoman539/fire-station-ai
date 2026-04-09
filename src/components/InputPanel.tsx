@@ -1,6 +1,6 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, MajorPurchase, CpfLifeOption } from '../types';
-import { CPF_LIFE_BASE_PAYOUTS, getProjectedMonthlyPayout, getProjectedRetirementSum, formatSGD, RS_GROWTH_RATE } from '../calculations';
+import { FireInputs, InsurancePolicy, MajorPurchase } from '../types';
+import { formatSGD } from '../calculations';
 
 interface Props {
   inputs: FireInputs;
@@ -19,7 +19,6 @@ function InfoTip({ text }: { text: string }) {
   const handleEnter = () => {
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
-      // Try to keep tooltip within viewport
       const tipWidth = 230;
       const left = Math.min(rect.left, window.innerWidth - tipWidth - 8);
       setPos({ top: rect.bottom + 6, left: Math.max(8, left) });
@@ -133,7 +132,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
 
   const updatePersonal = (field: string, val: number) =>
     update('personal', { ...inputs.personal, [field]: val });
-  const updateIncome = (field: string, val: number | string) =>
+  const updateIncome = (field: string, val: number) =>
     update('income', { ...inputs.income, [field]: val });
   const updateAssets = (field: string, val: number) =>
     update('assets', { ...inputs.assets, [field]: val });
@@ -179,10 +178,10 @@ export default function InputPanel({ inputs, onChange }: Props) {
       {/* Income & Expenses */}
       <Section title="Income & Expenses" defaultOpen={false}>
         <NumberField
-          label="Annual Gross Income"
+          label="Annual Take-Home Income"
           value={inputs.income.annualIncome}
           prefix="S$"
-          tip="Your gross annual salary (before CPF deductions). Employee CPF (20% for age ≤55) is automatically deducted to get take-home pay. CPF contributions are capped at the OW ceiling — S$8,000/month (S$96,000/year) from Jan 2026."
+          tip="Your annual income after CPF deductions and tax. This is the cash you actually receive to spend and invest."
           onChange={v => updateIncome('annualIncome', v)}
         />
         <NumberField
@@ -200,14 +199,21 @@ export default function InputPanel({ inputs, onChange }: Props) {
           onChange={v => updateIncome('annualInvestmentContribution', v)}
         />
         <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%"
-          tip="Expected annual salary increase. Singapore median is ~3–4%. Your gross salary compounds at this rate each year, increasing your CPF contributions and investable surplus over time."
+          tip="Expected annual salary increase. Singapore median is ~3–4%."
           onChange={v => updateIncome('salaryGrowthRate', v)} />
         <NumberField
           label="Retirement Expenses / Year"
           value={inputs.income.retirementExpenses}
           prefix="S$"
-          tip="Expected annual spending in retirement. Rule of thumb: 70–80% of current expenses. This drives your FIRE Number — the portfolio size needed to sustain withdrawals indefinitely."
+          tip="Expected annual spending in retirement, in today's dollars. Rule of thumb: 70–80% of current expenses. Inflation will be applied to project the future cost."
           onChange={v => updateIncome('retirementExpenses', v)}
+        />
+        <NumberField
+          label="Expected CPF LIFE Payout / Month"
+          value={inputs.income.cpfLifeMonthlyPayout}
+          prefix="S$"
+          tip="Your estimated CPF LIFE monthly payout from age 65. Check your CPF statement or use the CPF Board calculator at cpf.gov.sg. Set to 0 if unsure — the plan will assume a fully self-funded retirement."
+          onChange={v => updateIncome('cpfLifeMonthlyPayout', v)}
         />
 
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -226,43 +232,14 @@ export default function InputPanel({ inputs, onChange }: Props) {
             tip="The % of your portfolio you withdraw each year in retirement. FIRE Number = Retirement Expenses ÷ SWR. Lower = safer but needs more capital. 3.5% is conservative for Singapore (longer lifespan). 4% is the global Trinity Study standard."
             onChange={v => updateIncome('withdrawalRate', v)}
           />
-          {/* CPF LIFE Option selector */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-              CPF LIFE Option
-              <InfoTip text="Your CPF LIFE plan determines how much of your SA/OA is locked in the Retirement Account at age 55, and your monthly payout from age 65. FRS is the standard benchmark. BRS requires a property pledge. ERS is the maximum voluntary top-up." />
+          {inputs.income.cpfLifeMonthlyPayout > 0 && (
+            <div style={{ background: 'rgba(52, 211, 153, 0.08)', border: '1px solid rgba(52, 211, 153, 0.2)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>CPF LIFE offset active</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                {formatSGD(inputs.income.cpfLifeMonthlyPayout * 12)}/yr from age 65 reduces the portfolio needed.
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {(['BRS', 'FRS', 'ERS'] as CpfLifeOption[]).map(opt => {
-                const projectedPayout = getProjectedMonthlyPayout(opt, inputs.personal.currentAge);
-                const projectedRA = Math.round(getProjectedRetirementSum(opt, inputs.personal.currentAge));
-                const isActive = inputs.income.cpfLifeOption === opt;
-                return (
-                  <button
-                    key={opt}
-                    onClick={() => updateIncome('cpfLifeOption', opt)}
-                    style={{
-                      flex: 1,
-                      background: isActive ? 'rgba(96, 165, 250, 0.15)' : '#1e293b',
-                      border: `1px solid ${isActive ? 'rgba(96, 165, 250, 0.5)' : '#334155'}`,
-                      borderRadius: 8,
-                      padding: '8px 6px',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div style={{ color: isActive ? '#93c5fd' : '#94a3b8', fontSize: 11, fontWeight: 700 }}>{opt}</div>
-                    <div style={{ color: isActive ? '#60a5fa' : '#4b5563', fontSize: 10, marginTop: 2 }}>~{formatSGD(projectedPayout)}/mo</div>
-                    <div style={{ color: '#374151', fontSize: 9, marginTop: 1 }}>RA: {formatSGD(projectedRA)}</div>
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ fontSize: 9, color: '#4b5563', marginTop: 4, lineHeight: 1.4 }}>
-              {CPF_LIFE_BASE_PAYOUTS[inputs.income.cpfLifeOption].desc}
-              {' '}Projections at age 55 grow at {(RS_GROWTH_RATE * 100).toFixed(1)}%/yr from 2026 base.
-            </div>
-          </div>
+          )}
         </div>
       </Section>
 
@@ -272,7 +249,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
           label="Cash Savings"
           value={inputs.assets.cashSavings}
           prefix="S$"
-          tip="Current cash in bank accounts, savings accounts, T-bills, SSBs. Earns the Cash Return Rate below. The model keeps a 6-month expense buffer in cash — surplus beyond that flows to investments."
+          tip="Current cash in bank accounts, savings accounts, T-bills, SSBs. Earns the Cash Return Rate below."
           onChange={v => updateAssets('cashSavings', v)}
         />
         <SliderField label="Cash Return Rate" value={inputs.assets.cashReturnRate} min={0} max={5} step={0.25} unit="%"
@@ -282,37 +259,12 @@ export default function InputPanel({ inputs, onChange }: Props) {
           label="Investments / Equities"
           value={inputs.assets.investments}
           prefix="S$"
-          tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc. Earns the Investment Return Rate below. All income surplus beyond the 6-month cash buffer is added here each year."
+          tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc. Earns the Investment Return Rate below."
           onChange={v => updateAssets('investments', v)}
         />
         <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={15} step={0.5} unit="%"
-          tip="Expected annual return on your equity/investment portfolio. Global diversified ETFs (e.g. MSCI World) have averaged ~7% historically after inflation. In retirement, the model applies a 30% haircut (×0.7) for a more conservative drawdown assumption."
+          tip="Expected annual return on your equity/investment portfolio. Global diversified ETFs have averaged ~7% historically. In retirement, the model applies a 30% haircut (×0.7) for a more conservative drawdown assumption."
           onChange={v => updateAssets('investmentReturnRate', v)} />
-
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CPF Balances</div>
-          <div className="grid grid-cols-3 gap-2">
-            <NumberField label="OA (2.5%)" value={inputs.assets.cpfOA} prefix="S$"
-              tip="Ordinary Account — earns 2.5% p.a. Used for housing, education and investment. Extra 1% interest on first S$20k of OA (part of the S$60k combined cap below 55)."
-              onChange={v => updateAssets('cpfOA', v)} />
-            {inputs.personal.currentAge < 55
-              ? <NumberField label="SA (4%)" value={inputs.assets.cpfSA} prefix="S$"
-                  tip="Special Account — earns 4% p.a. Locked for retirement. At age 55, SA is permanently closed and transferred to your Retirement Account (RA) to meet the FRS/BRS/ERS target you select above."
-                  onChange={v => updateAssets('cpfSA', v)} />
-              : <NumberField label="RA (4%) 🔒" value={inputs.assets.cpfRA} prefix="S$"
-                  tip="Retirement Account — formed at age 55 from SA and OA. Earns 4% p.a. Locked until CPF LIFE begins at age 65. Enter current RA balance if client is already 55+."
-                  onChange={v => updateAssets('cpfRA', v)} />
-            }
-            <NumberField label="MA (4%)" value={inputs.assets.cpfMA} prefix="S$"
-              tip="MediSave Account — earns 4% p.a. Capped at BHS: S$79,000 in 2026, growing ~5%/yr until age 65, then fixed. MA overflow above BHS → SA (pre-55) or OA (post-55)."
-              onChange={v => updateAssets('cpfMA', v)} />
-          </div>
-          <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: 4 }}>
-            {inputs.personal.currentAge < 55
-              ? 'At 55: SA closes permanently, balance transfers to RA. Extra 1% on first S$60k combined (OA capped at S$20k). MA overflow → SA.'
-              : 'SA closed. RA locked until 65. Extra 2% on first S$30k + 1% on next S$30k combined (OA capped at S$20k). MA overflow → OA.'}
-          </div>
-        </div>
       </Section>
 
       {/* Insurance Policies */}
@@ -327,23 +279,23 @@ export default function InputPanel({ inputs, onChange }: Props) {
               className="bg-transparent text-white text-sm font-medium w-4/5 outline-none mb-2 border-b border-gray-600 pb-1" />
             <div className="grid grid-cols-2 gap-3">
               <NumberField label="Cash Value" value={p.cashValue} prefix="S$"
-                tip="Current surrender/cash value of the policy. This is the amount accessible if the policy is surrendered. It grows at the Annual Growth Rate below and is shown in the Insurance bar on the chart."
+                tip="Current surrender/cash value of the policy. It grows at the Annual Growth Rate below and is shown in the Insurance bar on the chart."
                 onChange={v => updatePolicy(p.id, 'cashValue', v)} />
               <SliderField label="Growth Rate" value={p.annualGrowthRate} min={0} max={10} step={0.5} unit="%"
-                tip="Expected annual growth rate of the policy's cash value. Whole life and endowment policies typically project 3–5% p.a. (participating fund non-guaranteed returns)."
+                tip="Expected annual growth rate of the policy's cash value. Whole life and endowment policies typically project 3–5% p.a."
                 onChange={v => updatePolicy(p.id, 'annualGrowthRate', v)} />
             </div>
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sum Assured</div>
               <div className="grid grid-cols-3 gap-2">
                 <NumberField label="☠️ Death" value={p.deathSumAssured} prefix="S$"
-                  tip="Death benefit paid to beneficiaries. In the Death scenario (What If panel), this lump sum is added to cash — replacing lost income for dependants."
+                  tip="Death benefit paid to beneficiaries. In the Death scenario (What If panel), this lump sum is added to cash."
                   onChange={v => updatePolicy(p.id, 'deathSumAssured', v)} />
                 <NumberField label="🦽 TPD" value={p.tpdSumAssured} prefix="S$"
-                  tip="Total & Permanent Disability benefit. Paid as a lump sum when the insured is permanently unable to work. In the TPD scenario, this replaces future income."
+                  tip="Total & Permanent Disability benefit. In the TPD scenario, this replaces future income."
                   onChange={v => updatePolicy(p.id, 'tpdSumAssured', v)} />
                 <NumberField label="🏥 CI" value={p.ciSumAssured} prefix="S$"
-                  tip="Critical Illness benefit paid on diagnosis of a covered condition (e.g. cancer, heart attack, stroke). In the CI scenario, this is offset against estimated treatment costs to show your coverage gap."
+                  tip="Critical Illness benefit paid on diagnosis. In the CI scenario, this offsets treatment costs."
                   onChange={v => updatePolicy(p.id, 'ciSumAssured', v)} />
               </div>
             </div>
@@ -375,7 +327,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
               <div>
                 <label className="text-xs text-gray-500 block mb-0.5">
                   Lump Sum
-                  <InfoTip text="One-off payment at the specified age. Deducted from investments first, then cash, then CPF OA as a last resort." />
+                  <InfoTip text="One-off payment at the specified age. Deducted from investments first, then cash." />
                 </label>
                 <div className="flex items-center bg-gray-700 border border-gray-600 rounded-md px-2.5 py-1.5 focus-within:border-emerald-500 transition-colors">
                   <span className="text-gray-400 text-xs mr-1.5">S$</span>
@@ -387,7 +339,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
               <div>
                 <label className="text-xs text-gray-500 block mb-0.5">
                   Recurring/yr
-                  <InfoTip text="Annual cost that recurs for a set number of years (e.g. school fees, car maintenance). Added to living expenses each year it applies." />
+                  <InfoTip text="Annual cost that recurs for a set number of years. Added to living expenses each year it applies." />
                 </label>
                 <div className="flex items-center bg-gray-700 border border-gray-600 rounded-md px-2.5 py-1.5 focus-within:border-emerald-500 transition-colors">
                   <span className="text-gray-400 text-xs mr-1.5">S$</span>

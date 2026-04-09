@@ -17,17 +17,12 @@ function migrateInputs(inputs: any): FireInputs {
       retirementExpenses:            inc.retirementExpenses ?? 48000,
       inflationRate:                 inc.inflationRate ?? 2.5,
       withdrawalRate:                inc.withdrawalRate ?? 3.5,
-      cpfLifeOption:                 inc.cpfLifeOption ?? 'FRS',
-      // cpfLifeMonthly from old profiles is dropped — now computed from RA
+      cpfLifeMonthlyPayout:          inc.cpfLifeMonthlyPayout ?? inc.cpfLifeMonthly ?? 0,
     },
     assets: {
-      cashSavings:         assets.cashSavings ?? 0,
-      investments:         assets.investments ?? 0,
-      cpfOA:               assets.cpfOA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.6) : 0),
-      cpfSA:               assets.cpfSA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.3) : 0),
-      cpfMA:               assets.cpfMA ?? (assets.cpfBalance ? Math.round(assets.cpfBalance * 0.1) : 0),
-      cpfRA:               assets.cpfRA ?? 0,
-      cashReturnRate:      assets.cashReturnRate ?? 1,
+      cashSavings:          assets.cashSavings ?? 0,
+      investments:          assets.investments ?? 0,
+      cashReturnRate:       assets.cashReturnRate ?? 1,
       investmentReturnRate: assets.investmentReturnRate ?? 7,
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
