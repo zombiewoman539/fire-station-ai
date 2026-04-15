@@ -332,6 +332,7 @@ function Dashboard() {
         inputs={inputs}
         onChange={handleInputChange}
         clientName={activeProfile?.name}
+        currentProfileId={activeProfile?.id}
       />
 
       {/* Right side: chart + toggleable bottom panel */}

@@ -43,7 +43,12 @@ export const defaultInputs: FireInputs = {
       deathSumAssured: 200000, tpdSumAssured: 200000, ciSumAssured: 100000,
       premiumAmount: 200, premiumFrequency: 'monthly',
       premiumDueDay: 1, premiumPaymentTerm: 'whole-life', premiumLimitedYears: 0,
+      nomineeName: '', nomineeClientId: null,
     },
   ],
   purchases: defaultPurchases,
+  estatePlanning: {
+    lpa: false,
+    will: false,
+  },
 };

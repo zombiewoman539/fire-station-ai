@@ -36,7 +36,13 @@ function migrateInputs(inputs: any): FireInputs {
       premiumDueDay: p.premiumDueDay ?? 1,
       premiumPaymentTerm: p.premiumPaymentTerm ?? 'whole-life',
       premiumLimitedYears: p.premiumLimitedYears ?? 0,
+      nomineeName: p.nomineeName ?? '',
+      nomineeClientId: p.nomineeClientId ?? null,
     })),
+    estatePlanning: {
+      lpa: inputs.estatePlanning?.lpa ?? false,
+      will: inputs.estatePlanning?.will ?? false,
+    },
   };
 }
 

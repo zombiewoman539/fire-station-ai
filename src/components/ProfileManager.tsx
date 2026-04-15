@@ -227,6 +227,9 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
           const retAge = profile.inputs?.personal?.retirementAge;
           const ageInfo = (age && retAge) ? `${age} → ${retAge}` : null;
           const summary = profileSummaries[profile.id];
+          const ep = profile.inputs?.estatePlanning;
+          const lpa = ep?.lpa ?? false;
+          const will = ep?.will ?? false;
 
           return (
             <div
@@ -292,6 +295,22 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                         {summary.onTrack ? '✓ On Track' : '⚠ Shortfall'}
                       </span>
                     )}
+                    <span
+                      title={lpa ? 'LPA done' : 'No LPA'}
+                      style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+                        background: lpa ? 'rgba(99,102,241,0.15)' : 'rgba(100,116,139,0.1)',
+                        color: lpa ? '#818cf8' : 'var(--text-4)',
+                        border: `1px solid ${lpa ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+                      }}>LPA</span>
+                    <span
+                      title={will ? 'Will done' : 'No Will'}
+                      style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+                        background: will ? 'rgba(99,102,241,0.15)' : 'rgba(100,116,139,0.1)',
+                        color: will ? '#818cf8' : 'var(--text-4)',
+                        border: `1px solid ${will ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+                      }}>Will</span>
                   </div>
                 )}
               </div>

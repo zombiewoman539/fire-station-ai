@@ -1,6 +1,8 @@
 import React from 'react';
 import { FireInputs, InsurancePolicy, MajorPurchase } from '../types';
 import { formatSGD } from '../calculations';
+import { listProfiles } from '../services/profileStorageSupabase';
+import { ClientProfile } from '../profileTypes';
 
 interface Props {
   open: boolean;
@@ -8,9 +10,10 @@ interface Props {
   inputs: FireInputs;
   onChange: (inputs: FireInputs) => void;
   clientName?: string;
+  currentProfileId?: string;
 }
 
-type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases';
+type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases' | 'estate';
 
 let _nextId = 200;
 const uid = () => String(++_nextId);
@@ -232,10 +235,15 @@ function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i:
   );
 }
 
-function InsuranceSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
+function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: FireInputs; onChange: (i: FireInputs) => void; currentProfileId?: string }) {
   const update = (policies: InsurancePolicy[]) => onChange({ ...inputs, policies });
-  const upd = (id: string, field: keyof InsurancePolicy, val: string | number) =>
+  const upd = (id: string, field: keyof InsurancePolicy, val: string | number | null) =>
     update(inputs.policies.map(p => p.id === id ? { ...p, [field]: val } : p));
+
+  const [allProfiles, setAllProfiles] = React.useState<ClientProfile[]>([]);
+  React.useEffect(() => {
+    listProfiles().then(list => setAllProfiles(list.filter(p => p.id !== currentProfileId))).catch(() => {});
+  }, [currentProfileId]);
 
   const addPolicy = () => update([...inputs.policies, {
     id: uid(), name: 'New Policy', policyType: 'whole-life',
@@ -243,6 +251,7 @@ function InsuranceSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
     deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
     premiumAmount: 0, premiumFrequency: 'monthly',
     premiumDueDay: 1, premiumPaymentTerm: 'whole-life', premiumLimitedYears: 0,
+    nomineeName: '', nomineeClientId: null,
   }]);
 
   const POLICY_TYPES = [
@@ -348,6 +357,62 @@ function InsuranceSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
               </div>
             </div>
           </div>
+
+          {/* Nomination */}
+          <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>
+            <SectionLabel>Nomination</SectionLabel>
+            {/* Link to existing FIRE Station client */}
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
+                Link to FIRE Station client
+              </label>
+              <select
+                value={p.nomineeClientId ?? ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  const linked = allProfiles.find(c => c.id === val);
+                  upd(p.id, 'nomineeClientId', val || null);
+                  if (linked) upd(p.id, 'nomineeName', linked.name);
+                  if (!val) upd(p.id, 'nomineeName', '');
+                }}
+                style={{
+                  width: '100%', background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                  borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                }}
+              >
+                <option value="">— Not linked —</option>
+                {allProfiles.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            {/* Free-text nominee name */}
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
+                Nominee name {p.nomineeClientId && <span style={{ color: '#34d399', fontSize: 10 }}>(auto-filled from linked client)</span>}
+              </label>
+              <input
+                value={p.nomineeName}
+                onChange={e => upd(p.id, 'nomineeName', e.target.value)}
+                placeholder="e.g. Spouse, Child..."
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                  borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                }}
+              />
+              {p.nomineeClientId && p.nomineeName && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, color: '#34d399' }}>●</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Linked to <strong style={{ color: 'var(--text-2)' }}>{p.nomineeName}</strong> in FIRE Station</span>
+                  <button onClick={() => { upd(p.id, 'nomineeClientId', null); }}
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', fontSize: 11 }}>
+                    Unlink
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ))}
 
@@ -424,6 +489,68 @@ function PurchasesSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
   );
 }
 
+function EstatePlanningSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
+  const ep = inputs.estatePlanning ?? { lpa: false, will: false };
+  const upd = (field: 'lpa' | 'will', val: boolean) =>
+    onChange({ ...inputs, estatePlanning: { ...ep, [field]: val } });
+
+  const ToggleCard = ({ field, label, description, icon }: { field: 'lpa' | 'will'; label: string; description: string; icon: string }) => {
+    const done = ep[field];
+    return (
+      <button
+        onClick={() => upd(field, !done)}
+        style={{
+          width: '100%', textAlign: 'left', cursor: 'pointer',
+          background: done ? 'rgba(16,185,129,0.1)' : 'var(--inset)',
+          border: `2px solid ${done ? 'rgba(16,185,129,0.5)' : 'var(--border)'}`,
+          borderRadius: 12, padding: '18px 20px', marginBottom: 14,
+          transition: 'all 0.15s',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ fontSize: 28 }}>{icon}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: done ? '#34d399' : 'var(--text-1)', marginBottom: 4 }}>
+              {label}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-4)', lineHeight: 1.5 }}>{description}</div>
+          </div>
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+            background: done ? '#10b981' : 'var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 14, color: done ? '#fff' : 'var(--text-5)',
+            transition: 'all 0.15s',
+          }}>
+            {done ? '✓' : '○'}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 20, lineHeight: 1.6 }}>
+        Track whether this client has put their key estate planning documents in place.
+        Click a card to toggle its status.
+      </div>
+      <ToggleCard
+        field="lpa"
+        label="Lasting Power of Attorney (LPA)"
+        description="Authorises a trusted person to make decisions on the client's behalf if they lose mental capacity. Registered with the Office of the Public Guardian, Singapore."
+        icon="⚖️"
+      />
+      <ToggleCard
+        field="will"
+        label="Will"
+        description="A legal document specifying how the client's assets should be distributed after death. Without a Will, Singapore intestacy laws apply."
+        icon="📜"
+      />
+    </div>
+  );
+}
+
 // ── Main EditModal ─────────────────────────────────────────────────────────────
 const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'personal',  icon: '👤', label: 'Personal' },
@@ -431,9 +558,10 @@ const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'assets',    icon: '🏦', label: 'Assets' },
   { key: 'insurance', icon: '🛡️', label: 'Insurance' },
   { key: 'purchases', icon: '🏠', label: 'Life Purchases' },
+  { key: 'estate',    icon: '📋', label: 'Estate Planning' },
 ];
 
-export default function EditModal({ open, onClose, inputs, onChange, clientName }: Props) {
+export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId }: Props) {
   const [activeSection, setActiveSection] = React.useState<Section>('personal');
 
   // Close on Escape
@@ -504,8 +632,9 @@ export default function EditModal({ open, onClose, inputs, onChange, clientName 
             {activeSection === 'personal'  && <PersonalSection inputs={inputs} onChange={onChange} />}
             {activeSection === 'income'    && <IncomeSection inputs={inputs} onChange={onChange} />}
             {activeSection === 'assets'    && <AssetsSection inputs={inputs} onChange={onChange} />}
-            {activeSection === 'insurance' && <InsuranceSection inputs={inputs} onChange={onChange} />}
+            {activeSection === 'insurance' && <InsuranceSection inputs={inputs} onChange={onChange} currentProfileId={currentProfileId} />}
             {activeSection === 'purchases' && <PurchasesSection inputs={inputs} onChange={onChange} />}
+            {activeSection === 'estate'    && <EstatePlanningSection inputs={inputs} onChange={onChange} />}
           </div>
         </div>
       </div>

@@ -36,6 +36,13 @@ export interface InsurancePolicy {
   premiumDueDay: number;
   premiumPaymentTerm: 'whole-life' | 'limited';
   premiumLimitedYears: number;
+  nomineeName: string;           // free-text nominee name
+  nomineeClientId: string | null; // linked FIRE Station client ID (optional)
+}
+
+export interface EstatePlanning {
+  lpa: boolean;  // Lasting Power of Attorney done
+  will: boolean; // Will done
 }
 
 export type ScenarioType = 'none' | 'critical-illness' | 'tpd' | 'death';
@@ -62,6 +69,7 @@ export interface FireInputs {
   assets: Assets;
   policies: InsurancePolicy[];
   purchases: MajorPurchase[];
+  estatePlanning: EstatePlanning;
 }
 
 export interface YearData {

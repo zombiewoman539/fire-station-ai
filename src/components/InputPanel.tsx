@@ -143,6 +143,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
       cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
       premiumAmount: 0, premiumFrequency: 'monthly' as const,
       premiumDueDay: 1, premiumPaymentTerm: 'whole-life' as const, premiumLimitedYears: 0,
+      nomineeName: '', nomineeClientId: null,
     }]);
   };
   const removePolicy = (id: string) => {
