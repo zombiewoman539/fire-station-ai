@@ -12,6 +12,7 @@ import {
 import ChartPanel from './components/ChartPanel';
 import ProfileManager from './components/ProfileManager';
 import EditModal from './components/EditModal';
+import ToggleBar from './components/ToggleBar';
 import AuthGate from './components/AuthGate';
 import InsightsPanel from './components/InsightsPanel';
 import MilestoneTracker from './components/MilestoneTracker';
@@ -79,13 +80,30 @@ function Dashboard() {
   }, []);
 
   const inputs = activeProfile?.inputs || defaultInputs;
-  const results = useMemo(() => calculate(inputs), [inputs]);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+
+  const toggleExcluded = useCallback((id: string) => {
+    setExcludedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Filter inputs by excluded IDs before calculating
+  const effectiveInputs = useMemo(() => ({
+    ...inputs,
+    purchases: inputs.purchases.filter(p => !excludedIds.has(p.id)),
+    policies: inputs.policies.filter(p => !excludedIds.has(p.id)),
+  }), [inputs, excludedIds]);
+
+  const results = useMemo(() => calculate(effectiveInputs), [effectiveInputs]);
 
   // Scenario results (recalculated when scenario or inputs change)
   const scenarioResults = useMemo(() => {
     if (scenario.type === 'none') return null;
-    return calculate(inputs, scenario);
-  }, [inputs, scenario]);
+    return calculate(effectiveInputs, scenario);
+  }, [effectiveInputs, scenario]);
 
   // Keep scenario age in range when profile changes
   useEffect(() => {
@@ -263,6 +281,13 @@ function Dashboard() {
             isDark={theme === 'dark'}
           />
         </div>
+
+        {/* Toggle bar: include/exclude individual purchases & policies */}
+        <ToggleBar
+          inputs={inputs}
+          excludedIds={excludedIds}
+          onToggle={toggleExcluded}
+        />
 
         {/* Collapsible bottom drawer */}
         <div style={{
