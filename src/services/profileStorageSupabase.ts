@@ -40,10 +40,25 @@ function migrateInputs(inputs: any): FireInputs {
   };
 }
 
+// Purge records that were soft-deleted more than 7 days ago.
+// Called on every listProfiles() so cleanup happens automatically over time.
+async function purgeExpiredDeletions(): Promise<void> {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase
+    .from('client_profiles')
+    .delete()
+    .lt('deleted_at', cutoff);
+  // Ignore errors — purge is best-effort, not critical
+}
+
 export async function listProfiles(): Promise<ClientProfile[]> {
+  // Purge expired soft-deletes in the background on every load
+  purgeExpiredDeletions().catch(() => {});
+
   const { data, error } = await supabase
     .from('client_profiles')
     .select('*')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
@@ -62,6 +77,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
     .from('client_profiles')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .single();
 
   if (error || !data) return null;
@@ -117,10 +133,12 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
   };
 }
 
+// Soft delete: sets deleted_at timestamp instead of removing the row.
+// Records are permanently purged after 7 days via purgeExpiredDeletions().
 export async function deleteProfile(id: string): Promise<void> {
   const { error } = await supabase
     .from('client_profiles')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
 
   if (error) throw error;
