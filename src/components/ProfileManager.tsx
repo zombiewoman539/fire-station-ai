@@ -164,11 +164,6 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
 
   const saveColor = saveStatus === 'saving' ? '#fbbf24' : saveStatus === 'saved' ? '#34d399' : 'transparent';
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--surface)', borderRight: '1px solid var(--border)' }}>
       {/* Header */}

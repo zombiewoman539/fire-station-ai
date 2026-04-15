@@ -118,7 +118,7 @@ function Dashboard() {
       ...prev,
       [activeProfile.id]: { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement },
     }));
-  }, [activeProfile?.id, inputs]);
+  }, [activeProfile, inputs]);
 
   // Scenario results (recalculated when scenario or inputs change)
   const scenarioResults = useMemo(() => {
