@@ -86,6 +86,19 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     ? CI_COST_DATA[scenario.ciType]
     : null;
 
+  // Annual premium cost across all policies for a given year index.
+  // Frequency is converted to annual; limited-pay policies stop after premiumLimitedYears.
+  const FREQ_MULT: Record<string, number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 };
+  const getAnnualPremiums = (yearIndex: number): number => {
+    let total = 0;
+    for (const p of policies) {
+      if (!p.premiumAmount || p.premiumAmount <= 0) continue;
+      if (p.premiumPaymentTerm === 'limited' && yearIndex >= (p.premiumLimitedYears || 0)) continue;
+      total += p.premiumAmount * (FREQ_MULT[p.premiumFrequency] ?? 12);
+    }
+    return total;
+  };
+
   const getRecurringCostAtAge = (age: number): number => {
     let total = 0;
     for (const p of purchases) {
@@ -121,6 +134,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     const isRetired = age >= retirementAge;
 
     let recurringPurchaseCosts = getRecurringCostAtAge(age);
+    const annualPremiums = getAnnualPremiums(i);
 
     // === SCENARIO EFFECTS ===
     let scenarioLumpCost = 0;
@@ -160,7 +174,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     // ============================================================
     if (!isRetired) {
       const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
-      const totalExpenses = income.annualExpenses + recurringPurchaseCosts;
+      const totalExpenses = income.annualExpenses + recurringPurchaseCosts + annualPremiums;
       const surplus = takeHomePay - totalExpenses;
 
       if (surplus > 0) {
@@ -185,7 +199,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       // Retirement expenses in today's dollars — inflate to the actual year
       const yearsFromNow = age - currentAge;
       const inflatedExpenses = income.retirementExpenses * Math.pow(1 + inflationRate, yearsFromNow);
-      const grossDrawdown = inflatedExpenses + recurringPurchaseCosts;
+      const grossDrawdown = inflatedExpenses + recurringPurchaseCosts + annualPremiums;
 
       // CPF LIFE reduces drawdown from age 65
       const annuityIncome = age >= 65 ? cpfLifeMonthly * 12 : 0;
