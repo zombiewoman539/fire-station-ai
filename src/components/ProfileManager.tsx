@@ -244,12 +244,15 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
         )}
         {filtered.map(profile => {
           const isActive = profile.id === activeProfile?.id;
+          // For the active card, use the live activeProfile from props so toolbar
+          // toggles are reflected immediately without waiting for a Supabase refresh.
+          const liveProfile = isActive && activeProfile ? activeProfile : profile;
           const isRenaming = renamingId === profile.id;
-          const age = profile.inputs?.personal?.currentAge;
-          const retAge = profile.inputs?.personal?.retirementAge;
+          const age = liveProfile.inputs?.personal?.currentAge;
+          const retAge = liveProfile.inputs?.personal?.retirementAge;
           const ageInfo = (age && retAge) ? `${age} → ${retAge}` : null;
           const summary = profileSummaries[profile.id];
-          const ep = profile.inputs?.estatePlanning;
+          const ep = liveProfile.inputs?.estatePlanning;
           const lpa = ep?.lpa ?? false;
           const will = ep?.will ?? false;
 
@@ -319,7 +322,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                     )}
                     <span
                       title={lpa ? 'LPA done — click to unmark' : 'No LPA — click to mark done'}
-                      onClick={e => toggleEstatePlanning(profile, 'lpa', e)}
+                      onClick={e => toggleEstatePlanning(liveProfile, 'lpa', e)}
                       style={{
                         fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
                         background: lpa ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.1)',
@@ -332,7 +335,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                     </span>
                     <span
                       title={will ? 'Will done — click to unmark' : 'No Will — click to mark done'}
-                      onClick={e => toggleEstatePlanning(profile, 'will', e)}
+                      onClick={e => toggleEstatePlanning(liveProfile, 'will', e)}
                       style={{
                         fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
                         background: will ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.1)',
