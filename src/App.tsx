@@ -244,20 +244,50 @@ function Dashboard() {
     </>
   );
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isDrawerOpen = bottomTab !== 'none';
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)' }}>
       {/* Left sidebar: client list */}
-      <div style={{ width: 280, flexShrink: 0, height: '100vh' }}>
-        <ProfileManager
-          activeProfile={activeProfile}
-          onSelectProfile={handleSelectProfile}
-          onNewProfile={handleNewProfile}
-          onEditDetails={() => setEditModalOpen(true)}
-          saveStatus={saveStatus}
-        />
+      <div style={{
+        width: sidebarCollapsed ? 0 : 280,
+        minWidth: sidebarCollapsed ? 0 : 280,
+        flexShrink: 0, height: '100vh',
+        overflow: 'hidden',
+        transition: 'width 0.25s ease, min-width 0.25s ease',
+        position: 'relative',
+      }}>
+        <div style={{ width: 280, height: '100%' }}>
+          <ProfileManager
+            activeProfile={activeProfile}
+            onSelectProfile={handleSelectProfile}
+            onNewProfile={handleNewProfile}
+            onEditDetails={() => setEditModalOpen(true)}
+            saveStatus={saveStatus}
+          />
+        </div>
       </div>
+
+      {/* Sidebar toggle button */}
+      <button
+        onClick={() => setSidebarCollapsed(c => !c)}
+        title={sidebarCollapsed ? 'Show client list' : 'Hide client list'}
+        style={{
+          position: 'absolute', left: sidebarCollapsed ? 8 : 268, top: 20, zIndex: 50,
+          width: 28, height: 28, borderRadius: '50%',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          color: 'var(--text-3)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+          transition: 'left 0.25s ease',
+        }}
+      >
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
+          style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
 
       {/* Edit Details modal */}
       <EditModal
