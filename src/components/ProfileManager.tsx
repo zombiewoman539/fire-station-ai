@@ -8,6 +8,7 @@ import {
   exportProfile,
   importProfile,
   duplicateProfile,
+  saveProfile,
 } from '../services/profileStorageSupabase';
 import { supabase } from '../services/supabaseClient';
 
@@ -158,6 +159,27 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     window.location.reload();
   };
 
+  const toggleEstatePlanning = async (profile: ClientProfile, field: 'lpa' | 'will', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated: ClientProfile = {
+      ...profile,
+      inputs: {
+        ...profile.inputs,
+        estatePlanning: {
+          ...profile.inputs.estatePlanning,
+          [field]: !profile.inputs.estatePlanning?.[field],
+        },
+      },
+    };
+    try {
+      await saveProfile(updated);
+      await refresh();
+      if (activeProfile?.id === profile.id) onSelectProfile(updated);
+    } catch (err: any) {
+      alert('Failed to save: ' + err.message);
+    }
+  };
+
   const filtered = profiles.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -296,21 +318,31 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                       </span>
                     )}
                     <span
-                      title={lpa ? 'LPA done' : 'No LPA'}
+                      title={lpa ? 'LPA done — click to unmark' : 'No LPA — click to mark done'}
+                      onClick={e => toggleEstatePlanning(profile, 'lpa', e)}
                       style={{
                         fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
-                        background: lpa ? 'rgba(99,102,241,0.15)' : 'rgba(100,116,139,0.1)',
+                        background: lpa ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.1)',
                         color: lpa ? '#818cf8' : 'var(--text-4)',
-                        border: `1px solid ${lpa ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
-                      }}>LPA</span>
+                        border: `1px solid ${lpa ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
+                        cursor: 'pointer', userSelect: 'none',
+                        transition: 'background 0.15s, color 0.15s',
+                      }}>
+                      {lpa ? '✓ ' : ''}LPA
+                    </span>
                     <span
-                      title={will ? 'Will done' : 'No Will'}
+                      title={will ? 'Will done — click to unmark' : 'No Will — click to mark done'}
+                      onClick={e => toggleEstatePlanning(profile, 'will', e)}
                       style={{
                         fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
-                        background: will ? 'rgba(99,102,241,0.15)' : 'rgba(100,116,139,0.1)',
+                        background: will ? 'rgba(99,102,241,0.2)' : 'rgba(100,116,139,0.1)',
                         color: will ? '#818cf8' : 'var(--text-4)',
-                        border: `1px solid ${will ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
-                      }}>Will</span>
+                        border: `1px solid ${will ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
+                        cursor: 'pointer', userSelect: 'none',
+                        transition: 'background 0.15s, color 0.15s',
+                      }}>
+                      {will ? '✓ ' : ''}Will
+                    </span>
                   </div>
                 )}
               </div>
