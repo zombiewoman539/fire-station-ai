@@ -193,6 +193,16 @@ function Dashboard() {
     setBottomTab(prev => prev === tab ? 'none' : tab);
   };
 
+  const lpa = inputs.estatePlanning?.lpa ?? false;
+  const will = inputs.estatePlanning?.will ?? false;
+
+  const toggleEstatePill = (field: 'lpa' | 'will') => {
+    handleInputChange({
+      ...inputs,
+      estatePlanning: { ...inputs.estatePlanning, [field]: field === 'lpa' ? !lpa : !will },
+    });
+  };
+
   // Toolbar buttons for chart panel
   const chartToolbar = (
     <>
@@ -258,6 +268,35 @@ function Dashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
         Edit
+      </button>
+      {/* LPA / Will quick-toggle pills */}
+      <button
+        onClick={() => toggleEstatePill('lpa')}
+        title={lpa ? 'LPA done — click to unmark' : 'LPA not done — click to mark done'}
+        style={{
+          background: lpa ? 'rgba(99,102,241,0.2)' : 'var(--card)',
+          border: `1px solid ${lpa ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`,
+          borderRadius: 8, padding: '7px 11px', cursor: 'pointer',
+          color: lpa ? '#818cf8' : 'var(--text-4)',
+          fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+          transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+        }}
+      >
+        {lpa ? '✓ ' : ''}LPA
+      </button>
+      <button
+        onClick={() => toggleEstatePill('will')}
+        title={will ? 'Will done — click to unmark' : 'Will not done — click to mark done'}
+        style={{
+          background: will ? 'rgba(99,102,241,0.2)' : 'var(--card)',
+          border: `1px solid ${will ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`,
+          borderRadius: 8, padding: '7px 11px', cursor: 'pointer',
+          color: will ? '#818cf8' : 'var(--text-4)',
+          fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+          transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+        }}
+      >
+        {will ? '✓ ' : ''}Will
       </button>
       <ExportReport
         inputs={inputs}
