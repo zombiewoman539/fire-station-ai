@@ -31,6 +31,7 @@ function Dashboard() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [theme, toggleTheme] = useTheme();
 
@@ -223,6 +224,21 @@ function Dashboard() {
         </svg>
         Present
       </button>
+      {/* Edit details — always accessible even when sidebar is hidden */}
+      <button
+        onClick={() => setEditModalOpen(true)}
+        className="flex items-center gap-1.5"
+        style={{
+          background: '#1f2937', border: '1px solid #374151', borderRadius: 8,
+          color: '#d1d5db', padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+        Edit
+      </button>
       <ExportReport
         inputs={inputs}
         results={results}
@@ -244,7 +260,6 @@ function Dashboard() {
     </>
   );
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isDrawerOpen = bottomTab !== 'none';
 
   return (
