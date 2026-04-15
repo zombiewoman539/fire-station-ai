@@ -28,24 +28,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {}
         }
       }
     </script>
     <style>
-      /* Custom scrollbar for dark theme */
+      /* Scrollbar */
       ::-webkit-scrollbar { width: 6px; }
-      ::-webkit-scrollbar-track { background: #1f2937; }
-      ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-      /* Range slider styling */
+      ::-webkit-scrollbar-track { background: var(--surface, #1f2937); }
+      ::-webkit-scrollbar-thumb { background: var(--border-mid, #4b5563); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--text-4, #6b7280); }
+
+      /* Range slider */
       input[type="range"] {
         -webkit-appearance: none;
         appearance: none;
         height: 6px;
         border-radius: 3px;
-        background: #4b5563;
+        background: var(--border-mid, #4b5563);
         outline: none;
       }
       input[type="range"]::-webkit-slider-thumb {
@@ -58,10 +60,11 @@
         cursor: pointer;
         border: 2px solid #064e3b;
       }
+      html.light input[type="range"] { background: #cbd5e1; }
+      html.light input[type="range"]::-webkit-slider-thumb { border-color: #065f46; }
+
       input[type="number"]::-webkit-inner-spin-button,
-      input[type="number"]::-webkit-outer-spin-button {
-        opacity: 1;
-      }
+      input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
     </style>
   </head>
   <body>

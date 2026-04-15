@@ -36,10 +36,10 @@ function InfoTip({ text }: { text: string }) {
       {show && (
         <div style={{
           position: 'fixed', top: pos.top, left: pos.left, width: 230, zIndex: 99999,
-          background: '#1e293b', border: '1px solid #334155',
+          background: 'var(--tip-bg)', border: '1px solid var(--tip-border)',
           borderRadius: 8, padding: '8px 10px',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.75)',
-          fontSize: 11, color: '#94a3b8', lineHeight: 1.55,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          fontSize: 11, color: 'var(--text-3)', lineHeight: 1.55,
           pointerEvents: 'none',
         }}>
           {text}
@@ -216,8 +216,8 @@ export default function InputPanel({ inputs, onChange }: Props) {
           onChange={v => updateIncome('cpfLifeMonthlyPayout', v)}
         />
 
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FIRE Target Settings</div>
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-soft)' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-4)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FIRE Target Settings</div>
           <SliderField
             label="Inflation Rate"
             value={inputs.income.inflationRate ?? 2.5}
@@ -235,7 +235,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
           {inputs.income.cpfLifeMonthlyPayout > 0 && (
             <div style={{ background: 'rgba(52, 211, 153, 0.08)', border: '1px solid rgba(52, 211, 153, 0.2)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
               <div style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>CPF LIFE offset active</div>
-              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>
                 {formatSGD(inputs.income.cpfLifeMonthlyPayout * 12)}/yr from age 65 reduces the portfolio needed.
               </div>
             </div>

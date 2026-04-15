@@ -5,4 +5,61 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s, color 0.2s;
 }
+
+/* ── Dark theme (default) ─────────────────────────────────── */
+:root {
+  --bg:            #111827;
+  --surface:       #1f2937;
+  --card:          #374151;
+  --deep:          #0f172a;
+  --inset:         #1e293b;
+  --border:        #374151;
+  --border-mid:    #4b5563;
+  --border-soft:   rgba(255, 255, 255, 0.06);
+  --text-1:        #ffffff;
+  --text-2:        #d1d5db;
+  --text-3:        #9ca3af;
+  --text-4:        #6b7280;
+  --text-5:        #4b5563;
+  --input-bg:      #374151;
+  --input-border:  #4b5563;
+  --tip-bg:        #1e293b;
+  --tip-border:    #334155;
+}
+
+/* ── Light theme ──────────────────────────────────────────── */
+html.light {
+  --bg:            #f1f5f9;
+  --surface:       #ffffff;
+  --card:          #f8fafc;
+  --deep:          #e2e8f0;
+  --inset:         #f8fafc;
+  --border:        #e2e8f0;
+  --border-mid:    #cbd5e1;
+  --border-soft:   rgba(0, 0, 0, 0.06);
+  --text-1:        #0f172a;
+  --text-2:        #1e293b;
+  --text-3:        #475569;
+  --text-4:        #64748b;
+  --text-5:        #94a3b8;
+  --input-bg:      #f1f5f9;
+  --input-border:  #cbd5e1;
+  --tip-bg:        #ffffff;
+  --tip-border:    #e2e8f0;
+}
+
+/* ── Tailwind overrides for light mode ────────────────────── */
+html.light .bg-gray-900    { background-color: var(--bg) !important; }
+html.light .bg-gray-800    { background-color: var(--surface) !important; }
+html.light .bg-gray-700    { background-color: var(--input-bg) !important; }
+html.light .bg-gray-900\/50 { background-color: rgba(241,245,249,0.8) !important; }
+html.light .border-gray-700    { border-color: var(--border) !important; }
+html.light .border-gray-700\/50 { border-color: rgba(226,232,240,0.6) !important; }
+html.light .border-gray-600    { border-color: var(--input-border) !important; }
+html.light .text-white          { color: var(--text-1) !important; }
+html.light .text-gray-400       { color: var(--text-3) !important; }
+html.light .text-gray-500       { color: var(--text-4) !important; }
+html.light input[type="number"] { color: var(--text-1) !important; }
+html.light .focus-within\:border-emerald-500:focus-within { border-color: #10b981 !important; }

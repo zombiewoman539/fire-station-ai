@@ -29,6 +29,7 @@ interface Props {
   cpfLifeMonthlyPayout?: number;
   toolbar?: React.ReactNode;
   scenarioResults?: FireResults | null;
+  isDark?: boolean;
 }
 
 function FireRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
@@ -49,7 +50,25 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayout = 0, toolbar, scenarioResults }: Props) {
+export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayout = 0, toolbar, scenarioResults, isDark = true }: Props) {
+  // Theme-aware color tokens
+  const clr = {
+    bg:         isDark ? '#111827' : '#f1f5f9',
+    surface:    isDark ? '#1f2937' : '#ffffff',
+    card:       isDark ? '#374151' : '#f8fafc',
+    border:     isDark ? '#374151' : '#e2e8f0',
+    borderMid:  isDark ? '#4b5563' : '#cbd5e1',
+    text1:      isDark ? '#ffffff'  : '#0f172a',
+    text2:      isDark ? '#d1d5db' : '#1e293b',
+    text3:      isDark ? '#9ca3af' : '#475569',
+    text4:      isDark ? '#6b7280' : '#64748b',
+    text5:      isDark ? '#4b5563' : '#94a3b8',
+    grid:       isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
+    tooltipBg:  isDark ? 'rgba(17,24,39,0.97)'   : 'rgba(255,255,255,0.98)',
+    tooltipText:isDark ? '#d1d5db' : '#1e293b',
+    tooltipBorder: isDark ? '#374151' : '#e2e8f0',
+    inset:      isDark ? '#1e293b' : '#f8fafc',
+  };
   const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
@@ -182,9 +201,9 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
     interaction: { mode: 'index' as const, intersect: false },
     scales: {
       x: {
-        grid: { color: 'rgba(255,255,255,0.04)' },
+        grid: { color: clr.grid },
         ticks: {
-          color: '#6b7280',
+          color: clr.text4,
           maxRotation: 0,
           font: { size: 11 },
           callback: function (_: any, index: number) {
@@ -195,9 +214,9 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
       },
       y: {
         min: 0,
-        grid: { color: 'rgba(255,255,255,0.04)' },
+        grid: { color: clr.grid },
         ticks: {
-          color: '#6b7280',
+          color: clr.text4,
           font: { size: 11 },
           callback: (val: number) => formatSGD(val),
         },
@@ -207,10 +226,10 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(17,24,39,0.95)',
-        titleColor: '#fff',
-        bodyColor: '#d1d5db',
-        borderColor: '#374151',
+        backgroundColor: clr.tooltipBg,
+        titleColor: clr.text1,
+        bodyColor: clr.tooltipText,
+        borderColor: clr.tooltipBorder,
         borderWidth: 1,
         padding: 12,
         cornerRadius: 8,
@@ -333,7 +352,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
   const numMetricCols = cpfLifeMonthlyPayout > 0 ? 5 : 4;
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: '#111827', height: '100%', overflow: 'visible' }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: clr.bg, height: '100%', overflow: 'visible' }}>
       {/* Top row: metrics + toolbar */}
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0, overflow: 'visible' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${numMetricCols}, 1fr)`, gap: 8, flex: 1, overflow: 'visible' }}>
@@ -347,7 +366,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
             className="bg-gray-800 rounded-lg"
             style={{
               padding: '8px 12px', cursor: 'pointer',
-              border: showFireBreakdown ? '1px solid rgba(96,165,250,0.5)' : '1px solid #374151',
+              border: showFireBreakdown ? '1px solid rgba(96,165,250,0.5)' : `1px solid ${clr.border}`,
               position: 'relative',
             }}
             onClick={handleFireCardClick}
@@ -357,21 +376,21 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
             </div>
             <div className="font-bold" style={{ color: '#60a5fa', fontSize: 18 }}>{formatSGD(fireNumber)}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-              <span style={{ fontSize: 9, color: '#4b5563' }}>{fireNumberBreakdown.withdrawalRate}% SWR</span>
+              <span style={{ fontSize: 9, color: clr.text5 }}>{fireNumberBreakdown.withdrawalRate}% SWR</span>
               <span style={{ fontSize: 9, color: '#3b82f6' }}>ⓘ click</span>
             </div>
             {showFireBreakdown && (
               <div
                 style={{
                   position: 'fixed', top: popupPos.top, left: popupPos.left, width: 280, zIndex: 9999,
-                  background: '#1e293b', border: '1px solid #3b82f6',
-                  borderRadius: 12, padding: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+                  background: clr.inset, border: '1px solid #3b82f6',
+                  borderRadius: 12, padding: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
                 }}
                 onClick={e => e.stopPropagation()}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}>How is FIRE Number calculated?</span>
-                  <button onClick={() => setShowFireBreakdown(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
+                  <span style={{ color: clr.text2, fontSize: 12, fontWeight: 700 }}>How is FIRE Number calculated?</span>
+                  <button onClick={() => setShowFireBreakdown(false)} style={{ background: 'none', border: 'none', color: clr.text4, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>✕</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <FireRow label="Retirement expenses today" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
@@ -385,7 +404,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
                     <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
                   )}
                   <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
-                  <div style={{ borderTop: '1px solid #334155', margin: '2px 0' }} />
+                  <div style={{ borderTop: `1px solid ${clr.border}`, margin: '2px 0' }} />
                   <FireRow
                     label={`÷ ${fireNumberBreakdown.withdrawalRate}% Safe Withdrawal Rate`}
                     value={formatSGD(Math.round(fireNumberBreakdown.netDrawdownNeeded / (fireNumberBreakdown.withdrawalRate / 100)))}
@@ -397,8 +416,8 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
                     bold
                   />
                 </div>
-                <div style={{ color: '#475569', fontSize: 10, marginTop: 10, lineHeight: 1.5, borderTop: '1px solid #334155', paddingTop: 8 }}>
-                  The <strong style={{ color: '#94a3b8' }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding.{cpfLifeMonthlyPayout > 0 ? ' CPF LIFE reduces what the portfolio must cover from age 65.' : ''}
+                <div style={{ color: clr.text3, fontSize: 10, marginTop: 10, lineHeight: 1.5, borderTop: `1px solid ${clr.border}`, paddingTop: 8 }}>
+                  The <strong style={{ color: clr.text3 }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding.{cpfLifeMonthlyPayout > 0 ? ' CPF LIFE reduces what the portfolio must cover from age 65.' : ''}
                 </div>
               </div>
             )}
@@ -458,9 +477,9 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
             onClick={() => setHideCash(v => !v)}
             style={{
               background: hideCash ? 'rgba(251, 191, 36, 0.15)' : 'transparent',
-              border: `1px solid ${hideCash ? 'rgba(251, 191, 36, 0.4)' : '#374151'}`,
+              border: `1px solid ${hideCash ? 'rgba(251, 191, 36, 0.4)' : clr.border}`,
               borderRadius: 6,
-              color: hideCash ? '#fcd34d' : '#6b7280',
+              color: hideCash ? '#fcd34d' : clr.text4,
               padding: '3px 8px',
               fontSize: 10,
               fontWeight: 600,
@@ -474,9 +493,9 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
             onClick={() => setHideInsurance(v => !v)}
             style={{
               background: hideInsurance ? 'rgba(251, 191, 36, 0.15)' : 'transparent',
-              border: `1px solid ${hideInsurance ? 'rgba(251, 191, 36, 0.4)' : '#374151'}`,
+              border: `1px solid ${hideInsurance ? 'rgba(251, 191, 36, 0.4)' : clr.border}`,
               borderRadius: 6,
-              color: hideInsurance ? '#fcd34d' : '#6b7280',
+              color: hideInsurance ? '#fcd34d' : clr.text4,
               padding: '3px 8px',
               fontSize: 10,
               fontWeight: 600,

@@ -31,6 +31,7 @@ function Dashboard() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [theme, toggleTheme] = useTheme();
 
   // Load initial profile on mount
   useEffect(() => {
@@ -209,13 +210,26 @@ function Dashboard() {
         results={results}
         clientName={activeProfile?.name || 'Client'}
       />
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        style={{
+          background: 'none', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '7px 10px', cursor: 'pointer',
+          color: 'var(--text-3)', fontSize: 14, lineHeight: 1,
+          display: 'flex', alignItems: 'center',
+        }}
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
     </>
   );
 
   const isDrawerOpen = bottomTab !== 'none';
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#111827', color: '#fff' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)' }}>
       <div
         className="relative flex-shrink-0 h-screen"
         style={{
@@ -279,6 +293,7 @@ function Dashboard() {
             cpfLifeMonthlyPayout={inputs.income.cpfLifeMonthlyPayout}
             toolbar={chartToolbar}
             scenarioResults={scenarioResults}
+            isDark={theme === 'dark'}
           />
         </div>
 
@@ -287,8 +302,8 @@ function Dashboard() {
           maxHeight: isDrawerOpen ? 340 : 0,
           overflow: 'hidden',
           transition: 'max-height 0.3s ease',
-          borderTop: isDrawerOpen ? '1px solid #1e293b' : 'none',
-          background: '#0f172a',
+          borderTop: isDrawerOpen ? '1px solid var(--border)' : 'none',
+          background: 'var(--deep)',
         }}>
           <div style={{ height: 340, overflowY: 'auto' }}>
             {bottomTab === 'insights' && (
@@ -320,9 +335,25 @@ function Dashboard() {
 // Skip auth on localhost for dev/preview testing
 const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+// ── Theme ─────────────────────────────────────────────────────────────────────
+export type Theme = 'dark' | 'light';
+
+export function useTheme(): [Theme, () => void] {
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem('fa-theme') as Theme) || 'dark'
+  );
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('fa-theme', theme);
+  }, [theme]);
+  const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+  return [theme, toggle];
+}
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
+  useTheme(); // apply persisted theme on mount
 
   useEffect(() => {
     // Safety timeout in case auth hangs entirely
