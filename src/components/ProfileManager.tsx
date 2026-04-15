@@ -11,15 +11,21 @@ import {
 } from '../services/profileStorageSupabase';
 import { supabase } from '../services/supabaseClient';
 
+export interface ProfileSummary {
+  onTrack: boolean;
+  wealthAtRetirement: number;
+}
+
 interface Props {
   activeProfile: ClientProfile | null;
   onSelectProfile: (profile: ClientProfile) => void;
   onNewProfile: (profile: ClientProfile) => void;
   onEditDetails: () => void;
   saveStatus: 'saved' | 'saving' | 'idle';
+  profileSummaries: Record<string, ProfileSummary>;
 }
 
-export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, onEditDetails, saveStatus }: Props) {
+export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, onEditDetails, saveStatus, profileSummaries }: Props) {
   const [profiles, setProfiles] = useState<ClientProfile[]>([]);
   const [search, setSearch] = useState('');
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -47,6 +53,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
       const p = await createProfile(name.trim());
       await refresh();
       onNewProfile(p);
+      onEditDetails();
     } catch (e: any) {
       alert('Failed to create profile: ' + e.message);
     }
@@ -224,6 +231,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
           const age = profile.inputs?.personal?.currentAge;
           const retAge = profile.inputs?.personal?.retirementAge;
           const ageInfo = (age && retAge) ? `${age} → ${retAge}` : null;
+          const summary = profileSummaries[profile.id];
 
           return (
             <div
@@ -277,9 +285,18 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                   </div>
                 )}
                 {!isRenaming && (
-                  <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
-                    {ageInfo && <span style={{ marginRight: 6 }}>{ageInfo} yrs</span>}
-                    <span>{formatDate(profile.updatedAt)}</span>
+                  <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    {ageInfo && <span>{ageInfo} yrs</span>}
+                    {summary && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                        background: summary.onTrack ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: summary.onTrack ? '#34d399' : '#f87171',
+                        border: `1px solid ${summary.onTrack ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                      }}>
+                        {summary.onTrack ? '✓ On Track' : '⚠ Shortfall'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

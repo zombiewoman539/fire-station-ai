@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
 import { calculate } from './calculations';
+import { ProfileSummary } from './components/ProfileManager';
 import { ClientProfile } from './profileTypes';
 import { supabase } from './services/supabaseClient';
 import {
@@ -32,6 +33,7 @@ function Dashboard() {
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [profileSummaries, setProfileSummaries] = useState<Record<string, ProfileSummary>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [theme, toggleTheme] = useTheme();
 
@@ -70,6 +72,14 @@ function Dashboard() {
 
         setActiveProfile(profile);
         localStorage.setItem('fire-active-profile', profile.id);
+
+        // Pre-compute on-track status for every loaded profile
+        const summaries: Record<string, ProfileSummary> = {};
+        for (const p of profiles) {
+          const r = calculate(p.inputs);
+          summaries[p.id] = { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement };
+        }
+        setProfileSummaries(summaries);
       } catch (e) {
         console.error('Failed to load profiles:', e);
       }
@@ -99,6 +109,16 @@ function Dashboard() {
   }), [inputs, excludedIds]);
 
   const results = useMemo(() => calculate(effectiveInputs), [effectiveInputs]);
+
+  // Keep active client's on-track badge in sync as inputs change
+  useEffect(() => {
+    if (!activeProfile) return;
+    const r = calculate(inputs); // use full inputs, not filtered
+    setProfileSummaries(prev => ({
+      ...prev,
+      [activeProfile.id]: { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement },
+    }));
+  }, [activeProfile?.id, inputs]);
 
   // Scenario results (recalculated when scenario or inputs change)
   const scenarioResults = useMemo(() => {
@@ -280,6 +300,7 @@ function Dashboard() {
             onNewProfile={handleNewProfile}
             onEditDetails={() => setEditModalOpen(true)}
             saveStatus={saveStatus}
+            profileSummaries={profileSummaries}
           />
         </div>
       </div>
