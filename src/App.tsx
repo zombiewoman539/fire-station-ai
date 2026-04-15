@@ -9,9 +9,9 @@ import {
   createProfile,
   saveProfile,
 } from './services/profileStorageSupabase';
-import InputPanel from './components/InputPanel';
 import ChartPanel from './components/ChartPanel';
 import ProfileManager from './components/ProfileManager';
+import EditModal from './components/EditModal';
 import AuthGate from './components/AuthGate';
 import InsightsPanel from './components/InsightsPanel';
 import MilestoneTracker from './components/MilestoneTracker';
@@ -24,12 +24,12 @@ type BottomTab = 'none' | 'insights' | 'scenarios';
 
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [theme, toggleTheme] = useTheme();
 
@@ -230,58 +230,25 @@ function Dashboard() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)' }}>
-      <div
-        className="relative flex-shrink-0 h-screen"
-        style={{
-          width: collapsed ? 0 : 380,
-          minWidth: collapsed ? 0 : 380,
-          transition: 'width 0.3s ease, min-width 0.3s ease',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Toggle button */}
-        <button onClick={() => setCollapsed(c => !c)}
-          className="absolute z-30 bg-gray-700 hover:bg-gray-600 text-white rounded-full shadow-lg border border-gray-600 flex items-center justify-center"
-          style={{ width: 28, height: 28, top: 20, right: -14, cursor: 'pointer' }}
-        >
-          <svg width="14" height="14" style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
-        <div className="h-full flex flex-col bg-gray-800 border-r border-gray-700" style={{ width: 380 }}>
-          {/* Profile Manager at top */}
-          <ProfileManager
-            activeProfile={activeProfile}
-            onSelectProfile={handleSelectProfile}
-            onNewProfile={handleNewProfile}
-            saveStatus={saveStatus}
-          />
-
-          {/* Input Panel (scrollable) */}
-          <div className="flex-1 overflow-y-auto" style={{ padding: '12px 20px 40px 20px' }}>
-            <InputPanel
-              inputs={inputs}
-              onChange={handleInputChange}
-            />
-          </div>
-        </div>
+      {/* Left sidebar: client list */}
+      <div style={{ width: 280, flexShrink: 0, height: '100vh' }}>
+        <ProfileManager
+          activeProfile={activeProfile}
+          onSelectProfile={handleSelectProfile}
+          onNewProfile={handleNewProfile}
+          onEditDetails={() => setEditModalOpen(true)}
+          saveStatus={saveStatus}
+        />
       </div>
 
-      {collapsed && (
-        <button onClick={() => setCollapsed(false)}
-          style={{
-            position: 'absolute', left: 8, top: 20, zIndex: 30,
-            width: 28, height: 28, borderRadius: '50%',
-            background: '#374151', border: '1px solid #4b5563',
-            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}>
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      )}
+      {/* Edit Details modal */}
+      <EditModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        inputs={inputs}
+        onChange={handleInputChange}
+        clientName={activeProfile?.name}
+      />
 
       {/* Right side: chart + toggleable bottom panel */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

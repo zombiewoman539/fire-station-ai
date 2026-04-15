@@ -27,9 +27,15 @@ function migrateInputs(inputs: any): FireInputs {
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
       ...p,
+      policyType: p.policyType ?? 'whole-life',
       deathSumAssured: p.deathSumAssured ?? 0,
       tpdSumAssured: p.tpdSumAssured ?? 0,
       ciSumAssured: p.ciSumAssured ?? 0,
+      premiumAmount: p.premiumAmount ?? 0,
+      premiumFrequency: p.premiumFrequency ?? 'monthly',
+      premiumDueDay: p.premiumDueDay ?? 1,
+      premiumPaymentTerm: p.premiumPaymentTerm ?? 'whole-life',
+      premiumLimitedYears: p.premiumLimitedYears ?? 0,
     })),
   };
 }

@@ -36,7 +36,14 @@ export const defaultInputs: FireInputs = {
     investmentReturnRate: 7,
   },
   policies: [
-    { id: uid(), name: 'Whole Life Policy', cashValue: 15000, annualGrowthRate: 3.5, deathSumAssured: 200000, tpdSumAssured: 200000, ciSumAssured: 100000 },
+    {
+      id: uid(), name: 'Whole Life Policy',
+      policyType: 'whole-life',
+      cashValue: 15000, annualGrowthRate: 3.5,
+      deathSumAssured: 200000, tpdSumAssured: 200000, ciSumAssured: 100000,
+      premiumAmount: 200, premiumFrequency: 'monthly',
+      premiumDueDay: 1, premiumPaymentTerm: 'whole-life', premiumLimitedYears: 0,
+    },
   ],
   purchases: defaultPurchases,
 };

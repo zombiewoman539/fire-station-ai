@@ -15,15 +15,19 @@ interface Props {
   activeProfile: ClientProfile | null;
   onSelectProfile: (profile: ClientProfile) => void;
   onNewProfile: (profile: ClientProfile) => void;
+  onEditDetails: () => void;
   saveStatus: 'saved' | 'saving' | 'idle';
 }
 
-export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, saveStatus }: Props) {
+export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, onEditDetails, saveStatus }: Props) {
   const [profiles, setProfiles] = useState<ClientProfile[]>([]);
-  const [showMenu, setShowMenu] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editName, setEditName] = useState('');
+  const [search, setSearch] = useState('');
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -48,72 +52,82 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     }
   };
 
-  const handleSwitch = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
-    const p = profiles.find(pr => pr.id === id);
-    if (p) onSelectProfile(p);
+  const openMenu = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const btn = menuBtnRefs.current[id];
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 180) });
+    }
+    setMenuId(prev => prev === id ? null : id);
   };
 
-  const handleRename = () => {
-    if (!activeProfile) return;
-    setEditName(activeProfile.name);
-    setEditing(true);
+  const closeMenu = () => setMenuId(null);
+
+  const handleRename = (profile: ClientProfile) => {
+    setRenamingId(profile.id);
+    setRenameValue(profile.name);
+    closeMenu();
   };
 
-  const commitRename = async () => {
-    if (!activeProfile || !editName.trim()) { setEditing(false); return; }
+  const commitRename = async (id: string) => {
+    if (!renameValue.trim()) { setRenamingId(null); return; }
     try {
-      await renameProfile(activeProfile.id, editName.trim());
+      await renameProfile(id, renameValue.trim());
       await refresh();
-      onSelectProfile({ ...activeProfile, name: editName.trim() });
+      if (activeProfile?.id === id) {
+        onSelectProfile({ ...activeProfile, name: renameValue.trim() });
+      }
     } catch (e: any) {
       alert('Failed to rename: ' + e.message);
     }
-    setEditing(false);
+    setRenamingId(null);
   };
 
-  const handleDelete = async () => {
-    if (!activeProfile) return;
-    if (!window.confirm(`Delete "${activeProfile.name}"? This cannot be undone.`)) return;
+  const handleDelete = async (profile: ClientProfile) => {
+    closeMenu();
+    if (!window.confirm(`Delete "${profile.name}"? This cannot be undone.`)) return;
     try {
-      await deleteProfile(activeProfile.id);
+      await deleteProfile(profile.id);
       const remaining = await listProfiles();
       setProfiles(remaining);
-      if (remaining.length > 0) {
-        onSelectProfile(remaining[0]);
-      } else {
-        const p = await createProfile('New Client');
-        await refresh();
-        onNewProfile(p);
+      if (activeProfile?.id === profile.id) {
+        if (remaining.length > 0) {
+          onSelectProfile(remaining[0]);
+        } else {
+          const p = await createProfile('New Client');
+          setProfiles([p]);
+          onNewProfile(p);
+        }
       }
     } catch (e: any) {
       alert('Failed to delete: ' + e.message);
     }
   };
 
-  const handleDuplicate = async () => {
-    if (!activeProfile) return;
+  const handleDuplicate = async (profile: ClientProfile) => {
+    closeMenu();
     try {
-      const p = await duplicateProfile(activeProfile.id, `${activeProfile.name} (Copy)`);
+      const p = await duplicateProfile(profile.id, `${profile.name} (Copy)`);
       if (p) { await refresh(); onSelectProfile(p); }
     } catch (e: any) {
       alert('Failed to duplicate: ' + e.message);
     }
   };
 
-  const handleExport = () => {
-    if (!activeProfile) return;
-    const json = exportProfile(activeProfile);
+  const handleExport = (profile: ClientProfile) => {
+    closeMenu();
+    const json = exportProfile(profile);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${activeProfile.name.replace(/[^a-zA-Z0-9]/g, '_')}_FIRE.json`;
+    a.download = `${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}_FIRE.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => fileInputRef.current?.click();
+  const handleImport = () => { closeMenu(); fileInputRef.current?.click(); };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -137,103 +151,226 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     window.location.reload();
   };
 
-  const statusDot = saveStatus === 'saving' ? '#fbbf24' : saveStatus === 'saved' ? '#34d399' : '#6b7280';
-  const statusText = saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : '';
+  const filtered = profiles.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const saveColor = saveStatus === 'saving' ? '#fbbf24' : saveStatus === 'saved' ? '#34d399' : 'transparent';
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+  };
 
   return (
-    <div style={{ padding: '10px 16px 10px 16px', borderBottom: '1px solid #374151', background: '#1f2937' }}>
-      {/* Profile selector row */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center" style={{ fontSize: 14, marginRight: 2 }}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--surface)', borderRight: '1px solid var(--border)' }}>
+      {/* Header */}
+      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>🔥</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>FIRE Station</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Save dot */}
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: saveColor, transition: 'background 0.3s',
+              display: saveStatus !== 'idle' ? 'block' : 'none',
+            }} title={saveStatus === 'saving' ? 'Saving…' : 'Saved'} />
+            {/* Import */}
+            <button onClick={handleImport} title="Import JSON"
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 7px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 11 }}>
+              ↑ Import
+            </button>
+            {/* New client */}
+            <button onClick={handleNew}
+              style={{ background: '#10b981', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600 }}>
+              + New
+            </button>
+          </div>
         </div>
 
-        {editing ? (
-          <input
-            autoFocus
-            value={editName}
-            onChange={e => setEditName(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setEditing(false); }}
-            className="text-white text-sm font-medium bg-gray-700 border border-emerald-500 rounded px-2 py-1 outline-none"
-            style={{ flex: 1 }}
-          />
-        ) : (
-          <select
-            value={activeProfile?.id || ''}
-            onChange={handleSwitch}
-            className="text-white text-sm font-medium bg-gray-700 border border-gray-600 rounded px-2 py-1 outline-none cursor-pointer hover:border-gray-500"
-            style={{ flex: 1, maxWidth: 220 }}
-          >
-            {profiles.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Save status */}
-        {statusText && (
-          <span className="flex items-center gap-1" style={{ fontSize: 10, color: statusDot, flexShrink: 0 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusDot, display: 'inline-block' }} />
-            {statusText}
-          </span>
-        )}
-
-        {/* Menu button */}
+        {/* Search */}
         <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="text-gray-400 hover:text-white"
-            style={{ padding: '2px 4px', fontSize: 16, lineHeight: 1 }}
-          >
-            &#8942;
-          </button>
-          {showMenu && (
-            <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMenu(false)} />
-              <div
-                style={{
-                  position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
-                  background: '#1f2937', border: '1px solid #374151', borderRadius: 8,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 170, padding: '4px 0',
-                }}
-              >
-                {[
-                  { label: 'New Client', icon: '+', action: handleNew },
-                  { label: 'Rename', icon: '✏', action: handleRename },
-                  { label: 'Duplicate', icon: '⧉', action: handleDuplicate },
-                  { label: 'Export JSON', icon: '↓', action: handleExport },
-                  { label: 'Import JSON', icon: '↑', action: handleImport },
-                  { label: 'Delete', icon: '🗑', action: handleDelete, danger: true },
-                  { label: 'Sign Out', icon: '→', action: handleLogout, danger: false },
-                ].map(item => (
-                  <button
-                    key={item.label}
-                    onClick={() => { item.action(); setShowMenu(false); }}
-                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-700 transition-colors"
-                    style={{ color: (item as any).danger ? '#f87171' : '#d1d5db' }}
-                  >
-                    <span style={{ width: 16, textAlign: 'center', fontSize: 12 }}>{item.icon}</span>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+            style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search clients..."
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--inset)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: '7px 10px 7px 30px',
+              fontSize: 13, color: 'var(--text-1)', outline: 'none',
+            }}
+          />
         </div>
       </div>
 
-      <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
+      {/* Client list */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text-4)', fontSize: 12, padding: '24px 0' }}>
+            {search ? 'No clients match your search.' : 'No clients yet. Create one above.'}
+          </div>
+        )}
+        {filtered.map(profile => {
+          const isActive = profile.id === activeProfile?.id;
+          const isRenaming = renamingId === profile.id;
+          const age = profile.inputs?.personal?.currentAge;
+          const retAge = profile.inputs?.personal?.retirementAge;
+          const ageInfo = (age && retAge) ? `${age} → ${retAge}` : null;
 
-      {/* New client shortcut */}
-      <button
-        onClick={handleNew}
-        className="w-full mt-2 py-1.5 text-xs font-medium text-emerald-400 border border-dashed border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition-colors"
-      >
-        + New Client
-      </button>
+          return (
+            <div
+              key={profile.id}
+              onClick={() => !isRenaming && onSelectProfile(profile)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 10px', borderRadius: 10, marginBottom: 2,
+                cursor: isRenaming ? 'default' : 'pointer',
+                background: isActive ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                border: isActive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'var(--card)'; }}
+              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+            >
+              {/* Avatar */}
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: isActive ? 'rgba(16, 185, 129, 0.2)' : 'var(--inset)',
+                border: isActive ? '2px solid rgba(16, 185, 129, 0.5)' : '2px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14, fontWeight: 700,
+                color: isActive ? '#34d399' : 'var(--text-3)',
+              }}>
+                {profile.name.charAt(0).toUpperCase()}
+              </div>
+
+              {/* Name + meta */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {isRenaming ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(profile.id)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') commitRename(profile.id);
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      background: 'var(--inset)', border: '1px solid #10b981',
+                      borderRadius: 6, padding: '3px 7px', fontSize: 13,
+                      color: 'var(--text-1)', outline: 'none', width: '100%',
+                    }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 13, fontWeight: 600, color: isActive ? '#34d399' : 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {profile.name}
+                  </div>
+                )}
+                {!isRenaming && (
+                  <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
+                    {ageInfo && <span style={{ marginRight: 6 }}>{ageInfo} yrs</span>}
+                    <span>{formatDate(profile.updatedAt)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Menu button */}
+              {!isRenaming && (
+                <button
+                  ref={el => { menuBtnRefs.current[profile.id] = el; }}
+                  onClick={e => openMenu(profile.id, e)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-4)', fontSize: 16, padding: '2px 4px',
+                    borderRadius: 4, flexShrink: 0,
+                    opacity: menuId === profile.id ? 1 : undefined,
+                  }}
+                  className="menu-btn"
+                >⋯</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Edit Details button */}
+      <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+        <button
+          onClick={onEditDetails}
+          disabled={!activeProfile}
+          style={{
+            width: '100%', padding: '10px 0', borderRadius: 10,
+            background: activeProfile ? '#10b981' : 'var(--inset)',
+            border: 'none', cursor: activeProfile ? 'pointer' : 'not-allowed',
+            color: activeProfile ? '#fff' : 'var(--text-4)',
+            fontSize: 13, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Edit Client Details
+        </button>
+        <button
+          onClick={handleLogout}
+          style={{
+            width: '100%', marginTop: 6, padding: '7px 0', borderRadius: 8,
+            background: 'none', border: '1px solid var(--border)',
+            cursor: 'pointer', color: 'var(--text-4)', fontSize: 12,
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
+
+      {/* Context menu */}
+      {menuId && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={closeMenu} />
+          <div style={{
+            position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 50,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+            minWidth: 170, padding: '4px 0',
+          }}>
+            {[
+              { label: 'Rename', icon: '✏', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleRename(p); } },
+              { label: 'Duplicate', icon: '⧉', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleDuplicate(p); } },
+              { label: 'Export JSON', icon: '↓', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleExport(p); } },
+              { label: 'Delete', icon: '🗑', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleDelete(p); }, danger: true },
+            ].map(item => (
+              <button
+                key={item.label}
+                onClick={item.action}
+                style={{
+                  width: '100%', background: 'none', border: 'none', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+                  color: (item as any).danger ? '#f87171' : 'var(--text-2)',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--card)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+              >
+                <span style={{ width: 16, textAlign: 'center', fontSize: 12 }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
     </div>
   );
 }

@@ -138,7 +138,12 @@ export default function InputPanel({ inputs, onChange }: Props) {
     update('assets', { ...inputs.assets, [field]: val });
 
   const addPolicy = () => {
-    update('policies', [...inputs.policies, { id: uid(), name: 'New Policy', cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0 }]);
+    update('policies', [...inputs.policies, {
+      id: uid(), name: 'New Policy', policyType: 'whole-life' as const,
+      cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
+      premiumAmount: 0, premiumFrequency: 'monthly' as const,
+      premiumDueDay: 1, premiumPaymentTerm: 'whole-life' as const, premiumLimitedYears: 0,
+    }]);
   };
   const removePolicy = (id: string) => {
     update('policies', inputs.policies.filter(p => p.id !== id));

@@ -25,11 +25,17 @@ export interface Assets {
 export interface InsurancePolicy {
   id: string;
   name: string;
+  policyType: 'whole-life' | 'term' | 'ilp' | 'endowment' | 'ci' | 'other';
   cashValue: number;
   annualGrowthRate: number;
   deathSumAssured: number;
   tpdSumAssured: number;
   ciSumAssured: number;
+  premiumAmount: number;
+  premiumFrequency: 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
+  premiumDueDay: number;
+  premiumPaymentTerm: 'whole-life' | 'limited';
+  premiumLimitedYears: number;
 }
 
 export type ScenarioType = 'none' | 'critical-illness' | 'tpd' | 'death';
