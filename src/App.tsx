@@ -23,9 +23,21 @@ import ExportReport from './components/ExportReport';
 import ScenarioPanel from './components/ScenarioPanel';
 import NavBar from './components/NavBar';
 import AdvisorDashboard from './components/AdvisorDashboard';
+import CoverageGapBar from './components/CoverageGapBar';
+import FamilyImpactPanel from './components/FamilyImpactPanel';
 import type { Session } from '@supabase/supabase-js';
 
-type BottomTab = 'none' | 'insights' | 'scenarios';
+type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
+
+function useWindowWidth() {
+  const [width, setWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return width;
+}
 
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
@@ -35,10 +47,12 @@ function Dashboard() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [profileSummaries, setProfileSummaries] = useState<Record<string, ProfileSummary>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [theme, toggleTheme] = useTheme();
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
 
   // Load initial profile on mount
   useEffect(() => {
@@ -116,6 +130,12 @@ function Dashboard() {
 
   const results = useMemo(() => calculate(effectiveInputs), [effectiveInputs]);
 
+  // Detect an unconfigured client (still showing default values)
+  const isDefaultClient =
+    inputs.income.annualIncome === defaultInputs.income.annualIncome &&
+    inputs.personal.currentAge === defaultInputs.personal.currentAge &&
+    inputs.assets.investments === defaultInputs.assets.investments;
+
   // Keep active client's on-track badge in sync as inputs change
   useEffect(() => {
     if (!activeProfile) return;
@@ -138,6 +158,11 @@ function Dashboard() {
       setScenario(s => ({ ...s, ageAtEvent: inputs.personal.currentAge + 5 }));
     }
   }, [inputs.personal.currentAge, scenario.ageAtEvent]);
+
+  // Auto-collapse sidebar on mobile
+  useEffect(() => {
+    if (isMobile) setSidebarCollapsed(true);
+  }, [isMobile]);
 
   // Auto-save with debounce
   const handleInputChange = useCallback((newInputs: FireInputs) => {
@@ -235,10 +260,10 @@ function Dashboard() {
         onClick={() => toggleTab('insights')}
         className="flex items-center gap-1.5"
         style={{
-          background: bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.15)' : '#1f2937',
-          border: `1px solid ${bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.4)' : '#374151'}`,
+          background: bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.15)' : 'var(--surface)',
+          border: `1px solid ${bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.4)' : 'var(--border)'}`,
           borderRadius: 8,
-          color: bottomTab === 'insights' ? '#34d399' : '#d1d5db',
+          color: bottomTab === 'insights' ? '#34d399' : 'var(--text-2)',
           padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
@@ -252,10 +277,10 @@ function Dashboard() {
         onClick={() => toggleTab('scenarios')}
         className="flex items-center gap-1.5"
         style={{
-          background: bottomTab === 'scenarios' ? 'rgba(239, 68, 68, 0.15)' : '#1f2937',
-          border: `1px solid ${bottomTab === 'scenarios' ? 'rgba(239, 68, 68, 0.4)' : '#374151'}`,
+          background: bottomTab === 'scenarios' ? 'rgba(239, 68, 68, 0.15)' : 'var(--surface)',
+          border: `1px solid ${bottomTab === 'scenarios' ? 'rgba(239, 68, 68, 0.4)' : 'var(--border)'}`,
           borderRadius: 8,
-          color: bottomTab === 'scenarios' ? '#f87171' : '#d1d5db',
+          color: bottomTab === 'scenarios' ? '#f87171' : 'var(--text-2)',
           padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
@@ -266,11 +291,28 @@ function Dashboard() {
         What If
       </button>
       <button
+        onClick={() => toggleTab('family')}
+        className="flex items-center gap-1.5"
+        style={{
+          background: bottomTab === 'family' ? 'rgba(251,146,60,0.15)' : 'var(--surface)',
+          border: `1px solid ${bottomTab === 'family' ? 'rgba(251,146,60,0.4)' : 'var(--border)'}`,
+          borderRadius: 8,
+          color: bottomTab === 'family' ? '#fb923c' : 'var(--text-2)',
+          padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        Family
+      </button>
+      <button
         onClick={() => setPresenting(true)}
         className="flex items-center gap-1.5"
         style={{
-          background: '#1f2937', border: '1px solid #374151', borderRadius: 8,
-          color: '#d1d5db', padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          color: 'var(--text-2)', padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
@@ -284,8 +326,8 @@ function Dashboard() {
         onClick={() => setEditModalOpen(true)}
         className="flex items-center gap-1.5"
         style={{
-          background: '#1f2937', border: '1px solid #374151', borderRadius: 8,
-          color: '#d1d5db', padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          color: 'var(--text-2)', padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
@@ -404,7 +446,43 @@ function Dashboard() {
       {/* Right side: chart + toggleable bottom panel */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Chart panel */}
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          {isDefaultClient && (
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+              padding: '16px 20px',
+              background: 'linear-gradient(to bottom, var(--bg) 60%, transparent 100%)',
+              pointerEvents: 'none',
+            }}>
+              <div style={{
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 12, padding: '14px 18px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                pointerEvents: 'auto',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 3 }}>
+                    👋 Enter this client's details to see their real projection
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-4)' }}>
+                    The chart is showing default placeholder values. Edit income, age, and assets to generate a personalised FIRE plan.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditModalOpen(true)}
+                  style={{
+                    flexShrink: 0, marginLeft: 20,
+                    background: '#10b981', border: 'none', borderRadius: 8,
+                    color: '#fff', padding: '8px 16px', fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Edit Details →
+                </button>
+              </div>
+            </div>
+          )}
           <ChartPanel
             results={results}
             retirementAge={inputs.personal.retirementAge}
@@ -415,6 +493,9 @@ function Dashboard() {
           />
         </div>
 
+        {/* Protection coverage gap bar */}
+        <CoverageGapBar inputs={inputs} />
+
         {/* Toggle bar: include/exclude individual purchases & policies */}
         <ToggleBar
           inputs={inputs}
@@ -424,19 +505,19 @@ function Dashboard() {
 
         {/* Collapsible bottom drawer */}
         <div style={{
-          maxHeight: isDrawerOpen ? 340 : 0,
+          maxHeight: isDrawerOpen ? 360 : 0,
           overflow: 'hidden',
           transition: 'max-height 0.3s ease',
           borderTop: isDrawerOpen ? '1px solid var(--border)' : 'none',
           background: 'var(--deep)',
         }}>
-          <div style={{ height: 340, overflowY: 'auto' }}>
+          <div style={{ height: 360, overflowY: 'auto' }}>
             {bottomTab === 'insights' && (
               <div style={{ display: 'flex', height: '100%' }}>
                 <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
                   <InsightsPanel inputs={inputs} results={results} />
                 </div>
-                <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid #1e293b', overflowY: 'auto' }}>
+                <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid var(--border)', overflowY: 'auto' }}>
                   <MilestoneTracker inputs={inputs} results={results} />
                 </div>
               </div>
@@ -449,6 +530,9 @@ function Dashboard() {
                 scenario={scenario}
                 onScenarioChange={setScenario}
               />
+            )}
+            {bottomTab === 'family' && (
+              <FamilyImpactPanel inputs={inputs} results={results} />
             )}
           </div>
         </div>

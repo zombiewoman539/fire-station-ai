@@ -110,6 +110,7 @@ function NumberField({ label, value, prefix, tip, small, onChange }: {
             const num = Number(e.target.value);
             if (!isNaN(num)) onChange(num);
           }}
+          onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); } }}
           style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, width: '100%' }} />
       </div>
     </div>
@@ -775,25 +776,41 @@ const NAV: { key: Section; icon: string; label: string }[] = [
 
 export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId, profile, onProfileMetaChange }: Props) {
   const [activeSection, setActiveSection] = React.useState<Section>('personal');
+  const activeSectionRef = React.useRef(activeSection);
+  activeSectionRef.current = activeSection;
 
-  // Close on Escape
+  // Close on Escape; arrow keys navigate sections
   React.useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const currentIdx = NAV.findIndex(n => n.key === activeSectionRef.current);
+        const nextIdx = e.key === 'ArrowDown'
+          ? (currentIdx + 1) % NAV.length
+          : (currentIdx - 1 + NAV.length) % NAV.length;
+        setActiveSection(NAV[nextIdx].key);
+        e.preventDefault();
+      }
+    };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
   if (!open) return null;
+  const isMobile = window.innerWidth < 768;
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '4vh' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'center', paddingTop: isMobile ? 0 : '4vh' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        width: 900, maxWidth: 'calc(100vw - 32px)', maxHeight: '92vh',
-        background: 'var(--surface)', borderRadius: 16,
+        width: isMobile ? '100vw' : 900,
+        maxWidth: isMobile ? '100vw' : 'calc(100vw - 32px)',
+        maxHeight: isMobile ? '100dvh' : '92vh',
+        height: isMobile ? '100dvh' : undefined,
+        background: 'var(--surface)', borderRadius: isMobile ? 0 : 16,
         border: '1px solid var(--border)',
         boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -814,33 +831,55 @@ export default function EditModal({ open, onClose, inputs, onChange, clientName,
         </div>
 
         {/* Body: nav + content */}
-        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          {/* Left nav */}
-          <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--border)', padding: '12px 8px', overflowY: 'auto', background: 'var(--deep)' }}>
-            {NAV.map(item => (
-              <button
-                key={item.key}
-                onClick={() => setActiveSection(item.key)}
-                style={{
-                  width: '100%', textAlign: 'left', background: activeSection === item.key ? 'rgba(16,185,129,0.12)' : 'none',
-                  border: activeSection === item.key ? '1px solid rgba(16,185,129,0.3)' : '1px solid transparent',
-                  borderRadius: 8, padding: '10px 12px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2,
-                  color: activeSection === item.key ? '#34d399' : 'var(--text-2)',
-                  fontSize: 13, fontWeight: activeSection === item.key ? 600 : 400,
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { if (activeSection !== item.key) (e.currentTarget as HTMLButtonElement).style.background = 'var(--card)'; }}
-                onMouseLeave={e => { if (activeSection !== item.key) (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
-              >
-                <span style={{ fontSize: 16 }}>{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, flexDirection: isMobile ? 'column' : 'row' }}>
+          {/* Nav — vertical on desktop, horizontal tabs on mobile */}
+          {isMobile ? (
+            <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border)', background: 'var(--deep)', flexShrink: 0, padding: '8px 8px 0' }}>
+              {NAV.map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveSection(item.key)}
+                  style={{
+                    flexShrink: 0, background: 'none', border: 'none',
+                    borderBottom: activeSection === item.key ? '2px solid #34d399' : '2px solid transparent',
+                    padding: '6px 12px 8px',
+                    color: activeSection === item.key ? '#34d399' : 'var(--text-3)',
+                    fontSize: 12, fontWeight: activeSection === item.key ? 600 : 400,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--border)', padding: '12px 8px', overflowY: 'auto', background: 'var(--deep)' }}>
+              {NAV.map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveSection(item.key)}
+                  style={{
+                    width: '100%', textAlign: 'left', background: activeSection === item.key ? 'rgba(16,185,129,0.12)' : 'none',
+                    border: activeSection === item.key ? '1px solid rgba(16,185,129,0.3)' : '1px solid transparent',
+                    borderRadius: 8, padding: '10px 12px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2,
+                    color: activeSection === item.key ? '#34d399' : 'var(--text-2)',
+                    fontSize: 13, fontWeight: activeSection === item.key ? 600 : 400,
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { if (activeSection !== item.key) (e.currentTarget as HTMLButtonElement).style.background = 'var(--card)'; }}
+                  onMouseLeave={e => { if (activeSection !== item.key) (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+                >
+                  <span style={{ fontSize: 16 }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Right content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 16px' : '24px 28px' }}>
             {activeSection === 'personal'  && <PersonalSection inputs={inputs} onChange={onChange} />}
             {activeSection === 'income'    && <IncomeSection inputs={inputs} onChange={onChange} />}
             {activeSection === 'assets'    && <AssetsSection inputs={inputs} onChange={onChange} />}

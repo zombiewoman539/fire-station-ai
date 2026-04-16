@@ -1,6 +1,7 @@
 import React from 'react';
 import { FireInputs, FireResults } from '../types';
 import { formatSGD } from '../calculations';
+import UrgencyTimeline from './UrgencyTimeline';
 
 interface Props {
   inputs: FireInputs;
@@ -169,12 +170,15 @@ export default function InsightsPanel({ inputs, results }: Props) {
   const warningCount = insights.filter(i => i.type === 'warning').length;
 
   return (
-    <div style={{ padding: '16px 16px 8px', borderTop: '1px solid #1f2937', flexShrink: 0 }}>
+    <div style={{ padding: '16px 16px 8px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+      {/* Urgency timeline — shown when protection gaps exist */}
+      <UrgencyTimeline inputs={inputs} />
+
       {/* Header with alert counts */}
       <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
         <div className="flex items-center gap-2">
           <span style={{ fontSize: 14 }}>💡</span>
-          <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 700 }}>Smart Insights</span>
+          <span style={{ color: 'var(--text-1)', fontSize: 13, fontWeight: 700 }}>Smart Insights</span>
         </div>
         <div className="flex items-center gap-2">
           {dangerCount > 0 && (
@@ -211,13 +215,13 @@ export default function InsightsPanel({ inputs, results }: Props) {
                   <div style={{ color: style.titleColor, fontSize: 12, fontWeight: 700, marginBottom: 3 }}>
                     {insight.title}
                   </div>
-                  <div style={{ color: '#9ca3af', fontSize: 11, lineHeight: 1.5 }}>
+                  <div style={{ color: 'var(--text-4)', fontSize: 11, lineHeight: 1.5 }}>
                     {insight.detail}
                   </div>
                   {insight.action && (
                     <div style={{
-                      color: '#d1d5db', fontSize: 11, lineHeight: 1.5,
-                      marginTop: 5, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,0.06)',
+                      color: 'var(--text-2)', fontSize: 11, lineHeight: 1.5,
+                      marginTop: 5, paddingTop: 5, borderTop: '1px solid var(--border-soft)',
                       fontStyle: 'italic',
                     }}>
                       → {insight.action}

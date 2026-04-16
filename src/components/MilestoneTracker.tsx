@@ -46,10 +46,10 @@ export default function MilestoneTracker({ inputs, results }: Props) {
     : 100;
 
   return (
-    <div style={{ padding: '12px 16px', borderTop: '1px solid #1f2937', flexShrink: 0 }}>
+    <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
       <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
         <span style={{ fontSize: 14 }}>🏁</span>
-        <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 700 }}>Wealth Milestones</span>
+        <span style={{ color: 'var(--text-1)', fontSize: 13, fontWeight: 700 }}>Wealth Milestones</span>
       </div>
 
       {/* Progress to next milestone */}
@@ -98,13 +98,13 @@ export default function MilestoneTracker({ inputs, results }: Props) {
               <span style={{ fontSize: 13, width: 20, textAlign: 'center' }}>{m.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  color: isPast ? '#34d399' : isFuture ? '#e5e7eb' : '#6b7280',
+                  color: isPast ? '#34d399' : isFuture ? 'var(--text-1)' : 'var(--text-4)',
                   fontSize: 11, fontWeight: 600,
                   textDecoration: isPast ? 'none' : 'none',
                 }}>
                   {m.label}
                 </div>
-                <div style={{ color: '#4b5563', fontSize: 10 }}>
+                <div style={{ color: 'var(--text-5)', fontSize: 10 }}>
                   {formatSGD(m.target)}
                 </div>
               </div>

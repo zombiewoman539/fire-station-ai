@@ -61,7 +61,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
       {/* Header */}
       <div className="flex items-center gap-2" style={{ marginBottom: 12 }}>
         <span style={{ fontSize: 15 }}>⚡</span>
-        <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 700 }}>What If Something Happens?</span>
+        <span style={{ color: 'var(--text-1)', fontSize: 13, fontWeight: 700 }}>What If Something Happens?</span>
       </div>
 
       {/* Scenario selector */}
@@ -73,14 +73,14 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
             style={{
               background: scenario.type === opt.value
                 ? (opt.value === 'none' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
-                : '#1e293b',
+                : 'var(--inset)',
               border: `1px solid ${scenario.type === opt.value
                 ? (opt.value === 'none' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)')
-                : '#334155'}`,
+                : 'var(--border)'}`,
               borderRadius: 8,
               color: scenario.type === opt.value
                 ? (opt.value === 'none' ? '#34d399' : '#f87171')
-                : '#94a3b8',
+                : 'var(--text-4)',
               padding: '6px 12px',
               fontSize: 11,
               fontWeight: 600,
@@ -97,7 +97,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
       {isActive && (
         <div style={{ marginBottom: 12 }}>
           <div className="flex justify-between" style={{ fontSize: 11, marginBottom: 4 }}>
-            <span style={{ color: '#94a3b8' }}>Age at event</span>
+            <span style={{ color: 'var(--text-4)' }}>Age at event</span>
             <span style={{ color: '#f87171', fontWeight: 700 }}>{scenario.ageAtEvent}</span>
           </div>
           <input
@@ -120,10 +120,10 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
               key={opt.value}
               onClick={() => onScenarioChange({ ...scenario, ciType: opt.value })}
               style={{
-                background: scenario.ciType === opt.value ? 'rgba(239, 68, 68, 0.12)' : '#1e293b',
-                border: `1px solid ${scenario.ciType === opt.value ? 'rgba(239, 68, 68, 0.3)' : '#334155'}`,
+                background: scenario.ciType === opt.value ? 'rgba(239, 68, 68, 0.12)' : 'var(--inset)',
+                border: `1px solid ${scenario.ciType === opt.value ? 'rgba(239, 68, 68, 0.3)' : 'var(--border)'}`,
                 borderRadius: 6,
-                color: scenario.ciType === opt.value ? '#fca5a5' : '#64748b',
+                color: scenario.ciType === opt.value ? '#fca5a5' : 'var(--text-4)',
                 padding: '5px 10px',
                 fontSize: 10,
                 fontWeight: 600,
@@ -140,65 +140,117 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
       {/* Impact details */}
       {isActive && scenarioResults && (
         <div>
-          {/* Impact summary cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            {/* Retirement wealth impact */}
+          {/* Before / After comparison card */}
+          <div style={{
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            marginBottom: 12,
+            overflow: 'hidden',
+          }}>
+            {/* Card header */}
             <div style={{
-              background: 'rgba(239, 68, 68, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              borderRadius: 10,
-              padding: '10px 12px',
+              padding: '7px 12px',
+              borderBottom: '1px solid var(--border)',
+              background: 'rgba(239,68,68,0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}>
-              <div style={{ color: '#94a3b8', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
-                Impact on Retirement
+              <span style={{ color: 'var(--text-1)', fontSize: 11, fontWeight: 700 }}>
+                📊 Retirement Impact — Age {scenario.ageAtEvent} Event
+              </span>
+              <span style={{
+                background: coverageRatio >= 0.8
+                  ? 'rgba(16,185,129,0.15)' : coverageRatio >= 0.4
+                    ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
+                color: coverageRatio >= 0.8 ? '#34d399' : coverageRatio >= 0.4 ? '#fbbf24' : '#f87171',
+                fontSize: 9,
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: 6,
+              }}>
+                {(coverageRatio * 100).toFixed(0)}% covered
+              </span>
+            </div>
+
+            {/* Two-column comparison */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              {/* Before */}
+              <div style={{ padding: '10px 12px', borderRight: '1px solid var(--border)' }}>
+                <div style={{ color: '#34d399', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  ✓ Without event
+                </div>
+                <CompareRow label="Retirement wealth" value={formatSGD(results.wealthAtRetirement)} color="var(--text-1)" />
+                <CompareRow label="FIRE number" value={formatSGD(results.fireNumber)} color="var(--text-4)" />
+                <CompareRow
+                  label="Status"
+                  value={results.onTrack ? 'On Track ✓' : 'Shortfall ✗'}
+                  color={results.onTrack ? '#34d399' : '#fbbf24'}
+                />
+                <CompareRow
+                  label="Funds last to"
+                  value={results.moneyRunsOutAge ? `Age ${results.moneyRunsOutAge}` : `Age ${inputs.personal.lifeExpectancy}+`}
+                  color={results.moneyRunsOutAge ? '#fbbf24' : '#34d399'}
+                />
               </div>
-              <div style={{ color: impact >= 0 ? '#34d399' : '#f87171', fontSize: 18, fontWeight: 700 }}>
-                {impact >= 0 ? '+' : ''}{formatSGD(impact)}
-              </div>
-              <div style={{ color: scenarioSurvives ? '#34d399' : '#f87171', fontSize: 10, fontWeight: 600 }}>
-                {scenarioSurvives ? 'Funds last to life expectancy' : `Depleted at age ${scenarioResults.moneyRunsOutAge}`}
+
+              {/* After */}
+              <div style={{ padding: '10px 12px' }}>
+                <div style={{ color: '#f87171', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  ✗ With event
+                </div>
+                <CompareRow
+                  label="Retirement wealth"
+                  value={formatSGD(scenarioWealth)}
+                  color={scenarioWealth < results.wealthAtRetirement ? '#f87171' : '#34d399'}
+                />
+                <CompareRow label="FIRE number" value={formatSGD(scenarioResults.fireNumber)} color="var(--text-4)" />
+                <CompareRow
+                  label="Status"
+                  value={scenarioSurvives ? 'On Track ✓' : 'Shortfall ✗'}
+                  color={scenarioSurvives ? '#34d399' : '#f87171'}
+                />
+                <CompareRow
+                  label="Funds last to"
+                  value={scenarioResults.moneyRunsOutAge ? `Age ${scenarioResults.moneyRunsOutAge}` : `Age ${inputs.personal.lifeExpectancy}+`}
+                  color={scenarioResults.moneyRunsOutAge ? '#f87171' : '#34d399'}
+                />
               </div>
             </div>
 
-            {/* Coverage assessment */}
+            {/* Delta footer */}
             <div style={{
-              background: coverageRatio >= 0.8
-                ? 'rgba(16, 185, 129, 0.08)' : coverageRatio >= 0.4
-                  ? 'rgba(251, 191, 36, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-              border: `1px solid ${coverageRatio >= 0.8
-                ? 'rgba(16, 185, 129, 0.2)' : coverageRatio >= 0.4
-                  ? 'rgba(251, 191, 36, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              borderRadius: 10,
-              padding: '10px 12px',
+              padding: '7px 12px',
+              borderTop: '1px solid var(--border)',
+              background: impact < 0 ? 'rgba(239,68,68,0.07)' : 'rgba(16,185,129,0.06)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}>
-              <div style={{ color: '#94a3b8', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
-                Coverage Level
-              </div>
-              <div style={{
-                color: coverageRatio >= 0.8 ? '#34d399' : coverageRatio >= 0.4 ? '#fbbf24' : '#f87171',
-                fontSize: 18, fontWeight: 700,
-              }}>
-                {(coverageRatio * 100).toFixed(0)}%
-              </div>
-              <div style={{ color: '#6b7280', fontSize: 10 }}>
-                {coverageRatio >= 0.8 ? 'Well covered' : coverageRatio >= 0.4 ? 'Partially covered' : 'Critically under-insured'}
-              </div>
+              <span style={{ color: 'var(--text-4)', fontSize: 10 }}>
+                {scenarioResults.moneyRunsOutAge
+                  ? `Funds depleted ${inputs.personal.lifeExpectancy - scenarioResults.moneyRunsOutAge} yrs before life expectancy`
+                  : 'Net retirement wealth change'}
+              </span>
+              <span style={{ color: impact < 0 ? '#f87171' : '#34d399', fontSize: 13, fontWeight: 700 }}>
+                {impact >= 0 ? '+' : ''}{formatSGD(impact)}
+              </span>
             </div>
           </div>
 
           {/* CI-specific cost breakdown */}
           {scenario.type === 'critical-illness' && ciData && (
             <div style={{
-              background: '#1e293b',
-              border: '1px solid #334155',
+              background: 'var(--inset)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
               padding: '12px',
               marginBottom: 10,
             }}>
-              <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ color: 'var(--text-1)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
                 {ciData.icon} {ciData.label} — Cost Breakdown
               </div>
-              <div style={{ color: '#94a3b8', fontSize: 10, lineHeight: 1.4, marginBottom: 10 }}>
+              <div style={{ color: 'var(--text-4)', fontSize: 10, lineHeight: 1.4, marginBottom: 10 }}>
                 {ciData.description}
               </div>
 
@@ -207,7 +259,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                 <CostRow label={`Ongoing (${ciData.ongoingYears} years)`} amount={ciData.annualOngoing * ciData.ongoingYears} />
                 <CostRow label={`Income Loss (~${ciData.incomeImpactMonths} months)`}
                   amount={Math.round(inputs.income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8)} />
-                <div style={{ borderTop: '1px solid #334155', paddingTop: 6, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>Total Financial Impact</span>
                   <span style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>
                     {formatSGD(totalCiCost + Math.round(inputs.income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8))}
@@ -228,7 +280,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                     <div style={{ color: '#fca5a5', fontSize: 10, fontWeight: 700 }}>
                       Coverage Gap: {formatSGD(totalCiCost - totalCiSA)}
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
+                    <div style={{ color: 'var(--text-4)', fontSize: 10, marginTop: 2 }}>
                       Without sufficient CI coverage, treatment costs will severely deplete your savings and delay FIRE by years.
                     </div>
                   </div>
@@ -240,16 +292,16 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
           {/* TPD breakdown */}
           {scenario.type === 'tpd' && (
             <div style={{
-              background: '#1e293b',
-              border: '1px solid #334155',
+              background: 'var(--inset)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
               padding: '12px',
               marginBottom: 10,
             }}>
-              <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ color: 'var(--text-1)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
                 🦽 Total Permanent Disability Impact
               </div>
-              <div style={{ color: '#94a3b8', fontSize: 10, lineHeight: 1.5, marginBottom: 8 }}>
+              <div style={{ color: 'var(--text-4)', fontSize: 10, lineHeight: 1.5, marginBottom: 8 }}>
                 Unable to work permanently. All earned income stops from age {scenario.ageAtEvent}. Family depends on savings, insurance payout, and CPF.
               </div>
               <CostRow label="Lost Lifetime Income" amount={Math.round(inputs.income.annualIncome * (inputs.personal.retirementAge - scenario.ageAtEvent))} />
@@ -263,16 +315,16 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
           {/* Death breakdown */}
           {scenario.type === 'death' && (
             <div style={{
-              background: '#1e293b',
-              border: '1px solid #334155',
+              background: 'var(--inset)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
               padding: '12px',
               marginBottom: 10,
             }}>
-              <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ color: 'var(--text-1)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
                 ☠️ Death — Family Impact
               </div>
-              <div style={{ color: '#94a3b8', fontSize: 10, lineHeight: 1.5, marginBottom: 8 }}>
+              <div style={{ color: 'var(--text-4)', fontSize: 10, lineHeight: 1.5, marginBottom: 8 }}>
                 Family loses all earned income from age {scenario.ageAtEvent}. Dependents must rely on insurance payout, accumulated savings, and CPF.
               </div>
               <CostRow label="Lost Lifetime Income" amount={Math.round(inputs.income.annualIncome * (inputs.personal.retirementAge - scenario.ageAtEvent))} />
@@ -288,14 +340,14 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
 
       {!isActive && (
         <div style={{
-          background: '#1e293b',
-          border: '1px solid #334155',
+          background: 'var(--inset)',
+          border: '1px solid var(--border)',
           borderRadius: 10,
           padding: '16px',
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>🛡️</div>
-          <div style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.5 }}>
+          <div style={{ color: 'var(--text-4)', fontSize: 12, lineHeight: 1.5 }}>
             Select a scenario above to see how unexpected life events could impact your financial plan — and whether your insurance coverage is sufficient.
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 12 }}>
@@ -309,11 +361,20 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
   );
 }
 
+function CompareRow({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ color: 'var(--text-5)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 1 }}>{label}</div>
+      <div style={{ color, fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>{value}</div>
+    </div>
+  );
+}
+
 function CostRow({ label, amount }: { label: string; amount: number }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ color: '#94a3b8', fontSize: 10 }}>{label}</span>
-      <span style={{ color: '#e2e8f0', fontSize: 10, fontWeight: 600 }}>{formatSGD(amount)}</span>
+      <span style={{ color: 'var(--text-4)', fontSize: 10 }}>{label}</span>
+      <span style={{ color: 'var(--text-1)', fontSize: 10, fontWeight: 600 }}>{formatSGD(amount)}</span>
     </div>
   );
 }
@@ -322,7 +383,7 @@ function CoverageBadge({ label, amount }: { label: string; amount: number }) {
   const color = amount > 0 ? '#34d399' : '#f87171';
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ color: '#6b7280', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
+      <div style={{ color: 'var(--text-4)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
       <div style={{ color, fontSize: 12, fontWeight: 700 }}>{amount > 0 ? formatSGD(amount) : 'None'}</div>
     </div>
   );
