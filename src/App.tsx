@@ -325,7 +325,7 @@ function Dashboard() {
   const isDrawerOpen = bottomTab !== 'none';
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)', position: 'relative' }}>
       {/* Left sidebar: client list */}
       <div style={{
         width: sidebarCollapsed ? 0 : 280,
