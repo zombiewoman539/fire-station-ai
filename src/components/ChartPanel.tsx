@@ -72,7 +72,9 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
   const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
   const [popupPos, setPopupPos] = React.useState({ top: 0, left: 0 });
-  const [hideCash, setHideCash] = React.useState(true);
+  const [hideCash, setHideCash] = React.useState(
+    () => localStorage.getItem('fa-show-cash') === 'false'
+  );
   const [hideInsurance, setHideInsurance] = React.useState(false);
   const fireCardRef = React.useRef<HTMLDivElement>(null);
 

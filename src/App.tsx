@@ -25,6 +25,7 @@ import NavBar from './components/NavBar';
 import AdvisorDashboard from './components/AdvisorDashboard';
 import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
+import SettingsPage from './components/SettingsPage';
 import type { Session } from '@supabase/supabase-js';
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
@@ -47,7 +48,9 @@ function Dashboard() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('fa-sidebar-open') !== 'true'
+  );
   const [profileSummaries, setProfileSummaries] = useState<Record<string, ProfileSummary>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [theme, toggleTheme] = useTheme();
@@ -593,6 +596,7 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<AdvisorDashboard />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
     </div>
