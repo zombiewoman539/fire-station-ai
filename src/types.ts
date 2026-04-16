@@ -2,6 +2,7 @@ export interface PersonalDetails {
   currentAge: number;
   retirementAge: number;
   lifeExpectancy: number;
+  dateOfBirth?: string | null; // YYYY-MM-DD — used to auto-calculate live age on dashboard
 }
 
 export interface IncomeExpenses {
@@ -38,6 +39,12 @@ export interface InsurancePolicy {
   premiumLimitedYears: number;
   nomineeName: string;           // free-text nominee name
   nomineeClientId: string | null; // linked FIRE Station client ID (optional)
+  // Policy management fields
+  insurer: string;               // insurance company name
+  policyNumber: string;          // contract/policy number
+  policyStatus: 'in-force' | 'lapsed' | 'surrendered' | 'claimed' | 'matured';
+  commencementDate: string | null; // YYYY-MM-DD — when policy started
+  maturityDate: string | null;     // YYYY-MM-DD — when policy ends (term/endowment)
 }
 
 export interface EstatePlanning {

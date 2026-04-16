@@ -5,9 +5,23 @@ import { calculate } from '../calculations';
 import { ClientProfile } from '../profileTypes';
 import { FireResults } from '../types';
 
+// Compute live age from date of birth. Falls back to the plan's currentAge if no DOB set.
+function getLiveAge(profile: ClientProfile): number {
+  const dob = profile.inputs.personal?.dateOfBirth;
+  if (dob) {
+    const today = new Date();
+    const birth = new Date(dob);
+    let age = today.getFullYear() - birth.getFullYear();
+    if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
+    return age;
+  }
+  return profile.inputs.personal?.currentAge ?? 0;
+}
+
 interface ClientRow {
   profile: ClientProfile;
   results: FireResults;
+  liveAge: number;
   totalDeathSA: number;
   totalPremiumPA: number;
   hasMissingInsurance: boolean;
@@ -16,6 +30,7 @@ interface ClientRow {
 
 type SortKey = 'name' | 'age' | 'retirementAge' | 'onTrack' | 'wealth' | 'coverage';
 type SortDir = 'asc' | 'desc';
+type AgeFilter = 'all' | 'under30' | '30s' | '40s' | '50s' | '60+';
 
 function formatSGDK(n: number) {
   if (Math.abs(n) >= 1_000_000) return `S$${(n / 1_000_000).toFixed(1)}M`;
@@ -47,11 +62,13 @@ export default function AdvisorDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall' | 'gaps'>('all');
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>('all');
 
   useEffect(() => {
     listProfiles().then(profiles => {
       const built: ClientRow[] = profiles.map(profile => {
         const results = calculate(profile.inputs);
+        const liveAge = getLiveAge(profile);
         const policies = profile.inputs.policies || [];
         const totalDeathSA = policies.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
         const freq: Record<string, number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 };
@@ -59,7 +76,7 @@ export default function AdvisorDashboard() {
         const hasMissingInsurance = policies.length === 0 || totalDeathSA === 0;
         const ep = profile.inputs.estatePlanning;
         const hasMissingEstate = !ep?.lpa || !ep?.will;
-        return { profile, results, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate };
+        return { profile, results, liveAge, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate };
       });
       setRows(built);
       setLoading(false);
@@ -84,11 +101,16 @@ export default function AdvisorDashboard() {
     if (filter === 'on-track') list = list.filter(r => r.results.onTrack);
     if (filter === 'shortfall') list = list.filter(r => !r.results.onTrack);
     if (filter === 'gaps') list = list.filter(r => r.hasMissingInsurance || r.hasMissingEstate);
+    if (ageFilter === 'under30') list = list.filter(r => r.liveAge < 30);
+    if (ageFilter === '30s') list = list.filter(r => r.liveAge >= 30 && r.liveAge < 40);
+    if (ageFilter === '40s') list = list.filter(r => r.liveAge >= 40 && r.liveAge < 50);
+    if (ageFilter === '50s') list = list.filter(r => r.liveAge >= 50 && r.liveAge < 60);
+    if (ageFilter === '60+') list = list.filter(r => r.liveAge >= 60);
     return [...list].sort((a, b) => {
       let av: string | number = 0;
       let bv: string | number = 0;
       if (sortKey === 'name') { av = a.profile.name.toLowerCase(); bv = b.profile.name.toLowerCase(); }
-      if (sortKey === 'age') { av = a.profile.inputs.personal?.currentAge || 0; bv = b.profile.inputs.personal?.currentAge || 0; }
+      if (sortKey === 'age') { av = a.liveAge; bv = b.liveAge; }
       if (sortKey === 'retirementAge') { av = a.profile.inputs.personal?.retirementAge || 0; bv = b.profile.inputs.personal?.retirementAge || 0; }
       if (sortKey === 'onTrack') { av = a.results.onTrack ? 1 : 0; bv = b.results.onTrack ? 1 : 0; }
       if (sortKey === 'wealth') { av = a.results.wealthAtRetirement; bv = b.results.wealthAtRetirement; }
@@ -97,7 +119,7 @@ export default function AdvisorDashboard() {
       if (av > bv) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [rows, filter, sortKey, sortDir]);
+  }, [rows, filter, ageFilter, sortKey, sortDir]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -181,7 +203,7 @@ export default function AdvisorDashboard() {
         </div>
 
         {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
           {([
             { key: 'all', label: 'All Clients' },
             { key: 'on-track', label: '✓ On Track' },
@@ -202,7 +224,34 @@ export default function AdvisorDashboard() {
               {f.label}
             </button>
           ))}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-4)', alignSelf: 'center' }}>
+        </div>
+
+        {/* Age filter */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 4 }}>Age</span>
+          {([
+            { key: 'all', label: 'All' },
+            { key: 'under30', label: 'Under 30' },
+            { key: '30s', label: '30–39' },
+            { key: '40s', label: '40–49' },
+            { key: '50s', label: '50–59' },
+            { key: '60+', label: '60+' },
+          ] as const).map(f => (
+            <button
+              key={f.key}
+              onClick={() => setAgeFilter(f.key)}
+              style={{
+                padding: '4px 11px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: '1px solid',
+                background: ageFilter === f.key ? 'rgba(129,140,248,0.15)' : 'var(--card)',
+                color: ageFilter === f.key ? '#818cf8' : 'var(--text-4)',
+                borderColor: ageFilter === f.key ? 'rgba(129,140,248,0.4)' : 'var(--border)',
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-4)' }}>
             {filtered.length} client{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -236,7 +285,6 @@ export default function AdvisorDashboard() {
                 const ep = profile.inputs.estatePlanning;
                 const lpa = ep?.lpa ?? false;
                 const will = ep?.will ?? false;
-                const age = profile.inputs.personal?.currentAge;
                 const retAge = profile.inputs.personal?.retirementAge;
 
                 return (
@@ -264,7 +312,12 @@ export default function AdvisorDashboard() {
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{profile.name}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-2)' }}>{age ?? '—'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-2)' }}>
+                      {row.liveAge}
+                      {profile.inputs.personal?.dateOfBirth && (
+                        <span style={{ fontSize: 10, color: 'var(--text-5)', marginLeft: 4 }}>live</span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-2)' }}>{retAge ?? '—'}</td>
                     <td style={{ padding: '12px 14px' }}>
                       <span style={{

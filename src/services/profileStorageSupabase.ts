@@ -38,6 +38,11 @@ function migrateInputs(inputs: any): FireInputs {
       premiumLimitedYears: p.premiumLimitedYears ?? 0,
       nomineeName: p.nomineeName ?? '',
       nomineeClientId: p.nomineeClientId ?? null,
+      insurer: p.insurer ?? '',
+      policyNumber: p.policyNumber ?? '',
+      policyStatus: p.policyStatus ?? 'in-force',
+      commencementDate: p.commencementDate ?? null,
+      maturityDate: p.maturityDate ?? null,
     })),
     estatePlanning: {
       lpa: inputs.estatePlanning?.lpa ?? false,

@@ -44,6 +44,8 @@ export const defaultInputs: FireInputs = {
       premiumAmount: 200, premiumFrequency: 'monthly',
       premiumDueDay: 1, premiumPaymentTerm: 'whole-life', premiumLimitedYears: 0,
       nomineeName: '', nomineeClientId: null,
+      insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
+      commencementDate: null, maturityDate: null,
     },
   ],
   purchases: defaultPurchases,

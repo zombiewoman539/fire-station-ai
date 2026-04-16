@@ -152,10 +152,49 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function PersonalSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
   const upd = (field: string, v: number) => onChange({ ...inputs, personal: { ...inputs.personal, [field]: v } });
+  const updDob = (dob: string | null) => onChange({ ...inputs, personal: { ...inputs.personal, dateOfBirth: dob || null } });
+
+  // Compute live age from DOB for display
+  const liveDobAge = (() => {
+    const dob = inputs.personal.dateOfBirth;
+    if (!dob) return null;
+    const today = new Date();
+    const birth = new Date(dob);
+    let age = today.getFullYear() - birth.getFullYear();
+    if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
+    return age;
+  })();
+
   return (
     <div>
+      {/* Date of Birth */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 6, fontWeight: 600 }}>
+          Date of Birth
+          <span style={{ fontWeight: 400, color: 'var(--text-5)', fontSize: 11, marginLeft: 6 }}>
+            — used to track live age on Dashboard (doesn't affect financial plan)
+          </span>
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="date"
+            value={inputs.personal.dateOfBirth ?? ''}
+            onChange={e => updDob(e.target.value || null)}
+            style={{
+              background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+              borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+            }}
+          />
+          {liveDobAge !== null && (
+            <span style={{ fontSize: 12, color: 'var(--text-4)' }}>
+              Currently <strong style={{ color: 'var(--text-2)' }}>{liveDobAge}</strong> years old today
+            </span>
+          )}
+        </div>
+      </div>
+
       <SliderField label="Current Age" value={inputs.personal.currentAge} min={18} max={70}
-        tip="Your age today. The projection starts from this age."
+        tip="Age used for the financial projection. Set this to the age when the plan was created — it won't change over time automatically."
         onChange={v => upd('currentAge', v)} />
       <SliderField label="Retirement Age" value={inputs.personal.retirementAge} min={40} max={80}
         tip="The age you plan to stop working. Income stops and retirement drawdown begins."
@@ -252,6 +291,8 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
     premiumAmount: 0, premiumFrequency: 'monthly',
     premiumDueDay: 1, premiumPaymentTerm: 'whole-life', premiumLimitedYears: 0,
     nomineeName: '', nomineeClientId: null,
+    insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
+    commencementDate: null, maturityDate: null,
   }]);
 
   const POLICY_TYPES = [
@@ -299,6 +340,90 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
             options={POLICY_TYPES}
             onChange={v => upd(p.id, 'policyType', v)}
           />
+
+          {/* Policy management details */}
+          <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>
+            <SectionLabel>Policy Details</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              {/* Insurer */}
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>Insurer</label>
+                <input
+                  list={`insurer-list-${p.id}`}
+                  value={p.insurer}
+                  onChange={e => upd(p.id, 'insurer', e.target.value)}
+                  placeholder="e.g. AIA, Prudential…"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                    borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                  }}
+                />
+                <datalist id={`insurer-list-${p.id}`}>
+                  {['AIA', 'Prudential', 'Great Eastern', 'Income Insurance', 'Manulife', 'AXA', 'HSBC Life', 'Singlife', 'Tokio Marine', 'FWD', 'Sun Life'].map(i => (
+                    <option key={i} value={i} />
+                  ))}
+                </datalist>
+              </div>
+              {/* Policy number */}
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>Policy Number</label>
+                <input
+                  value={p.policyNumber}
+                  onChange={e => upd(p.id, 'policyNumber', e.target.value)}
+                  placeholder="Contract / policy no."
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                    borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+            {/* Status */}
+            <SelectField
+              label="Status"
+              value={p.policyStatus}
+              options={[
+                { value: 'in-force', label: 'In Force' },
+                { value: 'lapsed', label: 'Lapsed' },
+                { value: 'surrendered', label: 'Surrendered' },
+                { value: 'claimed', label: 'Claimed' },
+                { value: 'matured', label: 'Matured' },
+              ]}
+              onChange={v => upd(p.id, 'policyStatus', v)}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>Commencement Date</label>
+                <input
+                  type="date"
+                  value={p.commencementDate ?? ''}
+                  onChange={e => upd(p.id, 'commencementDate', e.target.value || null)}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                    borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
+                  Maturity Date <span style={{ color: 'var(--text-5)', fontSize: 10 }}>(term / endowment)</span>
+                </label>
+                <input
+                  type="date"
+                  value={p.maturityDate ?? ''}
+                  onChange={e => upd(p.id, 'maturityDate', e.target.value || null)}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                    borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Premium section */}
           <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>
