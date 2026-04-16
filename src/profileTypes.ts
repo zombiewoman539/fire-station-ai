@@ -6,4 +6,8 @@ export interface ClientProfile {
   createdAt: string;
   updatedAt: string;
   inputs: FireInputs;
+  // CRM / activity tracking
+  lastMeetingDate: string | null;  // YYYY-MM-DD
+  nextReviewDate: string | null;   // YYYY-MM-DD
+  notes: string;                   // free-text advisor notes
 }

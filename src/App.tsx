@@ -56,6 +56,9 @@ function Dashboard() {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             inputs: defaultInputs,
+            lastMeetingDate: null,
+            nextReviewDate: null,
+            notes: '',
           };
           setActiveProfile(localProfile);
           clearTimeout(timeout);
@@ -162,6 +165,25 @@ function Dashboard() {
     localStorage.setItem('fire-active-profile', profile.id);
     setSaveStatus('idle');
   }, []);
+
+  // Updates CRM meta fields (lastMeetingDate, nextReviewDate, notes) and saves
+  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'>>) => {
+    if (!activeProfile) return;
+    const updated = { ...activeProfile, ...updates, updatedAt: new Date().toISOString() };
+    setActiveProfile(updated);
+    setSaveStatus('saving');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await saveProfile(updated);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (e) {
+        console.error('Save failed:', e);
+        setSaveStatus('idle');
+      }
+    }, 800);
+  }, [activeProfile]);
 
   const handleNewProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
@@ -375,6 +397,8 @@ function Dashboard() {
         onChange={handleInputChange}
         clientName={activeProfile?.name}
         currentProfileId={activeProfile?.id}
+        profile={activeProfile}
+        onProfileMetaChange={handleProfileMetaChange}
       />
 
       {/* Right side: chart + toggleable bottom panel */}

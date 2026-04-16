@@ -59,6 +59,9 @@ export function createProfile(name: string, inputs?: FireInputs): ClientProfile 
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     inputs: inputs || { ...defaultInputs },
+    lastMeetingDate: null,
+    nextReviewDate: null,
+    notes: '',
   };
   saveProfile(profile);
   return profile;
@@ -91,6 +94,9 @@ export function importProfile(json: string): ClientProfile {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     inputs: parsed.inputs || defaultInputs,
+    lastMeetingDate: null,
+    nextReviewDate: null,
+    notes: '',
   };
   saveProfile(profile);
   return profile;

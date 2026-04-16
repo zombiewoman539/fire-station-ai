@@ -26,6 +26,8 @@ interface ClientRow {
   totalPremiumPA: number;
   hasMissingInsurance: boolean;
   hasMissingEstate: boolean;
+  daysSinceMeeting: number | null;
+  reviewOverdue: boolean;
 }
 
 type SortKey = 'name' | 'age' | 'retirementAge' | 'onTrack' | 'wealth' | 'coverage';
@@ -61,7 +63,7 @@ export default function AdvisorDashboard() {
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall' | 'gaps'>('all');
+  const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall' | 'gaps' | 'overdue'>('all');
   const [ageFilter, setAgeFilter] = useState<AgeFilter>('all');
 
   useEffect(() => {
@@ -76,7 +78,12 @@ export default function AdvisorDashboard() {
         const hasMissingInsurance = policies.length === 0 || totalDeathSA === 0;
         const ep = profile.inputs.estatePlanning;
         const hasMissingEstate = !ep?.lpa || !ep?.will;
-        return { profile, results, liveAge, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate };
+        const daysSinceMeeting = profile.lastMeetingDate
+          ? Math.floor((Date.now() - new Date(profile.lastMeetingDate).getTime()) / 86400000)
+          : null;
+        const reviewDate = profile.nextReviewDate ? new Date(profile.nextReviewDate) : null;
+        const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
+        return { profile, results, liveAge, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate, daysSinceMeeting, reviewOverdue };
       });
       setRows(built);
       setLoading(false);
@@ -93,7 +100,9 @@ export default function AdvisorDashboard() {
     }).length;
     const noInsurance = rows.filter(r => r.hasMissingInsurance).length;
     const missingEstate = rows.filter(r => r.hasMissingEstate).length;
-    return { total, onTrack, shortfall, noInvestments, noInsurance, missingEstate };
+    const overdueReview = rows.filter(r => r.reviewOverdue || (r.daysSinceMeeting !== null && r.daysSinceMeeting > 365)).length;
+    const neverMet = rows.filter(r => r.daysSinceMeeting === null).length;
+    return { total, onTrack, shortfall, noInvestments, noInsurance, missingEstate, overdueReview, neverMet };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -101,6 +110,7 @@ export default function AdvisorDashboard() {
     if (filter === 'on-track') list = list.filter(r => r.results.onTrack);
     if (filter === 'shortfall') list = list.filter(r => !r.results.onTrack);
     if (filter === 'gaps') list = list.filter(r => r.hasMissingInsurance || r.hasMissingEstate);
+    if (filter === 'overdue') list = list.filter(r => r.reviewOverdue || (r.daysSinceMeeting !== null && r.daysSinceMeeting > 365) || r.daysSinceMeeting === null);
     if (ageFilter === 'under30') list = list.filter(r => r.liveAge < 30);
     if (ageFilter === '30s') list = list.filter(r => r.liveAge >= 30 && r.liveAge < 40);
     if (ageFilter === '40s') list = list.filter(r => r.liveAge >= 40 && r.liveAge < 50);
@@ -200,6 +210,12 @@ export default function AdvisorDashboard() {
             sub="no LPA or no Will"
             color={stats.missingEstate > 0 ? '#818cf8' : 'var(--text-1)'}
           />
+          <StatCard
+            label="Needs Follow-up"
+            value={stats.overdueReview + stats.neverMet}
+            sub={`${stats.overdueReview} overdue · ${stats.neverMet} never met`}
+            color={(stats.overdueReview + stats.neverMet) > 0 ? '#fb923c' : 'var(--text-1)'}
+          />
         </div>
 
         {/* Filter tabs */}
@@ -209,6 +225,7 @@ export default function AdvisorDashboard() {
             { key: 'on-track', label: '✓ On Track' },
             { key: 'shortfall', label: '⚠ Shortfall' },
             { key: 'gaps', label: 'Has Gaps' },
+            { key: 'overdue', label: '📅 Needs Follow-up' },
           ] as const).map(f => (
             <button
               key={f.key}
@@ -269,6 +286,7 @@ export default function AdvisorDashboard() {
                 <th style={thStyle('coverage')} onClick={() => handleSort('coverage')}>Death Coverage{sortArrow('coverage')}</th>
                 <th style={thPlain}>LPA</th>
                 <th style={thPlain}>Will</th>
+                <th style={thPlain}>Last Met</th>
                 <th style={thPlain}></th>
               </tr>
             </thead>
@@ -350,6 +368,18 @@ export default function AdvisorDashboard() {
                         color: will ? '#818cf8' : 'var(--text-4)',
                         border: `1px solid ${will ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
                       }}>{will ? '✓' : '—'}</span>
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      {row.daysSinceMeeting === null ? (
+                        <span style={{ fontSize: 11, color: 'var(--text-5)' }}>Never</span>
+                      ) : (
+                        <span style={{
+                          fontSize: 11, fontWeight: 600,
+                          color: row.daysSinceMeeting > 365 ? '#f87171' : row.daysSinceMeeting > 180 ? '#fbbf24' : 'var(--text-3)',
+                        }}>
+                          {row.daysSinceMeeting === 0 ? 'Today' : `${row.daysSinceMeeting}d ago`}
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       <button

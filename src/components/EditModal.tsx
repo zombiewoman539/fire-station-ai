@@ -11,9 +11,11 @@ interface Props {
   onChange: (inputs: FireInputs) => void;
   clientName?: string;
   currentProfileId?: string;
+  profile?: ClientProfile | null;
+  onProfileMetaChange?: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'>>) => void;
 }
 
-type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases' | 'estate';
+type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases' | 'estate' | 'activity';
 
 let _nextId = 200;
 const uid = () => String(++_nextId);
@@ -676,6 +678,90 @@ function EstatePlanningSection({ inputs, onChange }: { inputs: FireInputs; onCha
   );
 }
 
+function ActivitySection({ profile, onMetaChange }: {
+  profile: ClientProfile | null | undefined;
+  onMetaChange: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'>>) => void;
+}) {
+  const lastMeeting = profile?.lastMeetingDate ?? '';
+  const nextReview = profile?.nextReviewDate ?? '';
+  const notes = profile?.notes ?? '';
+
+  const daysSinceMeeting = lastMeeting ? Math.floor((Date.now() - new Date(lastMeeting).getTime()) / 86400000) : null;
+  const reviewDate = nextReview ? new Date(nextReview) : null;
+  const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
+  const daysUntilReview = reviewDate ? Math.ceil((reviewDate.getTime() - Date.now()) / 86400000) : null;
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+    borderRadius: 8, padding: '8px 12px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 20, lineHeight: 1.6 }}>
+        Track client meetings, schedule reviews, and keep advisor notes. None of this affects financial calculations.
+      </div>
+
+      {/* Last Meeting */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
+          Last Meeting Date
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input type="date" value={lastMeeting} onChange={e => onMetaChange({ lastMeetingDate: e.target.value || null })} style={inputStyle} />
+          {daysSinceMeeting !== null && (
+            <span style={{
+              fontSize: 12, whiteSpace: 'nowrap', fontWeight: 600,
+              color: daysSinceMeeting > 365 ? '#f87171' : daysSinceMeeting > 180 ? '#fbbf24' : '#34d399',
+            }}>
+              {daysSinceMeeting === 0 ? 'Today' : `${daysSinceMeeting} days ago`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Next Review */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
+          Next Review Date
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input type="date" value={nextReview} onChange={e => onMetaChange({ nextReviewDate: e.target.value || null })} style={inputStyle} />
+          {daysUntilReview !== null && (
+            <span style={{
+              fontSize: 12, whiteSpace: 'nowrap', fontWeight: 600,
+              color: reviewOverdue ? '#f87171' : daysUntilReview <= 14 ? '#fbbf24' : '#34d399',
+            }}>
+              {reviewOverdue
+                ? `Overdue by ${Math.abs(daysUntilReview)} days`
+                : daysUntilReview === 0 ? 'Today'
+                : `In ${daysUntilReview} days`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
+          Advisor Notes
+        </label>
+        <textarea
+          value={notes}
+          onChange={e => onMetaChange({ notes: e.target.value })}
+          placeholder="Client preferences, key concerns, action items, follow-ups…"
+          rows={8}
+          style={{
+            ...inputStyle,
+            resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Main EditModal ─────────────────────────────────────────────────────────────
 const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'personal',  icon: '👤', label: 'Personal' },
@@ -684,9 +770,10 @@ const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'insurance', icon: '🛡️', label: 'Insurance' },
   { key: 'purchases', icon: '🏠', label: 'Life Purchases' },
   { key: 'estate',    icon: '📋', label: 'Estate Planning' },
+  { key: 'activity',  icon: '📅', label: 'Activity & Notes' },
 ];
 
-export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId }: Props) {
+export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId, profile, onProfileMetaChange }: Props) {
   const [activeSection, setActiveSection] = React.useState<Section>('personal');
 
   // Close on Escape
@@ -760,6 +847,7 @@ export default function EditModal({ open, onClose, inputs, onChange, clientName,
             {activeSection === 'insurance' && <InsuranceSection inputs={inputs} onChange={onChange} currentProfileId={currentProfileId} />}
             {activeSection === 'purchases' && <PurchasesSection inputs={inputs} onChange={onChange} />}
             {activeSection === 'estate'    && <EstatePlanningSection inputs={inputs} onChange={onChange} />}
+            {activeSection === 'activity'  && <ActivitySection profile={profile} onMetaChange={onProfileMetaChange ?? (() => {})} />}
           </div>
         </div>
       </div>

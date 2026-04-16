@@ -255,6 +255,12 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
           const ep = liveProfile.inputs?.estatePlanning;
           const lpa = ep?.lpa ?? false;
           const will = ep?.will ?? false;
+          // Activity indicators
+          const daysSinceMeeting = liveProfile.lastMeetingDate
+            ? Math.floor((Date.now() - new Date(liveProfile.lastMeetingDate).getTime()) / 86400000)
+            : null;
+          const reviewDate = liveProfile.nextReviewDate ? new Date(liveProfile.nextReviewDate) : null;
+          const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
 
           return (
             <div
@@ -318,6 +324,25 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                         border: `1px solid ${summary.onTrack ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
                       }}>
                         {summary.onTrack ? '✓ On Track' : '⚠ Shortfall'}
+                      </span>
+                    )}
+                    {/* Activity indicators */}
+                    {daysSinceMeeting !== null && daysSinceMeeting > 180 && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+                        background: 'rgba(239,68,68,0.12)', color: '#f87171',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                      }} title={`Last met ${daysSinceMeeting} days ago`}>
+                        {daysSinceMeeting > 365 ? '1yr+' : '6mo+'} ago
+                      </span>
+                    )}
+                    {reviewOverdue && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+                        background: 'rgba(251,191,36,0.12)', color: '#fbbf24',
+                        border: '1px solid rgba(251,191,36,0.3)',
+                      }} title="Review is overdue">
+                        Review due
                       </span>
                     )}
                     <span

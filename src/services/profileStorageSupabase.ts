@@ -51,6 +51,14 @@ function migrateInputs(inputs: any): FireInputs {
   };
 }
 
+function parseMeta(meta: any): Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'> {
+  return {
+    lastMeetingDate: meta?.lastMeetingDate ?? null,
+    nextReviewDate: meta?.nextReviewDate ?? null,
+    notes: meta?.notes ?? '',
+  };
+}
+
 // Purge records that were soft-deleted more than 7 days ago.
 // Called on every listProfiles() so cleanup happens automatically over time.
 async function purgeExpiredDeletions(): Promise<void> {
@@ -80,6 +88,7 @@ export async function listProfiles(): Promise<ClientProfile[]> {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
+    ...parseMeta(row.meta),
   }));
 }
 
@@ -99,6 +108,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
+    ...parseMeta(data.meta),
   };
 }
 
@@ -113,6 +123,11 @@ export async function saveProfile(profile: ClientProfile): Promise<void> {
       user_id: user.id,
       name: profile.name,
       inputs: profile.inputs,
+      meta: {
+        lastMeetingDate: profile.lastMeetingDate ?? null,
+        nextReviewDate: profile.nextReviewDate ?? null,
+        notes: profile.notes ?? '',
+      },
       updated_at: new Date().toISOString(),
     });
 
@@ -129,6 +144,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
       user_id: user.id,
       name,
       inputs: inputs || defaultInputs,
+      meta: {},
     })
     .select()
     .single();
@@ -141,6 +157,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
+    ...parseMeta(data.meta),
   };
 }
 
