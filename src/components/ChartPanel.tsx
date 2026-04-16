@@ -352,7 +352,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
   const numMetricCols = cpfLifeMonthlyPayout > 0 ? 5 : 4;
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: clr.bg, height: '100%', overflow: 'visible' }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: clr.bg, height: '100%', overflow: 'hidden' }}>
       {/* Top row: metrics + toolbar */}
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0, overflow: 'visible' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${numMetricCols}, 1fr)`, gap: 8, flex: 1, overflow: 'visible' }}>
@@ -511,7 +511,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
       {/* Chart */}
       <div
         className="bg-gray-800 rounded-xl border border-gray-700"
-        style={{ flex: 1, minHeight: 350, padding: 16, position: 'relative' }}
+        style={{ flex: 1, minHeight: 0, padding: 16, position: 'relative' }}
       >
         <div style={{ position: 'absolute', top: 16, left: 16, right: 16, bottom: 16 }}>
           <Chart type="bar" data={data} options={options} />
