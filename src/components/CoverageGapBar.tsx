@@ -4,6 +4,7 @@ import { formatSGD } from '../calculations';
 
 interface Props {
   inputs: FireInputs;
+  compact?: boolean;
 }
 
 function coverageColor(pct: number): string {
@@ -24,7 +25,7 @@ function coverageBorder(pct: number): string {
   return 'rgba(248,113,113,0.22)';
 }
 
-export default function CoverageGapBar({ inputs }: Props) {
+export default function CoverageGapBar({ inputs, compact = false }: Props) {
   const { policies, income } = inputs;
   const annualIncome = income.annualIncome;
 
@@ -63,7 +64,7 @@ export default function CoverageGapBar({ inputs }: Props) {
     {
       key: 'ci',
       icon: '🏥',
-      label: 'Critical Illness',
+      label: 'CI',
       current: currentCI,
       needed: neededCI,
       pct: Math.min(100, Math.round((currentCI / neededCI) * 100)),
@@ -74,6 +75,74 @@ export default function CoverageGapBar({ inputs }: Props) {
   const criticalCount = items.filter(i => i.pct < 40).length;
   const totalGap = items.reduce((s, i) => s + i.gap, 0);
 
+  // ── Compact strip (used inside drawer) ────────────────────────────────────
+  if (compact) {
+    return (
+      <div style={{
+        padding: '8px 16px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
+          Coverage
+        </span>
+        <div style={{ display: 'flex', gap: 10, flex: 1, minWidth: 0 }}>
+          {items.map(item => {
+            const color = coverageColor(item.pct);
+            return (
+              <div key={item.key} style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-4)', fontWeight: 600 }}>
+                    {item.icon} {item.label}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color }}>{item.pct}%</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 2,
+                    width: `${item.pct}%`,
+                    background: item.pct < 40
+                      ? 'linear-gradient(90deg, #ef4444, #f87171)'
+                      : item.pct < 80
+                        ? 'linear-gradient(90deg, #d97706, #fbbf24)'
+                        : 'linear-gradient(90deg, #059669, #34d399)',
+                    transition: 'width 0.5s ease',
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {criticalCount > 0 && (
+          <span style={{
+            flexShrink: 0,
+            background: 'rgba(239,68,68,0.15)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: '#f87171', fontSize: 9, fontWeight: 700,
+            padding: '2px 7px', borderRadius: 8,
+          }}>
+            {criticalCount} gap{criticalCount > 1 ? 's' : ''}
+          </span>
+        )}
+        {criticalCount === 0 && totalGap === 0 && (
+          <span style={{
+            flexShrink: 0,
+            background: 'rgba(52,211,153,0.15)',
+            border: '1px solid rgba(52,211,153,0.3)',
+            color: '#34d399', fontSize: 9, fontWeight: 700,
+            padding: '2px 7px', borderRadius: 8,
+          }}>
+            ✓ Covered
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // ── Full cards (used standalone above chart) ──────────────────────────────
   return (
     <div style={{
       background: 'var(--surface)',

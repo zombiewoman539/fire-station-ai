@@ -493,9 +493,6 @@ function Dashboard() {
           />
         </div>
 
-        {/* Protection coverage gap bar */}
-        <CoverageGapBar inputs={inputs} />
-
         {/* Toggle bar: include/exclude individual purchases & policies */}
         <ToggleBar
           inputs={inputs}
@@ -505,12 +502,14 @@ function Dashboard() {
 
         {/* Collapsible bottom drawer */}
         <div style={{
-          maxHeight: isDrawerOpen ? 360 : 0,
+          maxHeight: isDrawerOpen ? 400 : 0,
           overflow: 'hidden',
           transition: 'max-height 0.3s ease',
           borderTop: isDrawerOpen ? '1px solid var(--border)' : 'none',
           background: 'var(--deep)',
         }}>
+          {/* Coverage gap bar — lives inside drawer so it doesn't eat chart space */}
+          <CoverageGapBar inputs={inputs} compact />
           <div style={{ height: 360, overflowY: 'auto' }}>
             {bottomTab === 'insights' && (
               <div style={{ display: 'flex', height: '100%' }}>
