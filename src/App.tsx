@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
 import { calculate } from './calculations';
@@ -20,6 +21,8 @@ import MilestoneTracker from './components/MilestoneTracker';
 import PresentationMode from './components/PresentationMode';
 import ExportReport from './components/ExportReport';
 import ScenarioPanel from './components/ScenarioPanel';
+import NavBar from './components/NavBar';
+import AdvisorDashboard from './components/AdvisorDashboard';
 import type { Session } from '@supabase/supabase-js';
 
 type BottomTab = 'none' | 'insights' | 'scenarios';
@@ -322,7 +325,7 @@ function Dashboard() {
   const isDrawerOpen = bottomTab !== 'none';
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text-1)' }}>
       {/* Left sidebar: client list */}
       <div style={{
         width: sidebarCollapsed ? 0 : 280,
@@ -448,30 +451,19 @@ export function useTheme(): [Theme, () => void] {
   return [theme, toggle];
 }
 
-function App() {
+function AppShell() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  useTheme(); // apply persisted theme on mount
+  useTheme();
 
   useEffect(() => {
-    // Safety timeout in case auth hangs entirely
     const timeout = setTimeout(() => setChecking(false), 6000);
-
-    // Use onAuthStateChange as the single source of truth (Supabase v2 recommended approach).
-    // After Google OAuth, Supabase redirects back with #access_token in the URL.
-    // INITIAL_SESSION fires first (often with null), then SIGNED_IN fires once the hash
-    // is processed. If we unblock on INITIAL_SESSION=null while the hash is present,
-    // we briefly flash AuthGate before SIGNED_IN arrives — causing the loop.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION' && !session && window.location.hash.includes('access_token')) {
-        // OAuth tokens are in the URL — SIGNED_IN is about to fire, keep showing the spinner
-        return;
-      }
+      if (event === 'INITIAL_SESSION' && !session && window.location.hash.includes('access_token')) return;
       setSession(session);
       clearTimeout(timeout);
       setChecking(false);
     });
-
     return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
@@ -487,7 +479,25 @@ function App() {
     return <AuthGate onAuth={() => {}} />;
   }
 
-  return <Dashboard />;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <NavBar />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<AdvisorDashboard />} />
+        </Routes>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
+    </BrowserRouter>
+  );
 }
 
 export default App;
