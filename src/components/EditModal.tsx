@@ -1,5 +1,5 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, MajorPurchase } from '../types';
+import { FireInputs, InsurancePolicy, MajorPurchase, FundAllocation } from '../types';
 import { formatSGD } from '../calculations';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile } from '../profileTypes';
@@ -279,7 +279,7 @@ function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i:
 
 function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: FireInputs; onChange: (i: FireInputs) => void; currentProfileId?: string }) {
   const update = (policies: InsurancePolicy[]) => onChange({ ...inputs, policies });
-  const upd = (id: string, field: keyof InsurancePolicy, val: string | number | null) =>
+  const upd = (id: string, field: keyof InsurancePolicy, val: string | number | null | FundAllocation[]) =>
     update(inputs.policies.map(p => p.id === id ? { ...p, [field]: val } : p));
 
   const [allProfiles, setAllProfiles] = React.useState<ClientProfile[]>([]);
@@ -295,7 +295,7 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
     premiumNextDueDate: null, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
     nomineeName: '', nomineeClientId: null,
     insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
-    commencementDate: null, maturityDate: null,
+    commencementDate: null, maturityDate: null, fundAllocations: [],
   }]);
 
   const POLICY_TYPES = [
@@ -496,6 +496,87 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
               </div>
             </div>
           </div>
+
+          {/* Fund Allocations — ILP only */}
+          {p.policyType === 'ilp' && (
+            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <SectionLabel>Fund Allocations</SectionLabel>
+                {(() => {
+                  const total = (p.fundAllocations || []).reduce((s, f) => s + (f.percentage || 0), 0);
+                  return total > 0 && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: Math.abs(total - 100) < 0.01 ? '#34d399' : '#fbbf24',
+                    }}>
+                      {total.toFixed(0)}% allocated
+                    </span>
+                  );
+                })()}
+              </div>
+              {(p.fundAllocations || []).map((f, fi) => (
+                <div key={fi} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Fund name (e.g. China Equity)"
+                    value={f.fundName}
+                    onChange={e => {
+                      const allocs = [...(p.fundAllocations || [])];
+                      allocs[fi] = { ...allocs[fi], fundName: e.target.value };
+                      upd(p.id, 'fundAllocations', allocs);
+                    }}
+                    style={{
+                      flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                      borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={f.percentage}
+                      onChange={e => {
+                        const allocs = [...(p.fundAllocations || [])];
+                        allocs[fi] = { ...allocs[fi], percentage: Math.max(0, Math.min(100, Number(e.target.value))) };
+                        upd(p.id, 'fundAllocations', allocs);
+                      }}
+                      style={{
+                        width: 56, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                        borderRadius: 8, padding: '6px 8px', color: 'var(--text-1)', fontSize: 13,
+                        outline: 'none', textAlign: 'right',
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: 'var(--text-4)' }}>%</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const allocs = (p.fundAllocations || []).filter((_, i) => i !== fi);
+                      upd(p.id, 'fundAllocations', allocs);
+                    }}
+                    style={{
+                      background: 'none', border: 'none', color: 'var(--text-5)', fontSize: 16,
+                      cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0,
+                    }}
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const allocs: FundAllocation[] = [...(p.fundAllocations || []), { fundName: '', percentage: 0 }];
+                  upd(p.id, 'fundAllocations', allocs);
+                }}
+                style={{
+                  marginTop: 4, background: 'none', border: '1px dashed var(--border-mid)',
+                  borderRadius: 8, padding: '5px 12px', fontSize: 12, color: 'var(--text-4)',
+                  cursor: 'pointer', width: '100%',
+                }}
+              >
+                + Add Fund
+              </button>
+            </div>
+          )}
 
           {/* Nomination */}
           <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>

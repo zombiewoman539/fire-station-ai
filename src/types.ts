@@ -23,6 +23,11 @@ export interface Assets {
   investmentReturnRate: number;
 }
 
+export interface FundAllocation {
+  fundName: string;
+  percentage: number; // 0–100
+}
+
 export interface InsurancePolicy {
   id: string;
   name: string;
@@ -45,6 +50,7 @@ export interface InsurancePolicy {
   policyStatus: 'in-force' | 'lapsed' | 'surrendered' | 'claimed' | 'matured';
   commencementDate: string | null; // YYYY-MM-DD — when policy started
   maturityDate: string | null;     // YYYY-MM-DD — when policy ends (term/endowment)
+  fundAllocations: FundAllocation[]; // ILP sub-fund breakdown (empty for non-ILP)
 }
 
 export interface EstatePlanning {

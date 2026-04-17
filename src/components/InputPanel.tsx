@@ -145,7 +145,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
       premiumNextDueDate: null, premiumPaymentTerm: 'limited' as const, premiumLimitedYears: 20,
       nomineeName: '', nomineeClientId: null,
       insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
-      commencementDate: null, maturityDate: null,
+      commencementDate: null, maturityDate: null, fundAllocations: [],
     }]);
   };
   const removePolicy = (id: string) => {

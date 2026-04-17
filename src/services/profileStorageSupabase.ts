@@ -43,6 +43,7 @@ function migrateInputs(inputs: any): FireInputs {
       policyStatus: p.policyStatus ?? 'in-force',
       commencementDate: p.commencementDate ?? null,
       maturityDate: p.maturityDate ?? null,
+      fundAllocations: p.fundAllocations ?? [],
     })),
     estatePlanning: {
       lpa: inputs.estatePlanning?.lpa ?? false,
