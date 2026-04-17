@@ -31,23 +31,23 @@ body {
 
 /* ── Light theme ──────────────────────────────────────────── */
 html.light {
-  --bg:            #f1f5f9;
-  --surface:       #ffffff;
-  --card:          #f8fafc;
-  --deep:          #e2e8f0;
-  --inset:         #f8fafc;
-  --border:        #e2e8f0;
-  --border-mid:    #cbd5e1;
-  --border-soft:   rgba(0, 0, 0, 0.06);
-  --text-1:        #0f172a;
-  --text-2:        #1e293b;
-  --text-3:        #475569;
-  --text-4:        #64748b;
-  --text-5:        #94a3b8;
-  --input-bg:      #f1f5f9;
-  --input-border:  #cbd5e1;
+  --bg:            #eef2f7;      /* page wash — slightly blue-tinted gray */
+  --surface:       #ffffff;      /* cards / panels */
+  --card:          #f4f7fa;      /* nested card bg */
+  --deep:          #dde4ee;      /* bottom drawer — clearly distinct from surface */
+  --inset:         #eef2f7;      /* inset sections inside cards */
+  --border:        #c5d0de;      /* visible separators */
+  --border-mid:    #94a3b8;      /* stronger emphasis borders */
+  --border-soft:   rgba(0, 0, 0, 0.07);
+  --text-1:        #0f172a;      /* near-black headings */
+  --text-2:        #1e293b;      /* dark body text */
+  --text-3:        #334155;      /* secondary labels */
+  --text-4:        #475569;      /* muted labels — was too light at #64748b */
+  --text-5:        #64748b;      /* very muted — was unreadable at #94a3b8 */
+  --input-bg:      #ffffff;      /* white inputs stand out on gray bg */
+  --input-border:  #94a3b8;      /* clear input border */
   --tip-bg:        #ffffff;
-  --tip-border:    #e2e8f0;
+  --tip-border:    #c5d0de;
 }
 
 /* ── Tailwind overrides for light mode ────────────────────── */
@@ -56,7 +56,7 @@ html.light .bg-gray-800    { background-color: var(--surface) !important; }
 html.light .bg-gray-700    { background-color: var(--input-bg) !important; }
 html.light .bg-gray-900\/50 { background-color: rgba(241,245,249,0.8) !important; }
 html.light .border-gray-700    { border-color: var(--border) !important; }
-html.light .border-gray-700\/50 { border-color: rgba(226,232,240,0.6) !important; }
+html.light .border-gray-700\/50 { border-color: rgba(197,208,222,0.6) !important; }
 html.light .border-gray-600    { border-color: var(--input-border) !important; }
 html.light .text-white          { color: var(--text-1) !important; }
 html.light .text-gray-400       { color: var(--text-3) !important; }

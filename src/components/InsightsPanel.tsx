@@ -2,6 +2,7 @@ import React from 'react';
 import { FireInputs, FireResults } from '../types';
 import { formatSGD } from '../calculations';
 import UrgencyTimeline from './UrgencyTimeline';
+import { useIsDark } from '../useIsDark';
 
 interface Props {
   inputs: FireInputs;
@@ -156,14 +157,24 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
   return insights;
 }
 
-const typeStyles: Record<string, { bg: string; border: string; titleColor: string }> = {
-  danger: { bg: 'rgba(127, 29, 29, 0.25)', border: 'rgba(239, 68, 68, 0.3)', titleColor: '#f87171' },
-  warning: { bg: 'rgba(120, 53, 15, 0.25)', border: 'rgba(251, 191, 36, 0.3)', titleColor: '#fbbf24' },
-  success: { bg: 'rgba(6, 78, 59, 0.25)', border: 'rgba(16, 185, 129, 0.3)', titleColor: '#34d399' },
-  info: { bg: 'rgba(30, 58, 138, 0.25)', border: 'rgba(96, 165, 250, 0.3)', titleColor: '#60a5fa' },
+const darkTypeStyles: Record<string, { bg: string; border: string; titleColor: string }> = {
+  danger: { bg: 'rgba(127, 29, 29, 0.25)', border: 'rgba(239, 68, 68, 0.3)',   titleColor: '#f87171' },
+  warning:{ bg: 'rgba(120, 53, 15, 0.25)', border: 'rgba(251, 191, 36, 0.3)',  titleColor: '#fbbf24' },
+  success:{ bg: 'rgba(6, 78, 59, 0.25)',   border: 'rgba(16, 185, 129, 0.3)',  titleColor: '#34d399' },
+  info:   { bg: 'rgba(30, 58, 138, 0.25)', border: 'rgba(96, 165, 250, 0.3)',  titleColor: '#60a5fa' },
+};
+
+const lightTypeStyles: Record<string, { bg: string; border: string; titleColor: string }> = {
+  danger: { bg: 'rgba(220, 38, 38, 0.08)',  border: 'rgba(220, 38, 38, 0.3)',  titleColor: '#b91c1c' },
+  warning:{ bg: 'rgba(180, 83, 9, 0.08)',   border: 'rgba(217, 119, 6, 0.35)', titleColor: '#b45309' },
+  success:{ bg: 'rgba(5, 150, 105, 0.08)',  border: 'rgba(5, 150, 105, 0.3)',  titleColor: '#047857' },
+  info:   { bg: 'rgba(37, 99, 235, 0.08)',  border: 'rgba(37, 99, 235, 0.3)',  titleColor: '#1d4ed8' },
 };
 
 export default function InsightsPanel({ inputs, results }: Props) {
+  const isDark = useIsDark();
+  const typeStyles = isDark ? darkTypeStyles : lightTypeStyles;
+
   const insights = generateInsights(inputs, results);
 
   const dangerCount = insights.filter(i => i.type === 'danger').length;

@@ -53,21 +53,21 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayout = 0, toolbar, scenarioResults, isDark = true }: Props) {
   // Theme-aware color tokens
   const clr = {
-    bg:         isDark ? '#111827' : '#f1f5f9',
+    bg:         isDark ? '#111827' : '#eef2f7',
     surface:    isDark ? '#1f2937' : '#ffffff',
-    card:       isDark ? '#374151' : '#f8fafc',
-    border:     isDark ? '#374151' : '#e2e8f0',
-    borderMid:  isDark ? '#4b5563' : '#cbd5e1',
+    card:       isDark ? '#374151' : '#f4f7fa',
+    border:     isDark ? '#374151' : '#c5d0de',
+    borderMid:  isDark ? '#4b5563' : '#94a3b8',
     text1:      isDark ? '#ffffff'  : '#0f172a',
     text2:      isDark ? '#d1d5db' : '#1e293b',
-    text3:      isDark ? '#9ca3af' : '#475569',
-    text4:      isDark ? '#6b7280' : '#64748b',
-    text5:      isDark ? '#4b5563' : '#94a3b8',
-    grid:       isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
+    text3:      isDark ? '#9ca3af' : '#334155',
+    text4:      isDark ? '#6b7280' : '#475569',
+    text5:      isDark ? '#4b5563' : '#64748b',
+    grid:       isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.08)',
     tooltipBg:  isDark ? 'rgba(17,24,39,0.97)'   : 'rgba(255,255,255,0.98)',
     tooltipText:isDark ? '#d1d5db' : '#1e293b',
-    tooltipBorder: isDark ? '#374151' : '#e2e8f0',
-    inset:      isDark ? '#1e293b' : '#f8fafc',
+    tooltipBorder: isDark ? '#374151' : '#c5d0de',
+    inset:      isDark ? '#1e293b' : '#eef2f7',
   };
   const { yearlyData, wealthAtRetirement, fireNumber, fireNumberBreakdown, yearsToBuild, onTrack, moneyRunsOutAge } = results;
   const [showFireBreakdown, setShowFireBreakdown] = React.useState(false);
