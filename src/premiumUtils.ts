@@ -8,6 +8,18 @@ const PERIOD_MONTHS: Record<string, number> = {
 };
 
 /**
+ * Add months to a date without overflowing into the wrong month.
+ * e.g. Jan 31 + 1 month → Feb 28 (not Mar 3).
+ */
+function addMonths(date: Date, months: number): Date {
+  const day = date.getDate();
+  const d = new Date(date.getFullYear(), date.getMonth() + months, 1);
+  // Clamp to the last day of the target month
+  d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return d;
+}
+
+/**
  * Given a base due date and frequency, advance by the recurrence period until
  * we land on the next occurrence that is >= today.
  * Returns null if no valid base date is provided.
@@ -18,13 +30,11 @@ export function nextOccurrence(baseISO: string | null, frequency: string): Date 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const base = new Date(baseISO);
-  let next = new Date(base);
+  let next = new Date(baseISO);
 
   // Advance by full periods until we reach today or beyond
   while (next < today) {
-    next = new Date(next);
-    next.setMonth(next.getMonth() + periodMonths);
+    next = addMonths(next, periodMonths);
   }
 
   return next;

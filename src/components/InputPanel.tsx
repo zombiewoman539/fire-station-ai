@@ -189,7 +189,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
           label="Annual Take-Home Income"
           value={inputs.income.annualIncome}
           prefix="S$"
-          tip="Your annual income after CPF deductions and tax. This is the cash you actually receive to spend and invest."
+          tip="Your annual take-home income after deductions and tax. This is the cash you actually receive to spend and invest."
           onChange={v => updateIncome('annualIncome', v)}
         />
         <NumberField
@@ -216,14 +216,6 @@ export default function InputPanel({ inputs, onChange }: Props) {
           tip="Expected annual spending in retirement, in today's dollars. Rule of thumb: 70–80% of current expenses. Inflation will be applied to project the future cost."
           onChange={v => updateIncome('retirementExpenses', v)}
         />
-        <NumberField
-          label="Expected CPF LIFE Payout / Month"
-          value={inputs.income.cpfLifeMonthlyPayout}
-          prefix="S$"
-          tip="Your estimated CPF LIFE monthly payout from age 65. Check your CPF statement or use the CPF Board calculator at cpf.gov.sg. Set to 0 if unsure — the plan will assume a fully self-funded retirement."
-          onChange={v => updateIncome('cpfLifeMonthlyPayout', v)}
-        />
-
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-soft)' }}>
           <div style={{ fontSize: 10, color: 'var(--text-4)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FIRE Target Settings</div>
           <SliderField
@@ -240,14 +232,6 @@ export default function InputPanel({ inputs, onChange }: Props) {
             tip="The % of your portfolio you withdraw each year in retirement. FIRE Number = Retirement Expenses ÷ SWR. Lower = safer but needs more capital. 3.5% is conservative for Singapore (longer lifespan). 4% is the global Trinity Study standard."
             onChange={v => updateIncome('withdrawalRate', v)}
           />
-          {inputs.income.cpfLifeMonthlyPayout > 0 && (
-            <div style={{ background: 'rgba(52, 211, 153, 0.08)', border: '1px solid rgba(52, 211, 153, 0.2)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
-              <div style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>CPF LIFE offset active</div>
-              <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>
-                {formatSGD(inputs.income.cpfLifeMonthlyPayout * 12)}/yr from age 65 reduces the portfolio needed.
-              </div>
-            </div>
-          )}
         </div>
       </Section>
 

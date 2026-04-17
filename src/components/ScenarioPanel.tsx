@@ -302,11 +302,11 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                 <CostRow label="Initial Treatment" amount={ciData.initialTreatment} />
                 <CostRow label={`Ongoing (${ciData.ongoingYears} years)`} amount={ciData.annualOngoing * ciData.ongoingYears} />
                 <CostRow label={`Income Loss (~${ciData.incomeImpactMonths} months)`}
-                  amount={Math.round(inputs.income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8)} />
+                  amount={Math.round(inputs.income.annualIncome * Math.ceil(ciData.incomeImpactMonths / 12) * 0.8)} />
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: clr.red, fontSize: 11, fontWeight: 700 }}>Total Financial Impact</span>
                   <span style={{ color: clr.red, fontSize: 11, fontWeight: 700 }}>
-                    {formatSGD(totalCiCost + Math.round(inputs.income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8))}
+                    {formatSGD(totalCiCost + Math.round(inputs.income.annualIncome * Math.ceil(ciData.incomeImpactMonths / 12) * 0.8))}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
@@ -346,7 +346,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                 🦽 Total Permanent Disability Impact
               </div>
               <div style={{ color: 'var(--text-4)', fontSize: 10, lineHeight: 1.5, marginBottom: 8 }}>
-                Unable to work permanently. All earned income stops from age {scenario.ageAtEvent}. Family depends on savings, insurance payout, and CPF.
+                Unable to work permanently. All earned income stops from age {scenario.ageAtEvent}. Family depends on savings and insurance payout.
               </div>
               <CostRow label="Lost Lifetime Income" amount={Math.round(inputs.income.annualIncome * (inputs.personal.retirementAge - scenario.ageAtEvent))} />
               <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
@@ -369,7 +369,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                 ☠️ Death — Family Impact
               </div>
               <div style={{ color: 'var(--text-4)', fontSize: 10, lineHeight: 1.5, marginBottom: 8 }}>
-                Family loses all earned income from age {scenario.ageAtEvent}. Dependents must rely on insurance payout, accumulated savings, and CPF.
+                Family loses all earned income from age {scenario.ageAtEvent}. Dependents must rely on insurance payout and accumulated savings.
               </div>
               <CostRow label="Lost Lifetime Income" amount={Math.round(inputs.income.annualIncome * (inputs.personal.retirementAge - scenario.ageAtEvent))} />
               <CostRow label="Ongoing Family Expenses" amount={Math.round(inputs.income.annualExpenses * (inputs.personal.lifeExpectancy - scenario.ageAtEvent))} />

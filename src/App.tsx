@@ -190,6 +190,7 @@ function Dashboard() {
 
   const handleSelectProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
+    setExcludedIds(new Set());
     localStorage.setItem('fire-active-profile', profile.id);
     setSaveStatus('idle');
   }, []);
@@ -489,7 +490,6 @@ function Dashboard() {
           <ChartPanel
             results={results}
             retirementAge={inputs.personal.retirementAge}
-            cpfLifeMonthlyPayout={inputs.income.cpfLifeMonthlyPayout}
             toolbar={chartToolbar}
             scenarioResults={scenarioResults}
             isDark={theme === 'dark'}

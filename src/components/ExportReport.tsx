@@ -177,7 +177,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
 </div>
 
 <div class="metrics" style="grid-template-columns:repeat(5,1fr);">
-  <div class="metric"><div class="metric-label">Annual Income</div><div class="metric-value" style="font-size:16px;">${formatSGD(income.annualIncome)}</div></div>
+  <div class="metric"><div class="metric-label">Annual Take-Home Income</div><div class="metric-value" style="font-size:16px;">${formatSGD(income.annualIncome)}</div></div>
   <div class="metric"><div class="metric-label">Annual Expenses</div><div class="metric-value" style="font-size:16px;">${formatSGD(income.annualExpenses)}</div></div>
   <div class="metric"><div class="metric-label">Savings Rate</div><div class="metric-value" style="font-size:16px;">${savingsRate.toFixed(0)}%</div></div>
   <div class="metric"><div class="metric-label">Investment Return</div><div class="metric-value" style="font-size:16px;">${assets.investmentReturnRate}%</div></div>

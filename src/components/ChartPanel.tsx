@@ -26,7 +26,6 @@ ChartJS.register(
 interface Props {
   results: FireResults;
   retirementAge: number;
-  cpfLifeMonthlyPayout?: number;
   toolbar?: React.ReactNode;
   scenarioResults?: FireResults | null;
   isDark?: boolean;
@@ -50,7 +49,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayout = 0, toolbar, scenarioResults, isDark = true }: Props) {
+export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults, isDark = true }: Props) {
   // Theme-aware color tokens
   const clr = {
     bg:         isDark ? '#111827' : '#eef2f7',
@@ -247,9 +246,6 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
             const idx = ctx[0].dataIndex;
             const d = yearlyData[idx];
             const lines: string[] = [];
-            if (d.age >= 65 && cpfLifeMonthlyPayout > 0) {
-              lines.push('', `  CPF LIFE income: +${formatSGD(cpfLifeMonthlyPayout)}/month`);
-            }
             if (d.purchaseLabels.length > 0) {
               lines.push('', '  ' + d.purchaseLabels.join(', '));
             }
@@ -351,7 +347,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
     ...(scenarioResults ? [{ color: '#ef4444', label: 'With Event', type: 'line' as const }] : []),
   ];
 
-  const numMetricCols = cpfLifeMonthlyPayout > 0 ? 5 : 4;
+  const numMetricCols = 4;
 
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '10px 16px 12px', background: clr.bg, height: '100%', overflow: 'hidden' }}>
@@ -359,9 +355,6 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
       <div className="flex items-start gap-2" style={{ marginBottom: 6, flexShrink: 0, overflow: 'visible' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${numMetricCols}, 1fr)`, gap: 8, flex: 1, overflow: 'visible' }}>
           <MetricCard label="Wealth at Retirement" value={formatSGD(wealthAtRetirement)} color="#34d399" />
-          {cpfLifeMonthlyPayout > 0 && (
-            <MetricCard label="CPF LIFE / month" value={formatSGD(cpfLifeMonthlyPayout)} color="#34d399" />
-          )}
           {/* FIRE Number card with breakdown popup */}
           <div
             ref={fireCardRef}
@@ -402,9 +395,6 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
                     color="#fbbf24"
                     bold
                   />
-                  {fireNumberBreakdown.cpfLifeAnnual > 0 && (
-                    <FireRow label="− CPF LIFE payout / yr" value={`− ${formatSGD(fireNumberBreakdown.cpfLifeAnnual)}`} color="#34d399" />
-                  )}
                   <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
                   <div style={{ borderTop: `1px solid ${clr.border}`, margin: '2px 0' }} />
                   <FireRow
@@ -419,7 +409,7 @@ export default function ChartPanel({ results, retirementAge, cpfLifeMonthlyPayou
                   />
                 </div>
                 <div style={{ color: clr.text3, fontSize: 10, marginTop: 10, lineHeight: 1.5, borderTop: `1px solid ${clr.border}`, paddingTop: 8 }}>
-                  The <strong style={{ color: clr.text3 }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding.{cpfLifeMonthlyPayout > 0 ? ' CPF LIFE reduces what the portfolio must cover from age 65.' : ''}
+                  The <strong style={{ color: clr.text3 }}>SWR method</strong> means you only withdraw {fireNumberBreakdown.withdrawalRate}% per year — the rest keeps compounding.
                 </div>
               </div>
             )}

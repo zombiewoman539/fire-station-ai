@@ -214,7 +214,7 @@ function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i:
   return (
     <div>
       <NumberField label="Annual Take-Home Income" value={inputs.income.annualIncome} prefix="S$"
-        tip="Your annual income after CPF deductions and tax. This is the cash you actually receive."
+        tip="Your annual take-home income after deductions and tax. This is the cash you actually receive."
         onChange={v => upd('annualIncome', v)} />
       <NumberField label="Annual Living Expenses" value={inputs.income.annualExpenses} prefix="S$"
         tip="Total yearly spend — housing, food, transport, lifestyle."
@@ -231,17 +231,6 @@ function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i:
         <NumberField label="Retirement Expenses / Year" value={inputs.income.retirementExpenses} prefix="S$"
           tip="Expected annual spending in retirement, in today's dollars. Inflation will be applied."
           onChange={v => upd('retirementExpenses', v)} />
-        <NumberField label="Expected CPF LIFE Payout / Month" value={inputs.income.cpfLifeMonthlyPayout} prefix="S$"
-          tip="Estimated CPF LIFE monthly payout from age 65. Check your CPF statement or use cpf.gov.sg calculator."
-          onChange={v => upd('cpfLifeMonthlyPayout', v)} />
-        {inputs.income.cpfLifeMonthlyPayout > 0 && (
-          <div style={{ background: 'rgba(52, 211, 153, 0.08)', border: '1px solid rgba(52, 211, 153, 0.2)', borderRadius: 8, padding: '8px 10px', marginBottom: 14 }}>
-            <div style={{ fontSize: 11, color: '#34d399', fontWeight: 600 }}>CPF LIFE offset active</div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
-              {formatSGD(inputs.income.cpfLifeMonthlyPayout * 12)}/yr from age 65 reduces the portfolio needed.
-            </div>
-          </div>
-        )}
       </div>
 
       <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 16, marginTop: 8 }}>

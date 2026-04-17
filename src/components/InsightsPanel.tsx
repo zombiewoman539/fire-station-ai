@@ -76,7 +76,7 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
   }
 
   // 3. Insurance coverage analysis
-  const totalInsuranceCashValue = policies.reduce((s, p) => s + p.cashValue, 0);
+  const totalInsuranceCashValue = policies.filter(p => p.policyStatus === 'in-force').reduce((s, p) => s + p.cashValue, 0);
   const incomeMultiple = income.annualIncome > 0 ? totalInsuranceCashValue / income.annualIncome : 0;
 
   if (policies.length === 0) {

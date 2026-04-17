@@ -92,10 +92,11 @@ export default function AdvisorDashboard() {
         const results = calculate(profile.inputs);
         const liveAge = getLiveAge(profile);
         const policies = profile.inputs.policies || [];
-        const totalDeathSA = policies.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
+        const inForce = policies.filter(p => p.policyStatus === 'in-force');
+        const totalDeathSA = inForce.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
         const freq: Record<string, number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 };
-        const totalPremiumPA = policies.reduce((s, p) => s + (p.premiumAmount || 0) * (freq[p.premiumFrequency] || 12), 0);
-        const hasMissingInsurance = policies.length === 0 || totalDeathSA === 0;
+        const totalPremiumPA = inForce.reduce((s, p) => s + (p.premiumAmount || 0) * (freq[p.premiumFrequency] || 12), 0);
+        const hasMissingInsurance = inForce.length === 0 || totalDeathSA === 0;
         const ep = profile.inputs.estatePlanning;
         const hasMissingEstate = !ep?.lpa || !ep?.will;
         const daysSinceMeeting = profile.lastMeetingDate

@@ -17,7 +17,6 @@ function migrateInputs(inputs: any): FireInputs {
       retirementExpenses:            inc.retirementExpenses ?? 48000,
       inflationRate:                 inc.inflationRate ?? 2.5,
       withdrawalRate:                inc.withdrawalRate ?? 3.5,
-      cpfLifeMonthlyPayout:          inc.cpfLifeMonthlyPayout ?? inc.cpfLifeMonthly ?? 0,
     },
     assets: {
       cashSavings:          assets.cashSavings ?? 0,

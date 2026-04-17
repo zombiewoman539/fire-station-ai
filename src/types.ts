@@ -13,7 +13,6 @@ export interface IncomeExpenses {
   retirementExpenses: number;
   inflationRate: number;     // Annual inflation rate (%), default 2.5 (Singapore avg)
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
-  cpfLifeMonthlyPayout: number;  // User-entered monthly CPF LIFE payout from age 65
 }
 
 export interface Assets {
@@ -105,7 +104,6 @@ export interface FireResults {
     inflatedRetirementExpenses: number;
     inflationRate: number;
     yearsToRetirement: number;
-    cpfLifeAnnual: number;
     netDrawdownNeeded: number;
     withdrawalRate: number;
     inflationBuffer: number;

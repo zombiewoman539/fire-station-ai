@@ -66,16 +66,14 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
   let cash = assets.cashSavings;
   let investments = assets.investments;
-  let insuranceValue = policies.reduce((s, p) => s + p.cashValue, 0);
+  const inForcePolicies = policies.filter(p => p.policyStatus === 'in-force');
+  let insuranceValue = inForcePolicies.reduce((s, p) => s + p.cashValue, 0);
 
   const cashRate = assets.cashReturnRate / 100;
   const investRate = assets.investmentReturnRate / 100;
   const salaryGrowth = income.salaryGrowthRate / 100;
   const inflationRate = (income.inflationRate ?? 2.5) / 100;
   const yearsToRetirement = retirementAge - currentAge;
-
-  // CPF LIFE monthly payout is user-entered — used as a simple income offset from age 65
-  const cpfLifeMonthly = income.cpfLifeMonthlyPayout ?? 0;
 
   // Scenario state
   const hasScenario = scenario && scenario.type !== 'none';
@@ -86,14 +84,27 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     ? CI_COST_DATA[scenario.ciType]
     : null;
 
-  // Annual premium cost across all policies for a given year index.
-  // Frequency is converted to annual; limited-pay policies stop after premiumLimitedYears.
+  // Annual premium cost across all in-force policies for a given year index.
+  // Frequency is converted to annual; limited-pay policies stop once their term has elapsed
+  // (measured from commencementDate, not from today).
   const FREQ_MULT: Record<string, number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 };
+  const currentCalendarYear = new Date().getFullYear();
   const getAnnualPremiums = (yearIndex: number): number => {
     let total = 0;
-    for (const p of policies) {
+    for (const p of inForcePolicies) {
       if (!p.premiumAmount || p.premiumAmount <= 0) continue;
-      if (p.premiumPaymentTerm === 'limited' && yearIndex >= (p.premiumLimitedYears || 0)) continue;
+      if (p.premiumPaymentTerm === 'limited' && p.premiumLimitedYears > 0) {
+        const refISO = p.commencementDate ?? p.premiumNextDueDate;
+        if (refISO) {
+          // Compute the calendar year premiums stop, then check if the simulation year has passed it
+          const payUntilYear = new Date(refISO).getFullYear() + p.premiumLimitedYears;
+          const simYear = currentCalendarYear + yearIndex;
+          if (simYear >= payUntilYear) continue;
+        } else {
+          // No reference date — fall back to years-from-today approximation
+          if (yearIndex >= p.premiumLimitedYears) continue;
+        }
+      }
       total += p.premiumAmount * (FREQ_MULT[p.premiumFrequency] ?? 12);
     }
     return total;
@@ -143,16 +154,16 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     if (hasScenario && age === scenarioAge && !scenarioPayoutApplied) {
       scenarioPayoutApplied = true;
       if (scenario!.type === 'death') {
-        cash += policies.reduce((s, p) => s + p.deathSumAssured, 0);
+        cash += inForcePolicies.reduce((s, p) => s + p.deathSumAssured, 0);
         insuranceValue = 0;
       }
       if (scenario!.type === 'tpd') {
-        cash += policies.reduce((s, p) => s + p.tpdSumAssured, 0);
+        cash += inForcePolicies.reduce((s, p) => s + p.tpdSumAssured, 0);
         insuranceValue = 0;
       }
       if (scenario!.type === 'critical-illness' && ciData) {
         const ciStage = scenario!.ciStage ?? 'early';
-        cash += policies.reduce((s, p) => s + (ciStage === 'early' ? (p.eciSumAssured || 0) : (p.ciSumAssured || 0)), 0);
+        cash += inForcePolicies.reduce((s, p) => s + (ciStage === 'early' ? (p.eciSumAssured || 0) : (p.ciSumAssured || 0)), 0);
         scenarioLumpCost = ciData.initialTreatment;
       }
     }
@@ -201,10 +212,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       const yearsFromNow = age - currentAge;
       const inflatedExpenses = income.retirementExpenses * Math.pow(1 + inflationRate, yearsFromNow);
       const grossDrawdown = inflatedExpenses + recurringPurchaseCosts + annualPremiums;
-
-      // CPF LIFE reduces drawdown from age 65
-      const annuityIncome = age >= 65 ? cpfLifeMonthly * 12 : 0;
-      const totalDrawdown = Math.max(0, grossDrawdown - annuityIncome);
+      const totalDrawdown = Math.max(0, grossDrawdown);
 
       const totalAvailable = Math.max(0, investments) + Math.max(0, cash);
 
@@ -241,10 +249,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       investments *= (1 + effectiveRate);
     }
 
-    // Insurance cash value growth
+    // Insurance cash value growth — use in-force policies only for the average rate
     if (insuranceValue > 0) {
-      insuranceValue *= (1 + (policies.length > 0
-        ? policies.reduce((s, p) => s + p.annualGrowthRate, 0) / policies.length / 100
+      insuranceValue *= (1 + (inForcePolicies.length > 0
+        ? inForcePolicies.reduce((s, p) => s + p.annualGrowthRate, 0) / inForcePolicies.length / 100
         : 0));
     }
 
@@ -264,20 +272,14 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     : 0;
 
   // ============================================================
-  // FIRE NUMBER (SWR method with CPF LIFE offset)
+  // FIRE NUMBER (SWR method)
   // ============================================================
   const grossRetirementExpenses = income.retirementExpenses;
   const inflatedRetirementExpenses = Math.round(grossRetirementExpenses * Math.pow(1 + inflationRate, yearsToRetirement));
-  const cpfLifeAnnual = cpfLifeMonthly * 12;
-  const yearsBeforeCpfLife = Math.max(0, 65 - retirementAge);
   const withdrawalRate = income.withdrawalRate / 100;
-  const netDrawdownNeeded = Math.max(0, inflatedRetirementExpenses - cpfLifeAnnual);
-  const portfolioForPostCpfLife = netDrawdownNeeded / withdrawalRate;
-  const preCpfLifeBridge = yearsBeforeCpfLife > 0
-    ? (inflatedRetirementExpenses - Math.min(inflatedRetirementExpenses, cpfLifeAnnual)) * yearsBeforeCpfLife
-    : 0;
+  const netDrawdownNeeded = inflatedRetirementExpenses;
   const inflationBuffer = 0.10;
-  const fireNumber = Math.round((portfolioForPostCpfLife + preCpfLifeBridge) * (1 + inflationBuffer));
+  const fireNumber = Math.round((netDrawdownNeeded / withdrawalRate) * (1 + inflationBuffer));
 
   let yearsToBuild = retirementAge - currentAge;
   for (let i = 0; i < yearlyData.length; i++) {
@@ -293,7 +295,6 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       inflatedRetirementExpenses,
       inflationRate: income.inflationRate ?? 2.5,
       yearsToRetirement,
-      cpfLifeAnnual,
       netDrawdownNeeded,
       withdrawalRate: income.withdrawalRate,
       inflationBuffer: inflationBuffer * 100,

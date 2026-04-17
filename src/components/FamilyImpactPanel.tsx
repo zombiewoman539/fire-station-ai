@@ -246,7 +246,7 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
   const totalCI = inForce.reduce((s, p) => s + (ciStage === 'early' ? (p.eciSumAssured || 0) : (p.ciSumAssured || 0)), 0);
 
   const totalTreatmentCost = ciData.initialTreatment + ciData.annualOngoing * ciData.ongoingYears;
-  const incomeLoss = Math.round(income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8);
+  const incomeLoss = Math.round(income.annualIncome * Math.ceil(ciData.incomeImpactMonths / 12) * 0.8);
   const totalFinancialHit = totalTreatmentCost + incomeLoss;
 
   const coveragePct = totalFinancialHit > 0 ? Math.min(100, Math.round((totalCI / totalFinancialHit) * 100)) : 100;
