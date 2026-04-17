@@ -496,6 +496,9 @@ function Dashboard() {
           />
         </div>
 
+        {/* Coverage gap bar — always visible compact strip */}
+        <CoverageGapBar inputs={inputs} compact />
+
         {/* Toggle bar: include/exclude individual purchases & policies */}
         <ToggleBar
           inputs={inputs}
@@ -511,8 +514,6 @@ function Dashboard() {
           borderTop: isDrawerOpen ? '1px solid var(--border)' : 'none',
           background: 'var(--deep)',
         }}>
-          {/* Coverage gap bar — lives inside drawer so it doesn't eat chart space */}
-          <CoverageGapBar inputs={inputs} compact />
           <div style={{ height: 360, overflowY: 'auto' }}>
             {bottomTab === 'insights' && (
               <div style={{ display: 'flex', height: '100%' }}>
