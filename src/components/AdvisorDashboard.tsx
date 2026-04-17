@@ -18,6 +18,16 @@ function getLiveAge(profile: ClientProfile): number {
   return profile.inputs.personal?.currentAge ?? 0;
 }
 
+interface UpcomingPremium {
+  clientName: string;
+  clientId: string;
+  policyName: string;
+  amount: number;
+  frequency: string;
+  nextDueDate: string;
+  daysUntil: number;
+}
+
 interface ClientRow {
   profile: ClientProfile;
   results: FireResults;
@@ -28,6 +38,19 @@ interface ClientRow {
   hasMissingEstate: boolean;
   daysSinceMeeting: number | null;
   reviewOverdue: boolean;
+  nearestDueDays: number | null;  // days until soonest in-force policy premium
+}
+
+const FREQ_LABEL: Record<string, string> = {
+  monthly: '/mth', quarterly: '/qtr', 'semi-annual': '/half-yr', annual: '/yr',
+};
+
+function daysUntil(iso: string): number {
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
 }
 
 type SortKey = 'name' | 'age' | 'retirementAge' | 'onTrack' | 'wealth' | 'coverage';
@@ -63,7 +86,7 @@ export default function AdvisorDashboard() {
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall' | 'gaps' | 'overdue'>('all');
+  const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall' | 'gaps' | 'overdue' | 'due-soon'>('all');
   const [ageFilter, setAgeFilter] = useState<AgeFilter>('all');
 
   useEffect(() => {
@@ -83,7 +106,11 @@ export default function AdvisorDashboard() {
           : null;
         const reviewDate = profile.nextReviewDate ? new Date(profile.nextReviewDate) : null;
         const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
-        return { profile, results, liveAge, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate, daysSinceMeeting, reviewOverdue };
+        const inForceDates = policies
+          .filter(p => p.policyStatus === 'in-force' && p.premiumNextDueDate)
+          .map(p => daysUntil(p.premiumNextDueDate!));
+        const nearestDueDays = inForceDates.length > 0 ? Math.min(...inForceDates) : null;
+        return { profile, results, liveAge, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate, daysSinceMeeting, reviewOverdue, nearestDueDays };
       });
       setRows(built);
       setLoading(false);
@@ -102,7 +129,8 @@ export default function AdvisorDashboard() {
     const missingEstate = rows.filter(r => r.hasMissingEstate).length;
     const overdueReview = rows.filter(r => r.reviewOverdue || (r.daysSinceMeeting !== null && r.daysSinceMeeting > 365)).length;
     const neverMet = rows.filter(r => r.daysSinceMeeting === null).length;
-    return { total, onTrack, shortfall, noInvestments, noInsurance, missingEstate, overdueReview, neverMet };
+    const dueSoon = rows.filter(r => r.nearestDueDays !== null && r.nearestDueDays <= 30).length;
+    return { total, onTrack, shortfall, noInvestments, noInsurance, missingEstate, overdueReview, neverMet, dueSoon };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -111,6 +139,7 @@ export default function AdvisorDashboard() {
     if (filter === 'shortfall') list = list.filter(r => !r.results.onTrack);
     if (filter === 'gaps') list = list.filter(r => r.hasMissingInsurance || r.hasMissingEstate);
     if (filter === 'overdue') list = list.filter(r => r.reviewOverdue || (r.daysSinceMeeting !== null && r.daysSinceMeeting > 365) || r.daysSinceMeeting === null);
+    if (filter === 'due-soon') list = list.filter(r => r.nearestDueDays !== null && r.nearestDueDays <= 30);
     if (ageFilter === 'under30') list = list.filter(r => r.liveAge < 30);
     if (ageFilter === '30s') list = list.filter(r => r.liveAge >= 30 && r.liveAge < 40);
     if (ageFilter === '40s') list = list.filter(r => r.liveAge >= 40 && r.liveAge < 50);
@@ -130,6 +159,30 @@ export default function AdvisorDashboard() {
       return 0;
     });
   }, [rows, filter, ageFilter, sortKey, sortDir]);
+
+  // All in-force premiums with a due date within 90 days, sorted by date
+  const upcomingPremiums = useMemo((): UpcomingPremium[] => {
+    const list: UpcomingPremium[] = [];
+    rows.forEach(row => {
+      (row.profile.inputs.policies || [])
+        .filter(p => p.policyStatus === 'in-force' && p.premiumNextDueDate)
+        .forEach(p => {
+          const days = daysUntil(p.premiumNextDueDate!);
+          if (days <= 90) {
+            list.push({
+              clientName: row.profile.name,
+              clientId: row.profile.id,
+              policyName: p.name,
+              amount: p.premiumAmount,
+              frequency: p.premiumFrequency,
+              nextDueDate: p.premiumNextDueDate!,
+              daysUntil: days,
+            });
+          }
+        });
+    });
+    return list.sort((a, b) => a.daysUntil - b.daysUntil);
+  }, [rows]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -216,6 +269,12 @@ export default function AdvisorDashboard() {
             sub={`${stats.overdueReview} overdue · ${stats.neverMet} never met`}
             color={(stats.overdueReview + stats.neverMet) > 0 ? '#fb923c' : 'var(--text-1)'}
           />
+          <StatCard
+            label="Premiums Due ≤30d"
+            value={stats.dueSoon}
+            sub="clients with upcoming renewal"
+            color={stats.dueSoon > 0 ? '#f87171' : 'var(--text-1)'}
+          />
         </div>
 
         {/* Filter tabs */}
@@ -226,6 +285,7 @@ export default function AdvisorDashboard() {
             { key: 'shortfall', label: '⚠ Shortfall' },
             { key: 'gaps', label: 'Has Gaps' },
             { key: 'overdue', label: '📅 Needs Follow-up' },
+            { key: 'due-soon', label: '💳 Premiums Due' },
           ] as const).map(f => (
             <button
               key={f.key}
@@ -272,6 +332,66 @@ export default function AdvisorDashboard() {
             {filtered.length} client{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
+
+        {/* Upcoming Premiums timeline */}
+        {upcomingPremiums.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12 }}>
+              💳 Upcoming Premiums <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-4)' }}>— next 90 days</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {upcomingPremiums.map((up, i) => {
+                const isOverdue = up.daysUntil < 0;
+                const isUrgent = up.daysUntil >= 0 && up.daysUntil <= 7;
+                const isSoon   = up.daysUntil > 7 && up.daysUntil <= 30;
+                const accentColor = isOverdue ? '#f87171' : isUrgent ? '#fb923c' : isSoon ? '#fbbf24' : 'var(--text-4)';
+                return (
+                  <div
+                    key={i}
+                    onClick={() => { localStorage.setItem('fire-active-profile', up.clientId); navigate('/'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 14,
+                      background: 'var(--card)', border: '1px solid var(--border)',
+                      borderLeft: `3px solid ${accentColor}`,
+                      borderRadius: 8, padding: '10px 14px', cursor: 'pointer',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--surface)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--card)'}
+                  >
+                    {/* Due date badge */}
+                    <div style={{ textAlign: 'center', minWidth: 52, flexShrink: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: accentColor, lineHeight: 1 }}>
+                        {isOverdue ? `+${Math.abs(up.daysUntil)}d` : up.daysUntil === 0 ? 'Today' : `${up.daysUntil}d`}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>
+                        {isOverdue ? 'overdue' : 'remaining'}
+                      </div>
+                    </div>
+                    {/* Divider */}
+                    <div style={{ width: 1, height: 32, background: 'var(--border)', flexShrink: 0 }} />
+                    {/* Policy info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{up.clientName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {up.policyName}
+                      </div>
+                    </div>
+                    {/* Amount */}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}>
+                        S${up.amount.toLocaleString()}{FREQ_LABEL[up.frequency] ?? ''}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1 }}>
+                        {formatShortDate(up.nextDueDate)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Table */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -327,7 +447,17 @@ export default function AdvisorDashboard() {
                         }}>
                           {profile.name.charAt(0).toUpperCase()}
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{profile.name}</span>
+                        <div>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{profile.name}</span>
+                          {row.nearestDueDays !== null && row.nearestDueDays <= 90 && (
+                            <div style={{
+                              fontSize: 10, fontWeight: 600, marginTop: 2,
+                              color: row.nearestDueDays < 0 ? '#f87171' : row.nearestDueDays <= 30 ? '#fb923c' : '#fbbf24',
+                            }}>
+                              💳 {row.nearestDueDays < 0 ? `Premium overdue ${Math.abs(row.nearestDueDays)}d` : row.nearestDueDays === 0 ? 'Premium due today' : `Premium due in ${row.nearestDueDays}d`}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-2)' }}>
