@@ -1,6 +1,5 @@
 import React from 'react';
 import { FireInputs, InsurancePolicy, MajorPurchase, FundAllocation } from '../types';
-import { formatSGD } from '../calculations';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile } from '../profileTypes';
 
