@@ -4,6 +4,7 @@ import { listProfiles } from '../services/profileStorageSupabase';
 import { calculate } from '../calculations';
 import { ClientProfile } from '../profileTypes';
 import { FireResults } from '../types';
+import { daysUntilNext, isPremiumActive, nextOccurrence } from '../premiumUtils';
 
 // Compute live age from date of birth. Falls back to the plan's currentAge if no DOB set.
 function getLiveAge(profile: ClientProfile): number {
@@ -44,10 +45,6 @@ interface ClientRow {
 const FREQ_LABEL: Record<string, string> = {
   monthly: '/mth', quarterly: '/qtr', 'semi-annual': '/half-yr', annual: '/yr',
 };
-
-function daysUntil(iso: string): number {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-}
 
 function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
@@ -107,8 +104,9 @@ export default function AdvisorDashboard() {
         const reviewDate = profile.nextReviewDate ? new Date(profile.nextReviewDate) : null;
         const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
         const inForceDates = policies
-          .filter(p => p.policyStatus === 'in-force' && p.premiumNextDueDate)
-          .map(p => daysUntil(p.premiumNextDueDate!));
+          .filter(p => p.policyStatus === 'in-force' && p.premiumNextDueDate && isPremiumActive(p))
+          .map(p => daysUntilNext(p.premiumNextDueDate, p.premiumFrequency))
+          .filter((d): d is number => d !== null);
         const nearestDueDays = inForceDates.length > 0 ? Math.min(...inForceDates) : null;
         return { profile, results, liveAge, totalDeathSA, totalPremiumPA, hasMissingInsurance, hasMissingEstate, daysSinceMeeting, reviewOverdue, nearestDueDays };
       });
@@ -165,17 +163,18 @@ export default function AdvisorDashboard() {
     const list: UpcomingPremium[] = [];
     rows.forEach(row => {
       (row.profile.inputs.policies || [])
-        .filter(p => p.policyStatus === 'in-force' && p.premiumNextDueDate)
+        .filter(p => p.policyStatus === 'in-force' && p.premiumNextDueDate && isPremiumActive(p))
         .forEach(p => {
-          const days = daysUntil(p.premiumNextDueDate!);
-          if (days <= 90) {
+          const days = daysUntilNext(p.premiumNextDueDate, p.premiumFrequency);
+          const next = nextOccurrence(p.premiumNextDueDate, p.premiumFrequency);
+          if (days !== null && next !== null && days <= 90) {
             list.push({
               clientName: row.profile.name,
               clientId: row.profile.id,
               policyName: p.name,
               amount: p.premiumAmount,
               frequency: p.premiumFrequency,
-              nextDueDate: p.premiumNextDueDate!,
+              nextDueDate: next.toISOString().slice(0, 10),
               daysUntil: days,
             });
           }

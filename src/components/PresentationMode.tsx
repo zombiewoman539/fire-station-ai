@@ -2,6 +2,7 @@ import React from 'react';
 import { FireInputs, FireResults } from '../types';
 import { formatSGD } from '../calculations';
 import ChartPanel from './ChartPanel';
+import { daysUntilNext, isPremiumActive, nextOccurrence } from '../premiumUtils';
 
 interface Props {
   inputs: FireInputs;
@@ -30,16 +31,9 @@ function annualPremium(p: { premiumAmount: number; premiumFrequency: string }): 
   return p.premiumAmount * (ANNUAL_MULTIPLIER[p.premiumFrequency] ?? 12);
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
+function formatDate(d: Date | null): string {
+  if (!d) return '—';
   return d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function daysUntil(iso: string | null): number | null {
-  if (!iso) return null;
-  const diff = new Date(iso).getTime() - Date.now();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 export default function PresentationMode({ inputs, results, clientName, onExit }: Props) {
@@ -248,10 +242,11 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
               </div>
 
               {/* Per-policy rows */}
-              {inForcePolicies.map(p => {
-                const days = daysUntil(p.premiumNextDueDate);
-                const isUrgent = days !== null && days >= 0 && days <= 30;
-                const isSoon   = days !== null && days > 30 && days <= 90;
+              {inForcePolicies.filter(p => isPremiumActive(p)).map(p => {
+                const next = nextOccurrence(p.premiumNextDueDate, p.premiumFrequency);
+                const days = daysUntilNext(p.premiumNextDueDate, p.premiumFrequency);
+                const isUrgent  = days !== null && days >= 0 && days <= 30;
+                const isSoon    = days !== null && days > 30 && days <= 90;
                 const isOverdue = days !== null && days < 0;
                 const dateColor = isOverdue ? '#f87171' : isUrgent ? '#fb923c' : isSoon ? '#fbbf24' : '#64748b';
                 return (
@@ -273,12 +268,23 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
                         {isOverdue && '⚠ Overdue · '}
                         {isUrgent && '🔴 Due soon · '}
                         {isSoon && '🟡 '}
-                        Next: {formatDate(p.premiumNextDueDate)}
+                        Next: {formatDate(next)}
                       </span>
                     </div>
                   </div>
                 );
               })}
+              {inForcePolicies.filter(p => !isPremiumActive(p)).map(p => (
+                <div key={p.id} style={{
+                  background: '#1e293b', borderRadius: 8, padding: '9px 12px', marginBottom: 5,
+                  borderLeft: '3px solid #334155', opacity: 0.6,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>{p.name}</span>
+                    <span style={{ fontSize: 10, color: '#475569' }}>Premiums paid up</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
