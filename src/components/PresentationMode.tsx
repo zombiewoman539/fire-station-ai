@@ -22,6 +22,26 @@ const STATUS_COLOR: Record<string, string> = {
   'matured': '#a78bfa',
 };
 
+const ANNUAL_MULTIPLIER: Record<string, number> = {
+  monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1,
+};
+
+function annualPremium(p: { premiumAmount: number; premiumFrequency: string }): number {
+  return p.premiumAmount * (ANNUAL_MULTIPLIER[p.premiumFrequency] ?? 12);
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function daysUntil(iso: string | null): number | null {
+  if (!iso) return null;
+  const diff = new Date(iso).getTime() - Date.now();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
 export default function PresentationMode({ inputs, results, clientName, onExit }: Props) {
   const { wealthAtRetirement, fireNumber, yearsToBuild, onTrack } = results;
   const { personal, income, policies, purchases, estatePlanning } = inputs;
@@ -208,6 +228,57 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Premium Schedule */}
+          {inForcePolicies.length > 0 && (
+            <div>
+              <SectionLabel>Premium Schedule</SectionLabel>
+
+              {/* Total annual cost */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: '#1e293b', borderRadius: 8, padding: '8px 12px', marginBottom: 10,
+              }}>
+                <span style={{ fontSize: 11, color: '#64748b' }}>Total Annual Premium</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#fbbf24' }}>
+                  {formatSGD(inForcePolicies.reduce((s, p) => s + annualPremium(p), 0))}/yr
+                </span>
+              </div>
+
+              {/* Per-policy rows */}
+              {inForcePolicies.map(p => {
+                const days = daysUntil(p.premiumNextDueDate);
+                const isUrgent = days !== null && days >= 0 && days <= 30;
+                const isSoon   = days !== null && days > 30 && days <= 90;
+                const isOverdue = days !== null && days < 0;
+                const dateColor = isOverdue ? '#f87171' : isUrgent ? '#fb923c' : isSoon ? '#fbbf24' : '#64748b';
+                return (
+                  <div key={p.id} style={{
+                    background: '#1e293b', borderRadius: 8, padding: '9px 12px', marginBottom: 5,
+                    borderLeft: `3px solid ${isOverdue ? '#f87171' : isUrgent ? '#fb923c' : isSoon ? '#fbbf24' : '#334155'}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{p.name}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>
+                        {formatSGD(p.premiumAmount)}{FREQ_LABEL[p.premiumFrequency] ?? ''}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 10, color: '#475569' }}>
+                        {formatSGD(annualPremium(p))}/yr
+                      </span>
+                      <span style={{ fontSize: 10, color: dateColor }}>
+                        {isOverdue && '⚠ Overdue · '}
+                        {isUrgent && '🔴 Due soon · '}
+                        {isSoon && '🟡 '}
+                        Next: {formatDate(p.premiumNextDueDate)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 

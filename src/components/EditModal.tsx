@@ -292,7 +292,7 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
     cashValue: 0, annualGrowthRate: 3,
     deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
     premiumAmount: 0, premiumFrequency: 'monthly',
-    premiumDueDay: 1, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
+    premiumNextDueDate: null, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
     nomineeName: '', nomineeClientId: null,
     insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
     commencementDate: null, maturityDate: null,
@@ -436,43 +436,19 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
                 onChange={v => upd(p.id, 'premiumAmount', v)} />
               <SelectField label="Frequency" value={p.premiumFrequency} options={FREQUENCIES} small
                 onChange={v => upd(p.id, 'premiumFrequency', v)} />
-              {p.premiumFrequency === 'annual' ? (
-                <SelectField
-                  label="Due Month"
-                  value={String(p.premiumDueDay)}
-                  small
-                  options={[
-                    { value: '1', label: 'January' }, { value: '2', label: 'February' },
-                    { value: '3', label: 'March' },   { value: '4', label: 'April' },
-                    { value: '5', label: 'May' },      { value: '6', label: 'June' },
-                    { value: '7', label: 'July' },     { value: '8', label: 'August' },
-                    { value: '9', label: 'September'},{ value: '10', label: 'October' },
-                    { value: '11', label: 'November'},{ value: '12', label: 'December' },
-                  ]}
-                  onChange={v => upd(p.id, 'premiumDueDay', Number(v))}
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>Next Due Date</label>
+                <input
+                  type="date"
+                  value={p.premiumNextDueDate ?? ''}
+                  onChange={e => upd(p.id, 'premiumNextDueDate', e.target.value || null)}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                    borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                  }}
                 />
-              ) : p.premiumFrequency === 'quarterly' ? (
-                <NumberField
-                  label="Due Month in Qtr (1–3)"
-                  value={p.premiumDueDay}
-                  small
-                  onChange={v => upd(p.id, 'premiumDueDay', Math.max(1, Math.min(3, v)))}
-                />
-              ) : p.premiumFrequency === 'semi-annual' ? (
-                <NumberField
-                  label="Due Month in Half (1–6)"
-                  value={p.premiumDueDay}
-                  small
-                  onChange={v => upd(p.id, 'premiumDueDay', Math.max(1, Math.min(6, v)))}
-                />
-              ) : (
-                <NumberField
-                  label="Due Day (1–31)"
-                  value={p.premiumDueDay}
-                  small
-                  onChange={v => upd(p.id, 'premiumDueDay', Math.max(1, Math.min(31, v)))}
-                />
-              )}
+              </div>
               <SelectField label="Payment Term" value={p.premiumPaymentTerm} options={[
                 { value: 'whole-life', label: 'Whole Life' },
                 { value: 'limited', label: 'Limited Pay' },

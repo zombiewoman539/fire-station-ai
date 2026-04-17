@@ -34,7 +34,7 @@ export interface InsurancePolicy {
   ciSumAssured: number;
   premiumAmount: number;
   premiumFrequency: 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
-  premiumDueDay: number;
+  premiumNextDueDate: string | null;  // YYYY-MM-DD — next payment date (recurs per frequency)
   premiumPaymentTerm: 'whole-life' | 'limited';
   premiumLimitedYears: number;
   nomineeName: string;           // free-text nominee name

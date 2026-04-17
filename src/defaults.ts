@@ -42,7 +42,7 @@ export const defaultInputs: FireInputs = {
       cashValue: 15000, annualGrowthRate: 3.5,
       deathSumAssured: 200000, tpdSumAssured: 200000, ciSumAssured: 100000,
       premiumAmount: 200, premiumFrequency: 'monthly',
-      premiumDueDay: 1, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
+      premiumNextDueDate: null, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
       nomineeName: '', nomineeClientId: null,
       insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
       commencementDate: null, maturityDate: null,
