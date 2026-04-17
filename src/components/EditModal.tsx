@@ -292,7 +292,7 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
     cashValue: 0, annualGrowthRate: 3,
     deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
     premiumAmount: 0, premiumFrequency: 'monthly',
-    premiumDueDay: 1, premiumPaymentTerm: 'whole-life', premiumLimitedYears: 0,
+    premiumDueDay: 1, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
     nomineeName: '', nomineeClientId: null,
     insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
     commencementDate: null, maturityDate: null,
