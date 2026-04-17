@@ -1,6 +1,7 @@
 import React from 'react';
 import { FireInputs, FireResults } from '../types';
 import { calculate, formatSGD, CI_COST_DATA } from '../calculations';
+import { useIsDark } from '../useIsDark';
 
 interface Props {
   inputs: FireInputs;
@@ -46,6 +47,17 @@ function StatBox({ label, value, sub, color }: {
 function IncomeReplacementPanel({
   type, inputs, results,
 }: { type: 'death' | 'tpd'; inputs: FireInputs; results: FireResults }) {
+  const isDark = useIsDark();
+  const fclr = {
+    red:       isDark ? '#f87171' : '#dc2626',
+    green:     isDark ? '#34d399' : '#047857',
+    amber:     isDark ? '#fbbf24' : '#b45309',
+    blue:      isDark ? '#60a5fa' : '#1d4ed8',
+    redBg:     isDark ? 'rgba(239,68,68,0.08)'  : 'rgba(220,38,38,0.09)',
+    redBorder: isDark ? 'rgba(239,68,68,0.25)'  : 'rgba(220,38,38,0.35)',
+    greenBg:   isDark ? 'rgba(52,211,153,0.10)' : 'rgba(5,150,105,0.10)',
+    greenBorder: isDark ? 'rgba(52,211,153,0.30)': 'rgba(5,150,105,0.35)',
+  };
   const { personal, income, policies } = inputs;
   const currentAge = personal.currentAge;
   const yearsNeeded = personal.lifeExpectancy - currentAge;
@@ -90,8 +102,8 @@ function IncomeReplacementPanel({
     <div>
       {/* Hero metric */}
       <div style={{
-        background: isFullyCovered ? 'rgba(52,211,153,0.08)' : 'rgba(239,68,68,0.07)',
-        border: `1px solid ${isFullyCovered ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.2)'}`,
+        background: isFullyCovered ? fclr.greenBg : fclr.redBg,
+        border: `1px solid ${isFullyCovered ? fclr.greenBorder : fclr.redBorder}`,
         borderRadius: 12, padding: '14px 16px', marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -126,7 +138,7 @@ function IncomeReplacementPanel({
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-5)' }}>
           <span>Today (age {currentAge})</span>
           {!isFullyCovered && scenarioResults.moneyRunsOutAge && (
-            <span style={{ color: '#f87171', fontWeight: 700 }}>
+            <span style={{ color: fclr.red, fontWeight: 700 }}>
               Money runs out: age {scenarioResults.moneyRunsOutAge}
             </span>
           )}
@@ -140,32 +152,32 @@ function IncomeReplacementPanel({
           label="Lost income"
           value={formatSGD(lostIncome)}
           sub={`${yearsToRetirement} yrs × ${formatSGD(income.annualIncome)}/yr`}
-          color="#f87171"
+          color={fclr.red}
         />
         <StatBox
           label={type === 'death' ? 'Death payout' : 'TPD payout'}
           value={payout > 0 ? formatSGD(payout) : 'None'}
           sub={payout > 0 ? `≈ ${yearsFromPayout.toFixed(1)} yrs of expenses` : 'No coverage'}
-          color={payout > 0 ? '#34d399' : '#f87171'}
+          color={payout > 0 ? fclr.green : fclr.red}
         />
         <StatBox
           label="From savings"
           value={formatSGD(currentWealth)}
           sub={`≈ ${yearsFromWealth.toFixed(1)} yrs of expenses`}
-          color="#60a5fa"
+          color={fclr.blue}
         />
       </div>
 
       {/* Gap callout or success */}
       {isFullyCovered ? (
         <div style={{
-          background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)',
+          background: fclr.greenBg, border: `1px solid ${fclr.greenBorder}`,
           borderRadius: 10, padding: '12px 14px',
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
           <span style={{ fontSize: 22 }}>✅</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>Family is fully protected</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: fclr.green }}>Family is fully protected</div>
             <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
               Current savings + {type === 'death' ? 'death' : 'TPD'} coverage sustain the family to life expectancy.
             </div>
@@ -173,25 +185,25 @@ function IncomeReplacementPanel({
         </div>
       ) : (
         <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+          background: fclr.redBg, border: `1px solid ${fclr.redBorder}`,
           borderRadius: 10, padding: '12px 14px',
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>🚨</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: fclr.red, marginBottom: 3 }}>
                 Family short by {gapYears.toFixed(1)} years — {formatSGD(gapSGD)} gap
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.5 }}>
                 After exhausting savings and {type === 'death' ? 'death' : 'TPD'} payout, the family still needs{' '}
                 <strong style={{ color: 'var(--text-2)' }}>{formatSGD(income.annualExpenses)}/yr</strong> for{' '}
-                <strong style={{ color: '#f87171' }}>{gapYears.toFixed(1)} more years</strong>.
+                <strong style={{ color: fclr.red }}>{gapYears.toFixed(1)} more years</strong>.
               </div>
             </div>
           </div>
           <div style={{
-            fontSize: 11, color: '#fbbf24', fontWeight: 600,
-            borderTop: '1px solid rgba(239,68,68,0.2)', paddingTop: 8,
+            fontSize: 11, color: fclr.amber, fontWeight: 600,
+            borderTop: `1px solid ${fclr.redBorder}`, paddingTop: 8,
           }}>
             💡 Recommendation: Add{' '}
             <strong>{formatSGD(gapSGD)}</strong> in{' '}
@@ -206,6 +218,18 @@ function IncomeReplacementPanel({
 // ── Critical Illness panel ────────────────────────────────────────────────────
 
 function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireResults }) {
+  const isDark = useIsDark();
+  const fclr = {
+    red:       isDark ? '#f87171' : '#dc2626',
+    redDim:    isDark ? '#fca5a5' : '#b91c1c',
+    green:     isDark ? '#34d399' : '#047857',
+    amber:     isDark ? '#fbbf24' : '#b45309',
+    orange:    isDark ? '#f97316' : '#c2410c',
+    redBg:     isDark ? 'rgba(239,68,68,0.08)'  : 'rgba(220,38,38,0.09)',
+    redBorder: isDark ? 'rgba(239,68,68,0.25)'  : 'rgba(220,38,38,0.35)',
+    greenBg:   isDark ? 'rgba(52,211,153,0.10)' : 'rgba(5,150,105,0.10)',
+    greenBorder: isDark ? 'rgba(52,211,153,0.30)': 'rgba(5,150,105,0.35)',
+  };
   const [ciType, setCiType] = React.useState<'cancer' | 'heart' | 'stroke' | 'kidney'>('cancer');
   const { personal, income, policies } = inputs;
   const currentAge = personal.currentAge;
@@ -240,10 +264,10 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
             key={key}
             onClick={() => setCiType(key as typeof ciType)}
             style={{
-              background: ciType === key ? 'rgba(239,68,68,0.15)' : 'var(--inset)',
-              border: `1px solid ${ciType === key ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
+              background: ciType === key ? fclr.redBg : 'var(--inset)',
+              border: `1px solid ${ciType === key ? fclr.redBorder : 'var(--border)'}`,
               borderRadius: 7, padding: '5px 10px', cursor: 'pointer',
-              color: ciType === key ? '#fca5a5' : 'var(--text-4)',
+              color: ciType === key ? fclr.redDim : 'var(--text-4)',
               fontSize: 11, fontWeight: ciType === key ? 700 : 400,
               whiteSpace: 'nowrap',
             }}
@@ -255,8 +279,8 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
 
       {/* Coverage meter */}
       <div style={{
-        background: isFullyCovered ? 'rgba(52,211,153,0.08)' : 'rgba(239,68,68,0.07)',
-        border: `1px solid ${isFullyCovered ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.2)'}`,
+        background: isFullyCovered ? fclr.greenBg : fclr.redBg,
+        border: `1px solid ${isFullyCovered ? fclr.greenBorder : fclr.redBorder}`,
         borderRadius: 12, padding: '14px 16px', marginBottom: 12,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
@@ -268,7 +292,7 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 11, color: 'var(--text-4)' }}>Total financial hit</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#f87171' }}>{formatSGD(totalFinancialHit)}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: fclr.red }}>{formatSGD(totalFinancialHit)}</div>
           </div>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: 'var(--border)', overflow: 'hidden', marginBottom: 6 }}>
@@ -290,9 +314,9 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
 
       {/* Cost breakdown */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <StatBox label="Initial treatment" value={formatSGD(ciData.initialTreatment)} sub={ciData.description.split(',')[0]} color="#f87171" />
-        <StatBox label={`Ongoing (${ciData.ongoingYears} yrs)`} value={formatSGD(ciData.annualOngoing * ciData.ongoingYears)} sub={`${formatSGD(ciData.annualOngoing)}/yr`} color="#f97316" />
-        <StatBox label="Income loss" value={formatSGD(incomeLoss)} sub={`~${ciData.incomeImpactMonths} months at 80%`} color="#fbbf24" />
+        <StatBox label="Initial treatment" value={formatSGD(ciData.initialTreatment)} sub={ciData.description.split(',')[0]} color={fclr.red} />
+        <StatBox label={`Ongoing (${ciData.ongoingYears} yrs)`} value={formatSGD(ciData.annualOngoing * ciData.ongoingYears)} sub={`${formatSGD(ciData.annualOngoing)}/yr`} color={fclr.orange} />
+        <StatBox label="Income loss" value={formatSGD(incomeLoss)} sub={`~${ciData.incomeImpactMonths} months at 80%`} color={fclr.amber} />
       </div>
 
       {/* Retirement impact */}
@@ -304,7 +328,7 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
         <div style={{ fontSize: 11, color: 'var(--text-4)' }}>
           Impact on retirement wealth
         </div>
-        <div style={{ fontSize: 13, fontWeight: 800, color: wealthImpact >= 0 ? '#34d399' : '#f87171' }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: wealthImpact >= 0 ? fclr.green : fclr.red }}>
           {wealthImpact >= 0 ? '+' : ''}{formatSGD(wealthImpact)}
         </div>
       </div>
@@ -312,12 +336,12 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
       {/* Gap callout */}
       {isFullyCovered ? (
         <div style={{
-          background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)',
+          background: fclr.greenBg, border: `1px solid ${fclr.greenBorder}`,
           borderRadius: 10, padding: '12px 14px', display: 'flex', gap: 10,
         }}>
           <span style={{ fontSize: 22 }}>✅</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>CI costs fully covered</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: fclr.green }}>CI costs fully covered</div>
             <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
               Your {formatSGD(totalCI)} CI policy covers the full {formatSGD(totalFinancialHit)} {ciData.label.toLowerCase()} cost.
             </div>
@@ -325,13 +349,13 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
         </div>
       ) : (
         <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+          background: fclr.redBg, border: `1px solid ${fclr.redBorder}`,
           borderRadius: 10, padding: '12px 14px',
         }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>🚨</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: fclr.red, marginBottom: 3 }}>
                 {formatSGD(gapSGD)} gap — {totalCI === 0 ? 'completely unprotected' : 'partially covered'}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.5 }}>
@@ -342,7 +366,7 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
               </div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600, borderTop: '1px solid rgba(239,68,68,0.2)', paddingTop: 8 }}>
+          <div style={{ fontSize: 11, color: fclr.amber, fontWeight: 600, borderTop: `1px solid ${fclr.redBorder}`, paddingTop: 8 }}>
             💡 Recommendation: Add {formatSGD(gapSGD)} in CI coverage to protect against {ciData.label.toLowerCase()}.
           </div>
         </div>
@@ -354,6 +378,12 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function FamilyImpactPanel({ inputs, results }: Props) {
+  const isDark = useIsDark();
+  const tabClr = {
+    green:       isDark ? '#34d399' : '#047857',
+    greenBg:     isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.12)',
+    greenBorder: isDark ? 'rgba(16,185,129,0.4)'  : 'rgba(5,150,105,0.4)',
+  };
   const [tab, setTab] = React.useState<ImpactTab>('death');
   const { personal } = inputs;
 
@@ -385,10 +415,10 @@ export default function FamilyImpactPanel({ inputs, results }: Props) {
             key={t.key}
             onClick={() => setTab(t.key)}
             style={{
-              flex: 1, background: tab === t.key ? 'rgba(16,185,129,0.15)' : 'var(--inset)',
-              border: `1px solid ${tab === t.key ? 'rgba(16,185,129,0.4)' : 'var(--border)'}`,
+              flex: 1, background: tab === t.key ? tabClr.greenBg : 'var(--inset)',
+              border: `1px solid ${tab === t.key ? tabClr.greenBorder : 'var(--border)'}`,
               borderRadius: 8, padding: '7px 0', cursor: 'pointer',
-              color: tab === t.key ? '#34d399' : 'var(--text-3)',
+              color: tab === t.key ? tabClr.green : 'var(--text-3)',
               fontSize: 12, fontWeight: tab === t.key ? 700 : 400,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             }}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FireInputs, FireResults, Scenario, ScenarioType } from '../types';
 import { formatSGD, CI_COST_DATA } from '../calculations';
+import { useIsDark } from '../useIsDark';
 
 interface Props {
   inputs: FireInputs;
@@ -25,6 +26,23 @@ const ciOptions: { value: 'cancer' | 'heart' | 'stroke' | 'kidney'; label: strin
 ];
 
 export default function ScenarioPanel({ inputs, results, scenarioResults, scenario, onScenarioChange }: Props) {
+  const isDark = useIsDark();
+
+  // Theme-aware semantic colors
+  const clr = {
+    red:      isDark ? '#f87171' : '#dc2626',
+    redDim:   isDark ? '#fca5a5' : '#b91c1c',
+    green:    isDark ? '#34d399' : '#047857',
+    amber:    isDark ? '#fbbf24' : '#b45309',
+    redBg:    isDark ? 'rgba(239,68,68,0.12)'   : 'rgba(220,38,38,0.10)',
+    redBg2:   isDark ? 'rgba(239,68,68,0.08)'   : 'rgba(220,38,38,0.08)',
+    redBorder:isDark ? 'rgba(239,68,68,0.3)'    : 'rgba(220,38,38,0.35)',
+    greenBg:  isDark ? 'rgba(16,185,129,0.15)'  : 'rgba(5,150,105,0.12)',
+    greenBorder: isDark ? 'rgba(16,185,129,0.4)': 'rgba(5,150,105,0.4)',
+    amberBg:  isDark ? 'rgba(251,191,36,0.15)'  : 'rgba(180,83,9,0.10)',
+    amberBorder: isDark ? 'rgba(251,191,36,0.4)': 'rgba(180,83,9,0.4)',
+  };
+
   const totalDeathSA = inputs.policies.reduce((s, p) => s + p.deathSumAssured, 0);
   const totalTpdSA = inputs.policies.reduce((s, p) => s + p.tpdSumAssured, 0);
   const totalCiSA = inputs.policies.reduce((s, p) => s + p.ciSumAssured, 0);
@@ -72,14 +90,14 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
             onClick={() => onScenarioChange({ ...scenario, type: opt.value, ciType: opt.value === 'critical-illness' ? (scenario.ciType || 'cancer') : undefined })}
             style={{
               background: scenario.type === opt.value
-                ? (opt.value === 'none' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
+                ? (opt.value === 'none' ? clr.greenBg : clr.redBg)
                 : 'var(--inset)',
               border: `1px solid ${scenario.type === opt.value
-                ? (opt.value === 'none' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)')
+                ? (opt.value === 'none' ? clr.greenBorder : clr.redBorder)
                 : 'var(--border)'}`,
               borderRadius: 8,
               color: scenario.type === opt.value
-                ? (opt.value === 'none' ? '#34d399' : '#f87171')
+                ? (opt.value === 'none' ? clr.green : clr.red)
                 : 'var(--text-4)',
               padding: '6px 12px',
               fontSize: 11,
@@ -98,7 +116,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
         <div style={{ marginBottom: 12 }}>
           <div className="flex justify-between" style={{ fontSize: 11, marginBottom: 4 }}>
             <span style={{ color: 'var(--text-4)' }}>Age at event</span>
-            <span style={{ color: '#f87171', fontWeight: 700 }}>{scenario.ageAtEvent}</span>
+            <span style={{ color: clr.red, fontWeight: 700 }}>{scenario.ageAtEvent}</span>
           </div>
           <input
             type="range"
@@ -120,10 +138,10 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
               key={opt.value}
               onClick={() => onScenarioChange({ ...scenario, ciType: opt.value })}
               style={{
-                background: scenario.ciType === opt.value ? 'rgba(239, 68, 68, 0.12)' : 'var(--inset)',
-                border: `1px solid ${scenario.ciType === opt.value ? 'rgba(239, 68, 68, 0.3)' : 'var(--border)'}`,
+                background: scenario.ciType === opt.value ? clr.redBg : 'var(--inset)',
+                border: `1px solid ${scenario.ciType === opt.value ? clr.redBorder : 'var(--border)'}`,
                 borderRadius: 6,
-                color: scenario.ciType === opt.value ? '#fca5a5' : 'var(--text-4)',
+                color: scenario.ciType === opt.value ? clr.redDim : 'var(--text-4)',
                 padding: '5px 10px',
                 fontSize: 10,
                 fontWeight: 600,
@@ -161,9 +179,9 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
               </span>
               <span style={{
                 background: coverageRatio >= 0.8
-                  ? 'rgba(16,185,129,0.15)' : coverageRatio >= 0.4
-                    ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
-                color: coverageRatio >= 0.8 ? '#34d399' : coverageRatio >= 0.4 ? '#fbbf24' : '#f87171',
+                  ? clr.greenBg : coverageRatio >= 0.4
+                    ? clr.amberBg : clr.redBg,
+                color: coverageRatio >= 0.8 ? clr.green : coverageRatio >= 0.4 ? clr.amber : clr.red,
                 fontSize: 9,
                 fontWeight: 700,
                 padding: '2px 7px',
@@ -177,7 +195,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
               {/* Before */}
               <div style={{ padding: '10px 12px', borderRight: '1px solid var(--border)' }}>
-                <div style={{ color: '#34d399', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                <div style={{ color: clr.green, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
                   ✓ Without event
                 </div>
                 <CompareRow label="Retirement wealth" value={formatSGD(results.wealthAtRetirement)} color="var(--text-1)" />
@@ -185,35 +203,35 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                 <CompareRow
                   label="Status"
                   value={results.onTrack ? 'On Track ✓' : 'Shortfall ✗'}
-                  color={results.onTrack ? '#34d399' : '#fbbf24'}
+                  color={results.onTrack ? clr.green : clr.amber}
                 />
                 <CompareRow
                   label="Funds last to"
                   value={results.moneyRunsOutAge ? `Age ${results.moneyRunsOutAge}` : `Age ${inputs.personal.lifeExpectancy}+`}
-                  color={results.moneyRunsOutAge ? '#fbbf24' : '#34d399'}
+                  color={results.moneyRunsOutAge ? clr.amber : clr.green}
                 />
               </div>
 
               {/* After */}
               <div style={{ padding: '10px 12px' }}>
-                <div style={{ color: '#f87171', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                <div style={{ color: clr.red, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
                   ✗ With event
                 </div>
                 <CompareRow
                   label="Retirement wealth"
                   value={formatSGD(scenarioWealth)}
-                  color={scenarioWealth < results.wealthAtRetirement ? '#f87171' : '#34d399'}
+                  color={scenarioWealth < results.wealthAtRetirement ? clr.red : clr.green}
                 />
                 <CompareRow label="FIRE number" value={formatSGD(scenarioResults.fireNumber)} color="var(--text-4)" />
                 <CompareRow
                   label="Status"
                   value={scenarioSurvives ? 'On Track ✓' : 'Shortfall ✗'}
-                  color={scenarioSurvives ? '#34d399' : '#f87171'}
+                  color={scenarioSurvives ? clr.green : clr.red}
                 />
                 <CompareRow
                   label="Funds last to"
                   value={scenarioResults.moneyRunsOutAge ? `Age ${scenarioResults.moneyRunsOutAge}` : `Age ${inputs.personal.lifeExpectancy}+`}
-                  color={scenarioResults.moneyRunsOutAge ? '#f87171' : '#34d399'}
+                  color={scenarioResults.moneyRunsOutAge ? clr.red : clr.green}
                 />
               </div>
             </div>
@@ -222,7 +240,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
             <div style={{
               padding: '7px 12px',
               borderTop: '1px solid var(--border)',
-              background: impact < 0 ? 'rgba(239,68,68,0.07)' : 'rgba(16,185,129,0.06)',
+              background: impact < 0 ? clr.redBg2 : clr.greenBg,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -232,7 +250,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                   ? `Funds depleted ${inputs.personal.lifeExpectancy - scenarioResults.moneyRunsOutAge} yrs before life expectancy`
                   : 'Net retirement wealth change'}
               </span>
-              <span style={{ color: impact < 0 ? '#f87171' : '#34d399', fontSize: 13, fontWeight: 700 }}>
+              <span style={{ color: impact < 0 ? clr.red : clr.green, fontSize: 13, fontWeight: 700 }}>
                 {impact >= 0 ? '+' : ''}{formatSGD(impact)}
               </span>
             </div>
@@ -260,24 +278,24 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
                 <CostRow label={`Income Loss (~${ciData.incomeImpactMonths} months)`}
                   amount={Math.round(inputs.income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8)} />
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2, display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>Total Financial Impact</span>
-                  <span style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ color: clr.red, fontSize: 11, fontWeight: 700 }}>Total Financial Impact</span>
+                  <span style={{ color: clr.red, fontSize: 11, fontWeight: 700 }}>
                     {formatSGD(totalCiCost + Math.round(inputs.income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8))}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                  <span style={{ color: '#34d399', fontSize: 11, fontWeight: 600 }}>Your CI Coverage</span>
-                  <span style={{ color: '#34d399', fontSize: 11, fontWeight: 600 }}>{formatSGD(totalCiSA)}</span>
+                  <span style={{ color: clr.green, fontSize: 11, fontWeight: 600 }}>Your CI Coverage</span>
+                  <span style={{ color: clr.green, fontSize: 11, fontWeight: 600 }}>{formatSGD(totalCiSA)}</span>
                 </div>
                 {totalCiSA < totalCiCost && (
                   <div style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    background: clr.redBg,
+                    border: `1px solid ${clr.redBorder}`,
                     borderRadius: 8,
                     padding: '8px 10px',
                     marginTop: 4,
                   }}>
-                    <div style={{ color: '#fca5a5', fontSize: 10, fontWeight: 700 }}>
+                    <div style={{ color: clr.redDim, fontSize: 10, fontWeight: 700 }}>
                       Coverage Gap: {formatSGD(totalCiCost - totalCiSA)}
                     </div>
                     <div style={{ color: 'var(--text-4)', fontSize: 10, marginTop: 2 }}>
@@ -306,8 +324,8 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
               </div>
               <CostRow label="Lost Lifetime Income" amount={Math.round(inputs.income.annualIncome * (inputs.personal.retirementAge - scenario.ageAtEvent))} />
               <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#34d399', fontSize: 11, fontWeight: 600 }}>Your TPD Coverage</span>
-                <span style={{ color: '#34d399', fontSize: 11, fontWeight: 600 }}>{formatSGD(totalTpdSA)}</span>
+                <span style={{ color: clr.green, fontSize: 11, fontWeight: 600 }}>Your TPD Coverage</span>
+                <span style={{ color: clr.green, fontSize: 11, fontWeight: 600 }}>{formatSGD(totalTpdSA)}</span>
               </div>
             </div>
           )}
@@ -330,8 +348,8 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
               <CostRow label="Lost Lifetime Income" amount={Math.round(inputs.income.annualIncome * (inputs.personal.retirementAge - scenario.ageAtEvent))} />
               <CostRow label="Ongoing Family Expenses" amount={Math.round(inputs.income.annualExpenses * (inputs.personal.lifeExpectancy - scenario.ageAtEvent))} />
               <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#34d399', fontSize: 11, fontWeight: 600 }}>Your Death Coverage</span>
-                <span style={{ color: '#34d399', fontSize: 11, fontWeight: 600 }}>{formatSGD(totalDeathSA)}</span>
+                <span style={{ color: clr.green, fontSize: 11, fontWeight: 600 }}>Your Death Coverage</span>
+                <span style={{ color: clr.green, fontSize: 11, fontWeight: 600 }}>{formatSGD(totalDeathSA)}</span>
               </div>
             </div>
           )}

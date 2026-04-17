@@ -63,3 +63,12 @@ html.light .text-gray-400       { color: var(--text-3) !important; }
 html.light .text-gray-500       { color: var(--text-4) !important; }
 html.light input[type="number"] { color: var(--text-1) !important; }
 html.light .focus-within\:border-emerald-500:focus-within { border-color: #10b981 !important; }
+
+/* ── Presentation mode — force dark regardless of theme ───── */
+html.light .presentation-overlay .bg-gray-900  { background-color: #111827 !important; }
+html.light .presentation-overlay .bg-gray-800  { background-color: #1f2937 !important; }
+html.light .presentation-overlay .bg-gray-700  { background-color: #374151 !important; }
+html.light .presentation-overlay .border-gray-700 { border-color: #374151 !important; }
+html.light .presentation-overlay .text-white   { color: #ffffff !important; }
+html.light .presentation-overlay .text-gray-400 { color: #9ca3af !important; }
+html.light .presentation-overlay .text-gray-500 { color: #6b7280 !important; }

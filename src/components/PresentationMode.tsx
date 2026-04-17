@@ -48,7 +48,7 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
   );
 
   return (
-    <div style={{
+    <div className="presentation-overlay" style={{
       position: 'fixed', inset: 0, zIndex: 100,
       background: '#0f172a', color: '#fff',
       display: 'flex', flexDirection: 'column',
@@ -277,7 +277,7 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
 
         {/* Right: Chart */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <ChartPanel results={results} retirementAge={personal.retirementAge} cpfLifeMonthlyPayout={inputs.income.cpfLifeMonthlyPayout} />
+          <ChartPanel results={results} retirementAge={personal.retirementAge} cpfLifeMonthlyPayout={inputs.income.cpfLifeMonthlyPayout} isDark={true} />
         </div>
       </div>
     </div>
