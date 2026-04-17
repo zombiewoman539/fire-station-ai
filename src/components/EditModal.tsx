@@ -290,7 +290,7 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
   const addPolicy = () => update([...inputs.policies, {
     id: uid(), name: 'New Policy', policyType: 'whole-life',
     cashValue: 0, annualGrowthRate: 3,
-    deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
+    deathSumAssured: 0, tpdSumAssured: 0, eciSumAssured: 0, ciSumAssured: 0,
     premiumAmount: 0, premiumFrequency: 'monthly',
     premiumNextDueDate: null, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
     nomineeName: '', nomineeClientId: null,
@@ -463,15 +463,18 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
           {/* Coverage / Sum Assured */}
           <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>
             <SectionLabel>Coverage (Sum Assured)</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <NumberField label="☠️ Death" value={p.deathSumAssured} prefix="S$" small
                 tip="Death benefit paid to beneficiaries. Used in the Death scenario."
                 onChange={v => upd(p.id, 'deathSumAssured', v)} />
               <NumberField label="🦽 TPD" value={p.tpdSumAssured} prefix="S$" small
                 tip="Total & Permanent Disability benefit."
                 onChange={v => upd(p.id, 'tpdSumAssured', v)} />
-              <NumberField label="🏥 CI" value={p.ciSumAssured} prefix="S$" small
-                tip="Critical Illness benefit paid on diagnosis."
+              <NumberField label="⚡ ECI" value={p.eciSumAssured} prefix="S$" small
+                tip="Early Critical Illness benefit — paid on early/intermediate stage diagnosis."
+                onChange={v => upd(p.id, 'eciSumAssured', v)} />
+              <NumberField label="🏥 Major CI" value={p.ciSumAssured} prefix="S$" small
+                tip="Major Critical Illness benefit — paid on advanced/severe stage diagnosis."
                 onChange={v => upd(p.id, 'ciSumAssured', v)} />
             </div>
           </div>

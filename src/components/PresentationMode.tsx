@@ -48,6 +48,7 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
   const inForcePolicies = policies.filter(p => p.policyStatus === 'in-force');
   const totalDeath = inForcePolicies.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
   const totalTPD   = inForcePolicies.reduce((s, p) => s + (p.tpdSumAssured || 0), 0);
+  const totalECI   = inForcePolicies.reduce((s, p) => s + (p.eciSumAssured || 0), 0);
   const totalCI    = inForcePolicies.reduce((s, p) => s + (p.ciSumAssured || 0), 0);
 
   // Upcoming purchases (age >= currentAge), sorted by age
@@ -166,11 +167,12 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
               <SectionLabel>Protection Coverage</SectionLabel>
 
               {/* Coverage totals */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 12 }}>
                 {[
                   { label: '☠️ Death', value: totalDeath },
                   { label: '🦽 TPD',   value: totalTPD },
-                  { label: '🏥 CI',    value: totalCI },
+                  { label: '⚡ ECI',   value: totalECI },
+                  { label: '🏥 Major CI', value: totalCI },
                 ].map(item => (
                   <div key={item.label} style={{ background: '#1e293b', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
                     <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>{item.label}</div>
@@ -210,6 +212,9 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
                     )}
                     {p.tpdSumAssured > 0 && (
                       <span style={{ fontSize: 10, color: '#94a3b8' }}>🦽 {formatSGD(p.tpdSumAssured)}</span>
+                    )}
+                    {p.eciSumAssured > 0 && (
+                      <span style={{ fontSize: 10, color: '#94a3b8' }}>⚡ {formatSGD(p.eciSumAssured)}</span>
                     )}
                     {p.ciSumAssured > 0 && (
                       <span style={{ fontSize: 10, color: '#94a3b8' }}>🏥 {formatSGD(p.ciSumAssured)}</span>

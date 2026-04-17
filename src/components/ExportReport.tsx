@@ -55,6 +55,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
   const totalDeath = inForce.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
   const totalTPD   = inForce.reduce((s, p) => s + (p.tpdSumAssured || 0), 0);
+  const totalECI   = inForce.reduce((s, p) => s + (p.eciSumAssured || 0), 0);
   const totalCI    = inForce.reduce((s, p) => s + (p.ciSumAssured || 0), 0);
 
   // Insurance rows — full detail
@@ -71,6 +72,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-transform:capitalize;vertical-align:top;">${p.policyType.replace('-', ' ')}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;vertical-align:top;">${p.deathSumAssured > 0 ? formatSGD(p.deathSumAssured) : '—'}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;vertical-align:top;">${p.tpdSumAssured > 0 ? formatSGD(p.tpdSumAssured) : '—'}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;vertical-align:top;">${p.eciSumAssured > 0 ? formatSGD(p.eciSumAssured) : '—'}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;vertical-align:top;">${p.ciSumAssured > 0 ? formatSGD(p.ciSumAssured) : '—'}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
         ${p.premiumAmount > 0 ? `<div style="font-weight:600;">${formatSGD(p.premiumAmount)} ${freq}</div>` : '—'}
@@ -85,11 +87,12 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
 
   // Coverage summary row
   const coverageSummary = policies.length > 0 ? `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
       ${[
         { label: '☠️ Total Death Coverage', value: totalDeath },
         { label: '🦽 Total TPD Coverage',   value: totalTPD },
-        { label: '🏥 Total CI Coverage',    value: totalCI },
+        { label: '⚡ Total ECI Coverage',    value: totalECI },
+        { label: '🏥 Total Major CI Coverage', value: totalCI },
       ].map(item => `
         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">
           <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">${item.label}</div>
@@ -203,7 +206,8 @@ ${coverageSummary}
     <th>Type</th>
     <th style="text-align:right;">Death SA</th>
     <th style="text-align:right;">TPD SA</th>
-    <th style="text-align:right;">CI SA</th>
+    <th style="text-align:right;">ECI SA</th>
+    <th style="text-align:right;">Major CI SA</th>
     <th>Premium</th>
     <th>Dates</th>
   </tr></thead>

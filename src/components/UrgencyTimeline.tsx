@@ -19,6 +19,7 @@ export default function UrgencyTimeline({ inputs }: Props) {
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
   const totalDeath = inForce.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
   const totalTPD   = inForce.reduce((s, p) => s + (p.tpdSumAssured   || 0), 0);
+  const totalECI   = inForce.reduce((s, p) => s + (p.eciSumAssured  || 0), 0);
   const totalCI    = inForce.reduce((s, p) => s + (p.ciSumAssured    || 0), 0);
 
   const neededDeath = income.annualIncome * 10;
@@ -27,8 +28,9 @@ export default function UrgencyTimeline({ inputs }: Props) {
 
   const hasDeathGap = totalDeath < neededDeath;
   const hasTPDGap   = totalTPD   < neededTPD;
+  const hasECIGap   = totalECI   < neededCI;
   const hasCIGap    = totalCI    < neededCI;
-  const hasAnyGap   = hasDeathGap || hasTPDGap || hasCIGap;
+  const hasAnyGap   = hasDeathGap || hasTPDGap || hasECIGap || hasCIGap;
 
   // Don't show if no gaps or already past cutoff
   if (!hasAnyGap || income.annualIncome === 0) return null;
@@ -82,7 +84,8 @@ export default function UrgencyTimeline({ inputs }: Props) {
   const gapLabels = [
     hasDeathGap && 'Death',
     hasTPDGap   && 'TPD',
-    hasCIGap    && 'CI',
+    hasECIGap   && 'ECI',
+    hasCIGap    && 'Major CI',
   ].filter(Boolean).join(' · ');
 
   return (

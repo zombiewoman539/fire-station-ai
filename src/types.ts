@@ -36,7 +36,8 @@ export interface InsurancePolicy {
   annualGrowthRate: number;
   deathSumAssured: number;
   tpdSumAssured: number;
-  ciSumAssured: number;
+  eciSumAssured: number;  // Early Critical Illness sum assured
+  ciSumAssured: number;   // Major Critical Illness sum assured
   premiumAmount: number;
   premiumFrequency: 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
   premiumNextDueDate: string | null;  // YYYY-MM-DD — next payment date (recurs per frequency)
@@ -64,6 +65,7 @@ export interface Scenario {
   type: ScenarioType;
   ageAtEvent: number;
   ciType?: 'cancer' | 'heart' | 'stroke' | 'kidney';
+  ciStage?: 'early' | 'advanced';
 }
 
 export interface MajorPurchase {

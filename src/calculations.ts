@@ -151,7 +151,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
         insuranceValue = 0;
       }
       if (scenario!.type === 'critical-illness' && ciData) {
-        cash += policies.reduce((s, p) => s + p.ciSumAssured, 0);
+        const ciStage = scenario!.ciStage ?? 'early';
+        cash += policies.reduce((s, p) => s + (ciStage === 'early' ? (p.eciSumAssured || 0) : (p.ciSumAssured || 0)), 0);
         scenarioLumpCost = ciData.initialTreatment;
       }
     }

@@ -30,6 +30,7 @@ function migrateInputs(inputs: any): FireInputs {
       policyType: p.policyType ?? 'whole-life',
       deathSumAssured: p.deathSumAssured ?? 0,
       tpdSumAssured: p.tpdSumAssured ?? 0,
+      eciSumAssured: p.eciSumAssured ?? 0,
       ciSumAssured: p.ciSumAssured ?? 0,
       premiumAmount: p.premiumAmount ?? 0,
       premiumFrequency: p.premiumFrequency ?? 'monthly',

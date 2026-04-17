@@ -35,11 +35,13 @@ export default function CoverageGapBar({ inputs, compact = false }: Props) {
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
   const currentDeath = inForce.reduce((s, p) => s + (p.deathSumAssured || 0), 0);
   const currentTPD   = inForce.reduce((s, p) => s + (p.tpdSumAssured   || 0), 0);
+  const currentECI   = inForce.reduce((s, p) => s + (p.eciSumAssured   || 0), 0);
   const currentCI    = inForce.reduce((s, p) => s + (p.ciSumAssured    || 0), 0);
 
   // Singapore industry benchmarks
   const neededDeath = annualIncome * 10;
   const neededTPD   = annualIncome * 10;
+  const neededECI   = annualIncome * 5;
   const neededCI    = annualIncome * 5;
 
   const items = [
@@ -62,9 +64,18 @@ export default function CoverageGapBar({ inputs, compact = false }: Props) {
       gap: Math.max(0, neededTPD - currentTPD),
     },
     {
+      key: 'eci',
+      icon: '⚡',
+      label: 'ECI',
+      current: currentECI,
+      needed: neededECI,
+      pct: Math.min(100, Math.round((currentECI / neededECI) * 100)),
+      gap: Math.max(0, neededECI - currentECI),
+    },
+    {
       key: 'ci',
       icon: '🏥',
-      label: 'CI',
+      label: 'Major CI',
       current: currentCI,
       needed: neededCI,
       pct: Math.min(100, Math.round((currentCI / neededCI) * 100)),

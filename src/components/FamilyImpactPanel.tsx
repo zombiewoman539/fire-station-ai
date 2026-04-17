@@ -231,18 +231,19 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
     greenBorder: isDark ? 'rgba(52,211,153,0.30)': 'rgba(5,150,105,0.35)',
   };
   const [ciType, setCiType] = React.useState<'cancer' | 'heart' | 'stroke' | 'kidney'>('cancer');
+  const [ciStage, setCiStage] = React.useState<'early' | 'advanced'>('early');
   const { personal, income, policies } = inputs;
   const currentAge = personal.currentAge;
   const ciData = CI_COST_DATA[ciType];
 
   const ciResults = React.useMemo(
-    () => calculate(inputs, { type: 'critical-illness', ageAtEvent: currentAge, ciType }),
+    () => calculate(inputs, { type: 'critical-illness', ageAtEvent: currentAge, ciType, ciStage }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(inputs), currentAge, ciType],
+    [JSON.stringify(inputs), currentAge, ciType, ciStage],
   );
 
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
-  const totalCI = inForce.reduce((s, p) => s + (p.ciSumAssured || 0), 0);
+  const totalCI = inForce.reduce((s, p) => s + (ciStage === 'early' ? (p.eciSumAssured || 0) : (p.ciSumAssured || 0)), 0);
 
   const totalTreatmentCost = ciData.initialTreatment + ciData.annualOngoing * ciData.ongoingYears;
   const incomeLoss = Math.round(income.annualIncome * (ciData.incomeImpactMonths / 12) * 0.8);
@@ -273,6 +274,30 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
             }}
           >
             {d.icon} {d.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Stage selector */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'center' }}>
+        <span style={{ fontSize: 10, color: 'var(--text-4)' }}>Stage:</span>
+        {([
+          { value: 'early', label: '⚡ Early CI' },
+          { value: 'advanced', label: '🏥 Major CI' },
+        ] as const).map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setCiStage(opt.value)}
+            style={{
+              background: ciStage === opt.value ? fclr.redBg : 'var(--inset)',
+              border: `1px solid ${ciStage === opt.value ? fclr.redBorder : 'var(--border)'}`,
+              borderRadius: 7, padding: '5px 10px', cursor: 'pointer',
+              color: ciStage === opt.value ? fclr.redDim : 'var(--text-4)',
+              fontSize: 11, fontWeight: ciStage === opt.value ? 700 : 400,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {opt.label}
           </button>
         ))}
       </div>

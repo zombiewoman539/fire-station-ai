@@ -45,7 +45,10 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
 
   const totalDeathSA = inputs.policies.reduce((s, p) => s + p.deathSumAssured, 0);
   const totalTpdSA = inputs.policies.reduce((s, p) => s + p.tpdSumAssured, 0);
-  const totalCiSA = inputs.policies.reduce((s, p) => s + p.ciSumAssured, 0);
+  const totalEciSA    = inputs.policies.reduce((s, p) => s + (p.eciSumAssured || 0), 0);
+  const totalMajorCiSA = inputs.policies.reduce((s, p) => s + (p.ciSumAssured || 0), 0);
+  const ciStage = scenario.ciStage ?? 'early';
+  const totalCiSA = ciStage === 'early' ? totalEciSA : totalMajorCiSA;
 
   const isActive = scenario.type !== 'none';
   const ciData = scenario.ciType ? CI_COST_DATA[scenario.ciType] : null;
@@ -87,7 +90,7 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
         {scenarioOptions.map(opt => (
           <button
             key={opt.value}
-            onClick={() => onScenarioChange({ ...scenario, type: opt.value, ciType: opt.value === 'critical-illness' ? (scenario.ciType || 'cancer') : undefined })}
+            onClick={() => onScenarioChange({ ...scenario, type: opt.value, ciType: opt.value === 'critical-illness' ? (scenario.ciType || 'cancer') : undefined, ciStage: opt.value === 'critical-illness' ? (scenario.ciStage || 'early') : undefined })}
             style={{
               background: scenario.type === opt.value
                 ? (opt.value === 'none' ? clr.greenBg : clr.redBg)
@@ -130,29 +133,52 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
         </div>
       )}
 
-      {/* CI type selector */}
+      {/* CI type + stage selectors */}
       {scenario.type === 'critical-illness' && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
-          {ciOptions.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => onScenarioChange({ ...scenario, ciType: opt.value })}
-              style={{
-                background: scenario.ciType === opt.value ? clr.redBg : 'var(--inset)',
-                border: `1px solid ${scenario.ciType === opt.value ? clr.redBorder : 'var(--border)'}`,
-                borderRadius: 6,
-                color: scenario.ciType === opt.value ? clr.redDim : 'var(--text-4)',
-                padding: '5px 10px',
-                fontSize: 10,
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {opt.icon} {opt.label}
-            </button>
-          ))}
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+            {ciOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => onScenarioChange({ ...scenario, ciType: opt.value })}
+                style={{
+                  background: scenario.ciType === opt.value ? clr.redBg : 'var(--inset)',
+                  border: `1px solid ${scenario.ciType === opt.value ? clr.redBorder : 'var(--border)'}`,
+                  borderRadius: 6,
+                  color: scenario.ciType === opt.value ? clr.redDim : 'var(--text-4)',
+                  padding: '5px 10px', fontSize: 10, fontWeight: 600,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {opt.icon} {opt.label}
+              </button>
+            ))}
+          </div>
+          {/* Stage selector */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-4)', alignSelf: 'center', marginRight: 4 }}>Stage:</span>
+            {([
+              { value: 'early', label: '⚡ Early CI', tip: 'Uses ECI sum assured' },
+              { value: 'advanced', label: '🏥 Major CI', tip: 'Uses Major CI sum assured' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                title={opt.tip}
+                onClick={() => onScenarioChange({ ...scenario, ciStage: opt.value })}
+                style={{
+                  background: ciStage === opt.value ? clr.amberBg : 'var(--inset)',
+                  border: `1px solid ${ciStage === opt.value ? clr.amberBorder : 'var(--border)'}`,
+                  borderRadius: 6,
+                  color: ciStage === opt.value ? (isDark ? '#fbbf24' : '#b45309') : 'var(--text-4)',
+                  padding: '5px 10px', fontSize: 10, fontWeight: 600,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Impact details */}

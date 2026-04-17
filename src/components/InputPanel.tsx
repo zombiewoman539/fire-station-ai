@@ -140,7 +140,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
   const addPolicy = () => {
     update('policies', [...inputs.policies, {
       id: uid(), name: 'New Policy', policyType: 'whole-life' as const,
-      cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, ciSumAssured: 0,
+      cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, eciSumAssured: 0, ciSumAssured: 0,
       premiumAmount: 0, premiumFrequency: 'monthly' as const,
       premiumNextDueDate: null, premiumPaymentTerm: 'limited' as const, premiumLimitedYears: 20,
       nomineeName: '', nomineeClientId: null,
@@ -302,8 +302,11 @@ export default function InputPanel({ inputs, onChange }: Props) {
                 <NumberField label="🦽 TPD" value={p.tpdSumAssured} prefix="S$"
                   tip="Total & Permanent Disability benefit. In the TPD scenario, this replaces future income."
                   onChange={v => updatePolicy(p.id, 'tpdSumAssured', v)} />
-                <NumberField label="🏥 CI" value={p.ciSumAssured} prefix="S$"
-                  tip="Critical Illness benefit paid on diagnosis. In the CI scenario, this offsets treatment costs."
+                <NumberField label="⚡ ECI" value={p.eciSumAssured} prefix="S$"
+                  tip="Early Critical Illness benefit — paid on early/intermediate stage diagnosis."
+                  onChange={v => updatePolicy(p.id, 'eciSumAssured', v)} />
+                <NumberField label="🏥 Major CI" value={p.ciSumAssured} prefix="S$"
+                  tip="Major Critical Illness benefit — paid on advanced/severe stage diagnosis."
                   onChange={v => updatePolicy(p.id, 'ciSumAssured', v)} />
               </div>
             </div>
