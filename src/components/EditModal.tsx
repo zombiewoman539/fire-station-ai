@@ -1,5 +1,5 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, MajorPurchase, FundAllocation } from '../types';
+import { FireInputs, InsurancePolicy, MajorPurchase, FundAllocation, ExpenseLineItem, InvestmentBucket } from '../types';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile } from '../profileTypes';
 
@@ -210,17 +210,114 @@ function PersonalSection({ inputs, onChange }: { inputs: FireInputs; onChange: (
 
 function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
   const upd = (field: string, v: number) => onChange({ ...inputs, income: { ...inputs.income, [field]: v } });
+
+  const items = inputs.income.expenseItems ?? [];
+
+  const addItem = () => {
+    const newItem: ExpenseLineItem = { id: uid(), label: 'New expense', amount: 0, frequency: 'monthly', category: 'variable' };
+    const next = [...items, newItem];
+    const total = next.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+    onChange({ ...inputs, income: { ...inputs.income, expenseItems: next, annualExpenses: total } });
+  };
+  const removeItem = (id: string) => {
+    const next = items.filter(e => e.id !== id);
+    const total = next.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+    onChange({ ...inputs, income: { ...inputs.income, expenseItems: next, annualExpenses: total || inputs.income.annualExpenses } });
+  };
+  const updateItem = (id: string, patch: Partial<ExpenseLineItem>) => {
+    const next = items.map(e => e.id === id ? { ...e, ...patch } : e);
+    const total = next.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+    onChange({ ...inputs, income: { ...inputs.income, expenseItems: next, annualExpenses: total } });
+  };
+  const expandExpenses = () => {
+    const seed: ExpenseLineItem = { id: uid(), label: 'Living expenses', amount: Math.round(inputs.income.annualExpenses / 12), frequency: 'monthly', category: 'variable' };
+    onChange({ ...inputs, income: { ...inputs.income, expenseItems: [seed] } });
+  };
+  const collapseExpenses = () => {
+    const total = items.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+    onChange({ ...inputs, income: { ...inputs.income, expenseItems: [], annualExpenses: total || inputs.income.annualExpenses } });
+  };
+
+  const expenseTotal = items.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+
   return (
     <div>
       <NumberField label="Annual Take-Home Income" value={inputs.income.annualIncome} prefix="S$"
         tip="Your annual take-home income after deductions and tax. This is the cash you actually receive."
         onChange={v => upd('annualIncome', v)} />
-      <NumberField label="Annual Living Expenses" value={inputs.income.annualExpenses} prefix="S$"
-        tip="Total yearly spend — housing, food, transport, lifestyle."
-        onChange={v => upd('annualExpenses', v)} />
-      <NumberField label="Annual Investment Contribution" value={inputs.income.annualInvestmentContribution} prefix="S$"
-        tip="How much you actively invest each year. Remaining surplus goes to cash savings."
-        onChange={v => upd('annualInvestmentContribution', v)} />
+
+      {/* ── Expense breakdown ── */}
+      {items.length === 0 ? (
+        <div>
+          <NumberField label="Annual Living Expenses" value={inputs.income.annualExpenses} prefix="S$"
+            tip="Total yearly spend — housing, food, transport, lifestyle."
+            onChange={v => upd('annualExpenses', v)} />
+          <button onClick={expandExpenses} style={{
+            fontSize: 12, color: 'var(--text-4)', marginTop: -8, marginBottom: 16,
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block',
+          }}>↓ Break down into monthly line items</button>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <SectionLabel>Monthly Expenses</SectionLabel>
+            <button onClick={collapseExpenses} style={{ fontSize: 11, color: 'var(--text-4)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              ↑ Use single total
+            </button>
+          </div>
+          {items.map(item => {
+            const annualEquiv = item.frequency === 'monthly' ? item.amount * 12 : item.amount;
+            return (
+              <div key={item.id} style={{ background: 'var(--inset)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid var(--border-soft)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <input value={item.label} onChange={e => updateItem(item.id, { label: e.target.value })}
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, fontWeight: 600 }} />
+                  <button onClick={() => removeItem(item.id)}
+                    style={{ color: 'var(--text-5)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 10px' }}>
+                    <span style={{ color: 'var(--text-4)', fontSize: 12, marginRight: 4 }}>S$</span>
+                    <input type="number" value={item.amount} onChange={e => updateItem(item.id, { amount: Number(e.target.value) || 0 })}
+                      style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, width: '100%' }} />
+                  </div>
+                  {/* Frequency toggle */}
+                  <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
+                    {(['monthly', 'annual'] as const).map(f => (
+                      <button key={f} onClick={() => updateItem(item.id, { frequency: f })} style={{
+                        fontSize: 11, padding: '6px 8px', border: 'none', cursor: 'pointer',
+                        background: item.frequency === f ? 'var(--border-mid)' : 'var(--input-bg)',
+                        color: item.frequency === f ? 'var(--text-1)' : 'var(--text-4)',
+                        fontWeight: item.frequency === f ? 700 : 400,
+                      }}>{f === 'monthly' ? '/mo' : '/yr'}</button>
+                    ))}
+                  </div>
+                  {/* Category pill */}
+                  <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
+                    {(['fixed', 'variable'] as const).map(c => (
+                      <button key={c} onClick={() => updateItem(item.id, { category: c })} style={{
+                        fontSize: 11, padding: '6px 8px', border: 'none', cursor: 'pointer',
+                        background: item.category === c ? (c === 'fixed' ? 'rgba(59,130,246,0.2)' : 'rgba(251,191,36,0.15)') : 'var(--input-bg)',
+                        color: item.category === c ? (c === 'fixed' ? '#60a5fa' : '#fbbf24') : 'var(--text-4)',
+                        fontWeight: item.category === c ? 700 : 400,
+                      }}>{c === 'fixed' ? 'Fixed' : 'Var'}</button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-5)', marginTop: 4, textAlign: 'right' }}>= S${annualEquiv.toLocaleString()}/yr</div>
+              </div>
+            );
+          })}
+          <button onClick={addItem} style={{
+            width: '100%', padding: '8px 0', fontSize: 12, color: '#34d399',
+            border: '1px dashed rgba(52,211,153,0.4)', borderRadius: 8, background: 'none', cursor: 'pointer', marginBottom: 6,
+          }}>+ Add expense</button>
+          <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}>
+            Total: S${expenseTotal.toLocaleString()}/yr
+          </div>
+        </div>
+      )}
+
       <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%"
         tip="Expected annual salary increase. Singapore median is ~3–4%."
         onChange={v => upd('salaryGrowthRate', v)} />
@@ -246,21 +343,121 @@ function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i:
 }
 
 function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
-  const upd = (field: string, v: number) => onChange({ ...inputs, assets: { ...inputs.assets, [field]: v } });
+  const updAssets = (field: string, v: number) => onChange({ ...inputs, assets: { ...inputs.assets, [field]: v } });
+
+  const buckets = inputs.assets.investmentBuckets ?? [];
+
+  const addBucket = () => {
+    const newBucket: InvestmentBucket = { id: uid(), label: 'New investment', currentValue: 0, monthlyContribution: 0, annualReturnRate: 7 };
+    onChange({ ...inputs, assets: { ...inputs.assets, investmentBuckets: [...buckets, newBucket] } });
+  };
+  const removeBucket = (id: string) => {
+    onChange({ ...inputs, assets: { ...inputs.assets, investmentBuckets: buckets.filter(b => b.id !== id) } });
+  };
+  const updateBucket = (id: string, patch: Partial<InvestmentBucket>) => {
+    onChange({ ...inputs, assets: { ...inputs.assets, investmentBuckets: buckets.map(b => b.id === id ? { ...b, ...patch } : b) } });
+  };
+  const expandBuckets = () => {
+    const seed: InvestmentBucket = {
+      id: uid(), label: 'Investments',
+      currentValue: inputs.assets.investments,
+      monthlyContribution: Math.round(inputs.income.annualInvestmentContribution / 12),
+      annualReturnRate: inputs.assets.investmentReturnRate,
+    };
+    onChange({ ...inputs, assets: { ...inputs.assets, investmentBuckets: [seed] } });
+  };
+  const collapseBuckets = () => {
+    const totalVal = buckets.reduce((s, b) => s + b.currentValue, 0);
+    const blended = totalVal > 0
+      ? buckets.reduce((s, b) => s + (b.currentValue / totalVal) * b.annualReturnRate, 0)
+      : inputs.assets.investmentReturnRate;
+    const totalMonthly = buckets.reduce((s, b) => s + b.monthlyContribution, 0);
+    onChange({
+      ...inputs,
+      assets: { ...inputs.assets, investmentBuckets: [], investments: totalVal, investmentReturnRate: Math.round(blended * 10) / 10 },
+      income: { ...inputs.income, annualInvestmentContribution: totalMonthly * 12 },
+    });
+  };
+
+  const bucketTotalVal = buckets.reduce((s, b) => s + b.currentValue, 0);
+  const bucketBlended = bucketTotalVal > 0
+    ? buckets.reduce((s, b) => s + (b.currentValue / bucketTotalVal) * b.annualReturnRate, 0)
+    : 0;
+  const bucketTotalMonthly = buckets.reduce((s, b) => s + b.monthlyContribution, 0);
+
   return (
     <div>
       <NumberField label="Cash Savings" value={inputs.assets.cashSavings} prefix="S$"
         tip="Cash in bank accounts, savings accounts, T-bills, SSBs. Earns the Cash Return Rate."
-        onChange={v => upd('cashSavings', v)} />
+        onChange={v => updAssets('cashSavings', v)} />
       <SliderField label="Cash Return Rate" value={inputs.assets.cashReturnRate} min={0} max={5} step={0.25} unit="%"
         tip="Expected annual return on cash (e.g. high-yield savings, T-bills, SSBs). Singapore T-bills ~3–3.5%."
-        onChange={v => upd('cashReturnRate', v)} />
-      <NumberField label="Investments / Equities" value={inputs.assets.investments} prefix="S$"
-        tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc."
-        onChange={v => upd('investments', v)} />
-      <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={15} step={0.5} unit="%"
-        tip="Expected annual return on equities. Global diversified ETFs average ~7% historically."
-        onChange={v => upd('investmentReturnRate', v)} />
+        onChange={v => updAssets('cashReturnRate', v)} />
+
+      {/* ── Investment buckets ── */}
+      {buckets.length === 0 ? (
+        <div>
+          <NumberField label="Investments / Equities" value={inputs.assets.investments} prefix="S$"
+            tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc."
+            onChange={v => updAssets('investments', v)} />
+          <NumberField label="Annual Investment Contribution" value={inputs.income.annualInvestmentContribution} prefix="S$"
+            tip="How much you actively invest each year. Remaining surplus goes to cash savings."
+            onChange={v => onChange({ ...inputs, income: { ...inputs.income, annualInvestmentContribution: v } })} />
+          <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={20} step={0.5} unit="%"
+            tip="Expected annual return on equities. Global diversified ETFs average ~7% historically."
+            onChange={v => updAssets('investmentReturnRate', v)} />
+          <button onClick={expandBuckets} style={{
+            fontSize: 12, color: 'var(--text-4)', marginTop: -8, marginBottom: 16,
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block',
+          }}>↓ Break into investment buckets</button>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <SectionLabel>Investment Portfolio</SectionLabel>
+            <button onClick={collapseBuckets} style={{ fontSize: 11, color: 'var(--text-4)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+              ↑ Use single total
+            </button>
+          </div>
+          {buckets.map(bucket => (
+            <div key={bucket.id} style={{ background: 'var(--inset)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid var(--border-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <input value={bucket.label} onChange={e => updateBucket(bucket.id, { label: e.target.value })}
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, fontWeight: 600 }} />
+                <button onClick={() => removeBucket(bucket.id)}
+                  style={{ color: 'var(--text-5)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {[
+                  { key: 'currentValue' as const, label: 'Current value', prefix: 'S$' },
+                  { key: 'monthlyContribution' as const, label: 'Monthly add', prefix: 'S$' },
+                  { key: 'annualReturnRate' as const, label: 'Return % p.a.', suffix: '%' },
+                ].map(({ key, label, prefix, suffix }) => (
+                  <div key={key}>
+                    <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>{label}</label>
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 8px' }}>
+                      {prefix && <span style={{ color: 'var(--text-4)', fontSize: 11, marginRight: 3 }}>{prefix}</span>}
+                      <input type="number" value={bucket[key]} step={key === 'annualReturnRate' ? 0.5 : 1}
+                        onChange={e => updateBucket(bucket.id, { [key]: Number(e.target.value) || 0 })}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }} />
+                      {suffix && <span style={{ color: 'var(--text-4)', fontSize: 11, marginLeft: 2 }}>{suffix}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <button onClick={addBucket} style={{
+            width: '100%', padding: '8px 0', fontSize: 12, color: '#34d399',
+            border: '1px dashed rgba(52,211,153,0.4)', borderRadius: 8, background: 'none', cursor: 'pointer', marginBottom: 8,
+          }}>+ Add investment</button>
+          <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7 }}>
+            <span style={{ fontWeight: 700, color: 'var(--text-2)' }}>S${bucketTotalVal.toLocaleString()}</span> total &nbsp;·&nbsp;
+            <span style={{ fontWeight: 700, color: '#34d399' }}>{bucketBlended.toFixed(1)}%</span> blended &nbsp;·&nbsp;
+            +S${bucketTotalMonthly.toLocaleString()}/mo
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -649,6 +846,17 @@ function PurchasesSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
     lumpSum: 0, recurringCost: 0, recurringYears: 0, repeatEveryYears: 0,
   }]);
 
+  const age = inputs.personal.currentAge;
+  const PRESETS: { icon: string; label: string; purchase: Omit<MajorPurchase, 'id'> }[] = [
+    { icon: '🏠', label: 'HDB Flat',  purchase: { name: 'HDB BTO Flat',          age: age + 3,  lumpSum: 400000, recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '🏙️', label: 'Condo',     purchase: { name: 'Private Condo',         age: age + 5,  lumpSum: 800000, recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '🔨', label: 'Reno',      purchase: { name: 'Home Renovation',       age: age + 3,  lumpSum: 60000,  recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '💍', label: 'Wedding',   purchase: { name: 'Wedding',               age: age + 2,  lumpSum: 30000,  recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '🚗', label: 'Car',       purchase: { name: 'Car (COE + Purchase)',  age: age + 2,  lumpSum: 120000, recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 10 } },
+    { icon: '👶', label: 'Child',     purchase: { name: 'Child',                age: age + 4,  lumpSum: 20000,  recurringCost: 15000, recurringYears: 20, repeatEveryYears: 0 } },
+    { icon: '👴', label: 'Parents',   purchase: { name: "Parents' Support",      age: age + 10, lumpSum: 0,      recurringCost: 12000, recurringYears: 20, repeatEveryYears: 0 } },
+  ];
+
   return (
     <div>
       {inputs.purchases.map(p => (
@@ -688,13 +896,33 @@ function PurchasesSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
         </div>
       ))}
 
+      {/* Quick-add presets */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Quick add</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {PRESETS.map(p => (
+            <button key={p.label} onClick={() => update([...inputs.purchases, { id: uid(), ...p.purchase }])}
+              style={{
+                fontSize: 12, padding: '5px 12px', borderRadius: 20,
+                background: 'var(--inset)', border: '1px solid var(--border)',
+                color: 'var(--text-3)', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#34d399'; (e.currentTarget as HTMLButtonElement).style.color = '#34d399'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-3)'; }}
+            >
+              {p.icon} {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button onClick={addPurchase}
         style={{
           width: '100%', padding: '10px 0', borderRadius: 10,
           background: 'none', border: '1px dashed rgba(16, 185, 129, 0.4)',
           cursor: 'pointer', color: '#34d399', fontSize: 13, fontWeight: 600,
         }}>
-        + Add Purchase
+        + Add Custom
       </button>
     </div>
   );
