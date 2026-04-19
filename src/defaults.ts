@@ -22,6 +22,7 @@ export const defaultInputs: FireInputs = {
   income: {
     annualIncome: 72000,
     annualExpenses: 36000,
+    expenseItems: [],
     annualInvestmentContribution: 12000,
     salaryGrowthRate: 3,
     retirementExpenses: 48000,
@@ -33,6 +34,7 @@ export const defaultInputs: FireInputs = {
     investments: 50000,
     cashReturnRate: 1,
     investmentReturnRate: 7,
+    investmentBuckets: [],
   },
   policies: [
     {

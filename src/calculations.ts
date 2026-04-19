@@ -64,13 +64,32 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const yearlyData: YearData[] = [];
   let moneyRunsOutAge: number | undefined;
 
+  // Derive expense total from line items when present
+  const annualExpenses = income.expenseItems && income.expenseItems.length > 0
+    ? income.expenseItems.reduce((s, item) =>
+        s + (item.frequency === 'monthly' ? item.amount * 12 : item.amount), 0)
+    : income.annualExpenses;
+
+  // Derive investment totals from buckets when present
+  const hasBuckets = assets.investmentBuckets && assets.investmentBuckets.length > 0;
+  const bucketTotalValue = hasBuckets
+    ? assets.investmentBuckets.reduce((s, b) => s + b.currentValue, 0)
+    : 0;
+  const annualInvestmentContribution = hasBuckets
+    ? assets.investmentBuckets.reduce((s, b) => s + b.monthlyContribution, 0) * 12
+    : income.annualInvestmentContribution;
+  const blendedInvestRate = hasBuckets && bucketTotalValue > 0
+    ? assets.investmentBuckets.reduce((s, b) =>
+        s + (b.currentValue / bucketTotalValue) * (b.annualReturnRate / 100), 0)
+    : assets.investmentReturnRate / 100;
+
   let cash = assets.cashSavings;
-  let investments = assets.investments;
+  let investments = hasBuckets ? bucketTotalValue : assets.investments;
   const inForcePolicies = policies.filter(p => p.policyStatus === 'in-force');
   let insuranceValue = inForcePolicies.reduce((s, p) => s + p.cashValue, 0);
 
   const cashRate = assets.cashReturnRate / 100;
-  const investRate = assets.investmentReturnRate / 100;
+  const investRate = blendedInvestRate;
   const salaryGrowth = income.salaryGrowthRate / 100;
   const inflationRate = (income.inflationRate ?? 2.5) / 100;
   const yearsToRetirement = retirementAge - currentAge;
@@ -186,11 +205,11 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     // ============================================================
     if (!isRetired) {
       const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
-      const totalExpenses = income.annualExpenses + recurringPurchaseCosts + annualPremiums;
+      const totalExpenses = annualExpenses + recurringPurchaseCosts + annualPremiums;
       const surplus = takeHomePay - totalExpenses;
 
       if (surplus > 0) {
-        const toInvest = Math.min(income.annualInvestmentContribution, surplus);
+        const toInvest = Math.min(annualInvestmentContribution, surplus);
         investments += toInvest;
         cash += surplus - toInvest;
       } else {

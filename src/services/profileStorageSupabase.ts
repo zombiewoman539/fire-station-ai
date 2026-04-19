@@ -12,6 +12,7 @@ function migrateInputs(inputs: any): FireInputs {
     income: {
       annualIncome:                  inc.annualIncome ?? 72000,
       annualExpenses:                inc.annualExpenses ?? 36000,
+      expenseItems:                  inc.expenseItems ?? [],
       annualInvestmentContribution:  inc.annualInvestmentContribution ?? 12000,
       salaryGrowthRate:              inc.salaryGrowthRate ?? 3,
       retirementExpenses:            inc.retirementExpenses ?? 48000,
@@ -23,6 +24,7 @@ function migrateInputs(inputs: any): FireInputs {
       investments:          assets.investments ?? 0,
       cashReturnRate:       assets.cashReturnRate ?? 1,
       investmentReturnRate: assets.investmentReturnRate ?? 7,
+      investmentBuckets:    assets.investmentBuckets ?? [],
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
       ...p,

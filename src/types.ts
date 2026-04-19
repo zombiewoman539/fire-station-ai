@@ -5,21 +5,39 @@ export interface PersonalDetails {
   dateOfBirth?: string | null; // YYYY-MM-DD — used to auto-calculate live age on dashboard
 }
 
+export interface ExpenseLineItem {
+  id: string;
+  label: string;
+  amount: number;                       // value in the chosen frequency
+  frequency: 'monthly' | 'annual';
+  category: 'fixed' | 'variable';
+}
+
 export interface IncomeExpenses {
   annualIncome: number;
-  annualExpenses: number;
-  annualInvestmentContribution: number;
+  annualExpenses: number;               // fallback when expenseItems is empty
+  expenseItems: ExpenseLineItem[];      // when non-empty, annualExpenses is derived from this
+  annualInvestmentContribution: number; // fallback when investmentBuckets is empty
   salaryGrowthRate: number;
   retirementExpenses: number;
   inflationRate: number;     // Annual inflation rate (%), default 2.5 (Singapore avg)
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
 }
 
+export interface InvestmentBucket {
+  id: string;
+  label: string;
+  currentValue: number;
+  monthlyContribution: number;
+  annualReturnRate: number;
+}
+
 export interface Assets {
   cashSavings: number;
-  investments: number;
+  investments: number;              // fallback when investmentBuckets is empty
   cashReturnRate: number;
-  investmentReturnRate: number;
+  investmentReturnRate: number;     // fallback when investmentBuckets is empty
+  investmentBuckets: InvestmentBucket[]; // when non-empty, investments + rate are derived
 }
 
 export interface FundAllocation {

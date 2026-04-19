@@ -1,5 +1,5 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, MajorPurchase } from '../types';
+import { FireInputs, InsurancePolicy, MajorPurchase, ExpenseLineItem, InvestmentBucket } from '../types';
 import { formatSGD } from '../calculations';
 
 interface Props {
@@ -155,6 +155,75 @@ export default function InputPanel({ inputs, onChange }: Props) {
     update('policies', inputs.policies.map(p => p.id === id ? { ...p, [field]: val } : p));
   };
 
+  // ── Expense line items ────────────────────────────────────────────────────────
+  const addExpenseItem = () => {
+    const newItem: ExpenseLineItem = {
+      id: uid(), label: 'New expense', amount: 0, frequency: 'monthly', category: 'variable',
+    };
+    update('income', { ...inputs.income, expenseItems: [...inputs.income.expenseItems, newItem] });
+  };
+  const removeExpenseItem = (id: string) => {
+    const remaining = inputs.income.expenseItems.filter(e => e.id !== id);
+    const total = remaining.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+    update('income', { ...inputs.income, expenseItems: remaining, annualExpenses: total || inputs.income.annualExpenses });
+  };
+  const updateExpenseItem = (id: string, patch: Partial<ExpenseLineItem>) => {
+    const items = inputs.income.expenseItems.map(e => e.id === id ? { ...e, ...patch } : e);
+    const total = items.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0);
+    update('income', { ...inputs.income, expenseItems: items, annualExpenses: total });
+  };
+  const expandExpenses = () => {
+    // Seed with a single item matching the current total
+    const seedItem: ExpenseLineItem = {
+      id: uid(), label: 'Living expenses', amount: Math.round(inputs.income.annualExpenses / 12),
+      frequency: 'monthly', category: 'variable',
+    };
+    update('income', { ...inputs.income, expenseItems: [seedItem] });
+  };
+  const collapseExpenses = () => {
+    const total = inputs.income.expenseItems.reduce(
+      (s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0
+    );
+    update('income', { ...inputs.income, expenseItems: [], annualExpenses: total || inputs.income.annualExpenses });
+  };
+
+  // ── Investment buckets ────────────────────────────────────────────────────────
+  const addBucket = () => {
+    const newBucket: InvestmentBucket = {
+      id: uid(), label: 'New investment', currentValue: 0, monthlyContribution: 0, annualReturnRate: 7,
+    };
+    update('assets', { ...inputs.assets, investmentBuckets: [...inputs.assets.investmentBuckets, newBucket] });
+  };
+  const removeBucket = (id: string) => {
+    update('assets', { ...inputs.assets, investmentBuckets: inputs.assets.investmentBuckets.filter(b => b.id !== id) });
+  };
+  const updateBucket = (id: string, patch: Partial<InvestmentBucket>) => {
+    update('assets', {
+      ...inputs.assets,
+      investmentBuckets: inputs.assets.investmentBuckets.map(b => b.id === id ? { ...b, ...patch } : b),
+    });
+  };
+  const expandBuckets = () => {
+    const seedBucket: InvestmentBucket = {
+      id: uid(), label: 'Investments',
+      currentValue: inputs.assets.investments,
+      monthlyContribution: Math.round(inputs.income.annualInvestmentContribution / 12),
+      annualReturnRate: inputs.assets.investmentReturnRate,
+    };
+    update('assets', { ...inputs.assets, investmentBuckets: [seedBucket] });
+  };
+  const collapseBuckets = () => {
+    const buckets = inputs.assets.investmentBuckets;
+    const totalVal = buckets.reduce((s, b) => s + b.currentValue, 0);
+    const blendedRate = totalVal > 0
+      ? buckets.reduce((s, b) => s + (b.currentValue / totalVal) * b.annualReturnRate, 0)
+      : inputs.assets.investmentReturnRate;
+    const totalMonthly = buckets.reduce((s, b) => s + b.monthlyContribution, 0);
+    update('assets', { ...inputs.assets, investmentBuckets: [], investments: totalVal, investmentReturnRate: Math.round(blendedRate * 10) / 10 });
+    update('income', { ...inputs.income, annualInvestmentContribution: totalMonthly * 12 });
+  };
+
+  // ── Purchases ─────────────────────────────────────────────────────────────────
   const addPurchase = () => {
     update('purchases', [...inputs.purchases, {
       id: uid(), name: 'New Purchase', age: inputs.personal.currentAge + 5,
@@ -166,6 +235,19 @@ export default function InputPanel({ inputs, onChange }: Props) {
   };
   const updatePurchase = (id: string, field: keyof MajorPurchase, val: string | number) => {
     update('purchases', inputs.purchases.map(p => p.id === id ? { ...p, [field]: val } : p));
+  };
+
+  const PURCHASE_PRESETS: { icon: string; name: string; purchase: Omit<MajorPurchase, 'id'> }[] = [
+    { icon: '🏠', name: 'HDB Flat',   purchase: { name: 'HDB BTO Flat',            age: inputs.personal.currentAge + 3,  lumpSum: 400000, recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '🏙️', name: 'Condo',      purchase: { name: 'Private Condo',           age: inputs.personal.currentAge + 5,  lumpSum: 800000, recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '🔨', name: 'Reno',       purchase: { name: 'Home Renovation',         age: inputs.personal.currentAge + 3,  lumpSum: 60000,  recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '💍', name: 'Wedding',    purchase: { name: 'Wedding',                 age: inputs.personal.currentAge + 2,  lumpSum: 30000,  recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 0 } },
+    { icon: '🚗', name: 'Car',        purchase: { name: 'Car (COE + Purchase)',    age: inputs.personal.currentAge + 2,  lumpSum: 120000, recurringCost: 0,     recurringYears: 0,  repeatEveryYears: 10 } },
+    { icon: '👶', name: 'Child',      purchase: { name: 'Child',                  age: inputs.personal.currentAge + 4,  lumpSum: 20000,  recurringCost: 15000, recurringYears: 20, repeatEveryYears: 0 } },
+    { icon: '👴', name: 'Parents',    purchase: { name: "Parents' Support",        age: inputs.personal.currentAge + 10, lumpSum: 0,      recurringCost: 12000, recurringYears: 20, repeatEveryYears: 0 } },
+  ];
+  const addPreset = (preset: typeof PURCHASE_PRESETS[0]) => {
+    update('purchases', [...inputs.purchases, { id: uid(), ...preset.purchase }]);
   };
 
   return (
@@ -192,23 +274,104 @@ export default function InputPanel({ inputs, onChange }: Props) {
           tip="Your annual take-home income after deductions and tax. This is the cash you actually receive to spend and invest."
           onChange={v => updateIncome('annualIncome', v)}
         />
-        <NumberField
-          label="Annual Living Expenses"
-          value={inputs.income.annualExpenses}
-          prefix="S$"
-          tip="Your total yearly spend — housing, food, transport, lifestyle. Surplus after expenses is split between investments (your contribution below) and cash savings."
-          onChange={v => updateIncome('annualExpenses', v)}
-        />
-        <NumberField
-          label="Annual Investment Contribution"
-          value={inputs.income.annualInvestmentContribution}
-          prefix="S$"
-          tip="How much you actively invest each year from your take-home pay. Any remaining surplus goes to cash savings. Set to 0 if the client doesn't invest."
-          onChange={v => updateIncome('annualInvestmentContribution', v)}
-        />
-        <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%"
-          tip="Expected annual salary increase. Singapore median is ~3–4%."
-          onChange={v => updateIncome('salaryGrowthRate', v)} />
+
+        {/* ── Expense breakdown ── */}
+        {inputs.income.expenseItems.length === 0 ? (
+          <div>
+            <NumberField
+              label="Annual Living Expenses"
+              value={inputs.income.annualExpenses}
+              prefix="S$"
+              tip="Your total yearly spend — housing, food, transport, lifestyle. Surplus after expenses is split between investments and cash savings."
+              onChange={v => updateIncome('annualExpenses', v)}
+            />
+            <button onClick={expandExpenses} style={{
+              fontSize: 11, color: 'var(--text-4)', marginTop: -6, marginBottom: 10,
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block',
+            }}>
+              ↓ Break down into monthly line items
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 10 }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly Expenses</span>
+              <button onClick={collapseExpenses} style={{
+                fontSize: 10, color: 'var(--text-4)', background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              }}>↑ Use single total</button>
+            </div>
+            {inputs.income.expenseItems.map(item => {
+              const annualEquiv = item.frequency === 'monthly' ? item.amount * 12 : item.amount;
+              return (
+                <div key={item.id} style={{
+                  background: 'var(--inset)', borderRadius: 8, padding: '8px 10px', marginBottom: 5,
+                  border: '1px solid var(--border-soft)',
+                }}>
+                  <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+                    <input
+                      value={item.label}
+                      onChange={e => updateExpenseItem(item.id, { label: e.target.value })}
+                      style={{
+                        flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                        color: 'var(--text-1)', fontSize: 12, fontWeight: 600,
+                      }}
+                    />
+                    <button onClick={() => removeExpenseItem(item.id)}
+                      style={{ color: 'var(--text-5)', fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center" style={{
+                      flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                      borderRadius: 6, padding: '4px 8px',
+                    }}>
+                      <span style={{ color: 'var(--text-4)', fontSize: 11, marginRight: 4 }}>S$</span>
+                      <input
+                        type="number"
+                        value={item.amount}
+                        onChange={e => updateExpenseItem(item.id, { amount: Number(e.target.value) || 0 })}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }}
+                      />
+                    </div>
+                    {/* Frequency toggle */}
+                    <div className="flex" style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      {(['monthly', 'annual'] as const).map(f => (
+                        <button key={f} onClick={() => updateExpenseItem(item.id, { frequency: f })} style={{
+                          fontSize: 10, padding: '4px 7px', border: 'none', cursor: 'pointer',
+                          background: item.frequency === f ? 'var(--border-mid)' : 'var(--input-bg)',
+                          color: item.frequency === f ? 'var(--text-1)' : 'var(--text-4)',
+                          fontWeight: item.frequency === f ? 700 : 400,
+                        }}>{f === 'monthly' ? '/mo' : '/yr'}</button>
+                      ))}
+                    </div>
+                    {/* Category pill */}
+                    <div className="flex" style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      {(['fixed', 'variable'] as const).map(c => (
+                        <button key={c} onClick={() => updateExpenseItem(item.id, { category: c })} style={{
+                          fontSize: 10, padding: '4px 7px', border: 'none', cursor: 'pointer',
+                          background: item.category === c ? (c === 'fixed' ? 'rgba(59,130,246,0.25)' : 'rgba(251,191,36,0.2)') : 'var(--input-bg)',
+                          color: item.category === c ? (c === 'fixed' ? '#60a5fa' : '#fbbf24') : 'var(--text-4)',
+                          fontWeight: item.category === c ? 700 : 400,
+                        }}>{c === 'fixed' ? 'Fixed' : 'Var'}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 4, textAlign: 'right' }}>
+                    = S${annualEquiv.toLocaleString()}/yr
+                  </div>
+                </div>
+              );
+            })}
+            <button onClick={addExpenseItem} style={{
+              width: '100%', padding: '5px 0', fontSize: 11, color: '#34d399',
+              border: '1px dashed rgba(52,211,153,0.4)', borderRadius: 6,
+              background: 'none', cursor: 'pointer', marginBottom: 4,
+            }}>+ Add expense</button>
+            <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginTop: 4 }}>
+              Total: S${inputs.income.expenseItems.reduce((s, e) => s + (e.frequency === 'monthly' ? e.amount * 12 : e.amount), 0).toLocaleString()}/yr
+            </div>
+          </div>
+        )}
+
         <NumberField
           label="Retirement Expenses / Year"
           value={inputs.income.retirementExpenses}
@@ -216,6 +379,9 @@ export default function InputPanel({ inputs, onChange }: Props) {
           tip="Expected annual spending in retirement, in today's dollars. Rule of thumb: 70–80% of current expenses. Inflation will be applied to project the future cost."
           onChange={v => updateIncome('retirementExpenses', v)}
         />
+        <SliderField label="Salary Growth Rate" value={inputs.income.salaryGrowthRate} min={0} max={10} step={0.5} unit="%"
+          tip="Expected annual salary increase. Singapore median is ~3–4%."
+          onChange={v => updateIncome('salaryGrowthRate', v)} />
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-soft)' }}>
           <div style={{ fontSize: 10, color: 'var(--text-4)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FIRE Target Settings</div>
           <SliderField
@@ -247,16 +413,118 @@ export default function InputPanel({ inputs, onChange }: Props) {
         <SliderField label="Cash Return Rate" value={inputs.assets.cashReturnRate} min={0} max={5} step={0.25} unit="%"
           tip="Expected annual return on cash (e.g. high-yield savings, T-bills, SSBs). Singapore T-bills and SSBs currently yield ~3–3.5%. Default 1% assumes basic savings account."
           onChange={v => updateAssets('cashReturnRate', v)} />
-        <NumberField
-          label="Investments / Equities"
-          value={inputs.assets.investments}
-          prefix="S$"
-          tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc. Earns the Investment Return Rate below."
-          onChange={v => updateAssets('investments', v)}
-        />
-        <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={15} step={0.5} unit="%"
-          tip="Expected annual return on your equity/investment portfolio. Global diversified ETFs have averaged ~7% historically. In retirement, the model applies a 30% haircut (×0.7) for a more conservative drawdown assumption."
-          onChange={v => updateAssets('investmentReturnRate', v)} />
+
+        {/* ── Investment buckets ── */}
+        {inputs.assets.investmentBuckets.length === 0 ? (
+          <div>
+            <NumberField
+              label="Investments / Equities"
+              value={inputs.assets.investments}
+              prefix="S$"
+              tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc."
+              onChange={v => updateAssets('investments', v)}
+            />
+            <NumberField
+              label="Annual Investment Contribution"
+              value={inputs.income.annualInvestmentContribution}
+              prefix="S$"
+              tip="How much you actively invest each year from your take-home pay. Any remaining surplus goes to cash savings."
+              onChange={v => updateIncome('annualInvestmentContribution', v)}
+            />
+            <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={20} step={0.5} unit="%"
+              tip="Expected annual return on your investment portfolio. Global diversified ETFs have averaged ~7% historically."
+              onChange={v => updateAssets('investmentReturnRate', v)} />
+            <button onClick={expandBuckets} style={{
+              fontSize: 11, color: 'var(--text-4)', marginTop: -6, marginBottom: 10,
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block',
+            }}>
+              ↓ Break into investment buckets
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 10 }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Investment Portfolio</span>
+              <button onClick={collapseBuckets} style={{
+                fontSize: 10, color: 'var(--text-4)', background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              }}>↑ Use single total</button>
+            </div>
+            {inputs.assets.investmentBuckets.map(bucket => (
+              <div key={bucket.id} style={{
+                background: 'var(--inset)', borderRadius: 8, padding: '8px 10px', marginBottom: 5,
+                border: '1px solid var(--border-soft)',
+              }}>
+                <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+                  <input
+                    value={bucket.label}
+                    onChange={e => updateBucket(bucket.id, { label: e.target.value })}
+                    style={{
+                      flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                      color: 'var(--text-1)', fontSize: 12, fontWeight: 600,
+                    }}
+                  />
+                  <button onClick={() => removeBucket(bucket.id)}
+                    style={{ color: 'var(--text-5)', fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>Current value</label>
+                    <div className="flex items-center" style={{
+                      background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '4px 8px',
+                    }}>
+                      <span style={{ color: 'var(--text-4)', fontSize: 10, marginRight: 3 }}>S$</span>
+                      <input type="number" value={bucket.currentValue}
+                        onChange={e => updateBucket(bucket.id, { currentValue: Number(e.target.value) || 0 })}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 11, width: '100%' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>Monthly add</label>
+                    <div className="flex items-center" style={{
+                      background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '4px 8px',
+                    }}>
+                      <span style={{ color: 'var(--text-4)', fontSize: 10, marginRight: 3 }}>S$</span>
+                      <input type="number" value={bucket.monthlyContribution}
+                        onChange={e => updateBucket(bucket.id, { monthlyContribution: Number(e.target.value) || 0 })}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 11, width: '100%' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>Return % p.a.</label>
+                    <div className="flex items-center" style={{
+                      background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '4px 8px',
+                    }}>
+                      <input type="number" value={bucket.annualReturnRate} step={0.5}
+                        onChange={e => updateBucket(bucket.id, { annualReturnRate: Number(e.target.value) || 0 })}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 11, width: '100%' }} />
+                      <span style={{ color: 'var(--text-4)', fontSize: 10, marginLeft: 2 }}>%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button onClick={addBucket} style={{
+              width: '100%', padding: '5px 0', fontSize: 11, color: '#34d399',
+              border: '1px dashed rgba(52,211,153,0.4)', borderRadius: 6,
+              background: 'none', cursor: 'pointer', marginBottom: 6,
+            }}>+ Add investment</button>
+            {(() => {
+              const buckets = inputs.assets.investmentBuckets;
+              const totalVal = buckets.reduce((s, b) => s + b.currentValue, 0);
+              const blended = totalVal > 0
+                ? buckets.reduce((s, b) => s + (b.currentValue / totalVal) * b.annualReturnRate, 0)
+                : 0;
+              const totalMonthly = buckets.reduce((s, b) => s + b.monthlyContribution, 0);
+              return (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'right', lineHeight: 1.7 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-2)' }}>S${totalVal.toLocaleString()}</span> total &nbsp;·&nbsp;
+                  <span style={{ fontWeight: 700, color: '#34d399' }}>{blended.toFixed(1)}%</span> blended &nbsp;·&nbsp;
+                  +S${totalMonthly.toLocaleString()}/mo
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </Section>
 
       {/* Insurance Policies */}
@@ -366,9 +634,27 @@ export default function InputPanel({ inputs, onChange }: Props) {
             )}
           </div>
         ))}
+        {/* Quick-add presets */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-5)', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick add</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {PURCHASE_PRESETS.map(p => (
+              <button key={p.name} onClick={() => addPreset(p)} style={{
+                fontSize: 11, padding: '3px 9px', borderRadius: 20,
+                background: 'var(--inset)', border: '1px solid var(--border)',
+                color: 'var(--text-3)', cursor: 'pointer',
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#34d399'; (e.currentTarget as HTMLButtonElement).style.color = '#34d399'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-3)'; }}
+              >
+                {p.icon} {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <button onClick={addPurchase}
           className="w-full py-2 mt-1 text-xs font-medium text-emerald-400 border border-dashed border-emerald-500/40 rounded-lg hover:bg-emerald-500/10 transition-colors">
-          + Add Purchase
+          + Add Custom
         </button>
       </Section>
     </>
