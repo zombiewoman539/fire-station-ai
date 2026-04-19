@@ -26,6 +26,9 @@ import AdvisorDashboard from './components/AdvisorDashboard';
 import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
 import SettingsPage from './components/SettingsPage';
+import ManagerDashboard from './components/ManagerDashboard';
+import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboarding';
+import { TeamProvider, useTeam } from './contexts/TeamContext';
 import type { Session } from '@supabase/supabase-js';
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
@@ -565,7 +568,9 @@ export function useTheme(): [Theme, () => void] {
 function AppShell() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   useTheme();
+  const { teamStatus, loaded: teamLoaded } = useTeam();
 
   useEffect(() => {
     const timeout = setTimeout(() => setChecking(false), 6000);
@@ -577,6 +582,13 @@ function AppShell() {
     });
     return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
+
+  // Show onboarding modal once team status is known and user has no team
+  useEffect(() => {
+    if (teamLoaded && !teamStatus && session && shouldShowOnboarding()) {
+      setShowOnboarding(true);
+    }
+  }, [teamLoaded, teamStatus, session]);
 
   if (checking && !isLocalDev) {
     return (
@@ -593,13 +605,17 @@ function AppShell() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <NavBar />
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<AdvisorDashboard />} />
+          <Route path="/team" element={<ManagerDashboard />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
+      {showOnboarding && (
+        <TeamOnboarding onDismiss={() => setShowOnboarding(false)} />
+      )}
     </div>
   );
 }
@@ -607,7 +623,9 @@ function AppShell() {
 function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <TeamProvider>
+        <AppShell />
+      </TeamProvider>
     </BrowserRouter>
   );
 }
