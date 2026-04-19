@@ -157,18 +157,18 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
   return insights;
 }
 
-const darkTypeStyles: Record<string, { bg: string; border: string; titleColor: string }> = {
-  danger: { bg: 'rgba(127, 29, 29, 0.25)', border: 'rgba(239, 68, 68, 0.3)',   titleColor: '#f87171' },
-  warning:{ bg: 'rgba(120, 53, 15, 0.25)', border: 'rgba(251, 191, 36, 0.3)',  titleColor: '#fbbf24' },
-  success:{ bg: 'rgba(6, 78, 59, 0.25)',   border: 'rgba(16, 185, 129, 0.3)',  titleColor: '#34d399' },
-  info:   { bg: 'rgba(30, 58, 138, 0.25)', border: 'rgba(96, 165, 250, 0.3)',  titleColor: '#60a5fa' },
+const darkTypeStyles: Record<string, { bg: string; border: string; titleColor: string; accent: string }> = {
+  danger: { bg: 'rgba(127, 29, 29, 0.25)', border: 'rgba(239, 68, 68, 0.3)',   titleColor: '#f87171', accent: 'rgba(239, 68, 68, 0.6)'   },
+  warning:{ bg: 'rgba(120, 53, 15, 0.25)', border: 'rgba(251, 191, 36, 0.3)',  titleColor: '#fbbf24', accent: 'rgba(251, 191, 36, 0.6)'  },
+  success:{ bg: 'rgba(6, 78, 59, 0.25)',   border: 'rgba(16, 185, 129, 0.3)',  titleColor: '#34d399', accent: 'rgba(16, 185, 129, 0.6)'  },
+  info:   { bg: 'rgba(30, 58, 138, 0.25)', border: 'rgba(96, 165, 250, 0.3)',  titleColor: '#60a5fa', accent: 'rgba(96, 165, 250, 0.6)'  },
 };
 
-const lightTypeStyles: Record<string, { bg: string; border: string; titleColor: string }> = {
-  danger: { bg: 'rgba(220, 38, 38, 0.08)',  border: 'rgba(220, 38, 38, 0.3)',  titleColor: '#b91c1c' },
-  warning:{ bg: 'rgba(180, 83, 9, 0.08)',   border: 'rgba(217, 119, 6, 0.35)', titleColor: '#b45309' },
-  success:{ bg: 'rgba(5, 150, 105, 0.08)',  border: 'rgba(5, 150, 105, 0.3)',  titleColor: '#047857' },
-  info:   { bg: 'rgba(37, 99, 235, 0.08)',  border: 'rgba(37, 99, 235, 0.3)',  titleColor: '#1d4ed8' },
+const lightTypeStyles: Record<string, { bg: string; border: string; titleColor: string; accent: string }> = {
+  danger: { bg: 'rgba(220, 38, 38, 0.09)',  border: 'rgba(220, 38, 38, 0.35)', titleColor: '#b91c1c', accent: 'rgba(220, 38, 38, 0.65)'  },
+  warning:{ bg: 'rgba(180, 83, 9, 0.09)',   border: 'rgba(217, 119, 6, 0.38)', titleColor: '#b45309', accent: 'rgba(217, 119, 6, 0.65)'  },
+  success:{ bg: 'rgba(5, 150, 105, 0.09)',  border: 'rgba(5, 150, 105, 0.35)', titleColor: '#047857', accent: 'rgba(5, 150, 105, 0.65)' },
+  info:   { bg: 'rgba(37, 99, 235, 0.09)',  border: 'rgba(37, 99, 235, 0.35)', titleColor: '#1d4ed8', accent: 'rgba(37, 99, 235, 0.65)'  },
 };
 
 export default function InsightsPanel({ inputs, results }: Props) {
@@ -194,16 +194,18 @@ export default function InsightsPanel({ inputs, results }: Props) {
         <div className="flex items-center gap-2">
           {dangerCount > 0 && (
             <span style={{
-              background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontSize: 10, fontWeight: 700,
-              padding: '2px 8px', borderRadius: 10,
+              background: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(220, 38, 38, 0.12)',
+              color: isDark ? '#f87171' : '#b91c1c',
+              fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
             }}>
               {dangerCount} critical
             </span>
           )}
           {warningCount > 0 && (
             <span style={{
-              background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24', fontSize: 10, fontWeight: 700,
-              padding: '2px 8px', borderRadius: 10,
+              background: isDark ? 'rgba(251, 191, 36, 0.2)' : 'rgba(217, 119, 6, 0.12)',
+              color: isDark ? '#fbbf24' : '#b45309',
+              fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
             }}>
               {warningCount} warning{warningCount > 1 ? 's' : ''}
             </span>
@@ -217,7 +219,9 @@ export default function InsightsPanel({ inputs, results }: Props) {
           const style = typeStyles[insight.type];
           return (
             <div key={i} style={{
-              background: style.bg, border: `1px solid ${style.border}`,
+              background: style.bg,
+              border: `1px solid ${style.border}`,
+              borderLeft: `3px solid ${style.accent}`,
               borderRadius: 10, padding: '10px 12px', marginBottom: 6,
             }}>
               <div className="flex items-start gap-2">
