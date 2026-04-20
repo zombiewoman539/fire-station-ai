@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { getMyTeamStatus, acceptPendingInvite, TeamStatus } from '../services/teamService';
+import {
+  getMyTeamStatus, getPendingInvite,
+  TeamStatus, PendingInvite,
+} from '../services/teamService';
 
 interface TeamContextValue {
-  teamStatus: TeamStatus | null;  // null = solo or not loaded yet
+  teamStatus: TeamStatus | null;
+  pendingInvite: PendingInvite | null;
   loaded: boolean;
   isManager: boolean;
   refresh: () => Promise<void>;
@@ -11,6 +15,7 @@ interface TeamContextValue {
 
 const TeamContext = createContext<TeamContextValue>({
   teamStatus: null,
+  pendingInvite: null,
   loaded: false,
   isManager: false,
   refresh: async () => {},
@@ -18,17 +23,25 @@ const TeamContext = createContext<TeamContextValue>({
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
   const [teamStatus, setTeamStatus] = useState<TeamStatus | null>(null);
+  const [pendingInvite, setPendingInvite] = useState<PendingInvite | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoaded(true); return; }
 
-    // First: try to auto-accept a pending invite (harmless if none exists)
-    await acceptPendingInvite();
-
+    // Check for an active team membership first
     const status = await getMyTeamStatus();
     setTeamStatus(status);
+
+    // Only look for a pending invite if the user isn't already in a team
+    if (!status) {
+      const invite = await getPendingInvite();
+      setPendingInvite(invite);
+    } else {
+      setPendingInvite(null);
+    }
+
     setLoaded(true);
   }, []);
 
@@ -37,6 +50,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   return (
     <TeamContext.Provider value={{
       teamStatus,
+      pendingInvite,
       loaded,
       isManager: teamStatus?.role === 'manager',
       refresh: load,

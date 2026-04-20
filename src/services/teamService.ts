@@ -56,9 +56,28 @@ export async function inviteAdvisor(email: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Check for a pending invite matching the caller's email and activate it. */
+export interface PendingInvite {
+  orgId: string;
+  orgName: string;
+}
+
+/** Returns the pending invite for the current user, or null if none exists. */
+export async function getPendingInvite(): Promise<PendingInvite | null> {
+  const { data, error } = await supabase.rpc('get_pending_invite');
+  if (error || !data || data.length === 0) return null;
+  return { orgId: data[0].org_id, orgName: data[0].org_name };
+}
+
+/** Accept the pending invite — activates membership. */
 export async function acceptPendingInvite(): Promise<boolean> {
   const { data, error } = await supabase.rpc('accept_pending_invite');
+  if (error) return false;
+  return data as boolean;
+}
+
+/** Decline the pending invite — deletes the membership row. */
+export async function declinePendingInvite(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('reject_pending_invite');
   if (error) return false;
   return data as boolean;
 }

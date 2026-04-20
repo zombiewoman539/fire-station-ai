@@ -28,6 +28,7 @@ import FamilyImpactPanel from './components/FamilyImpactPanel';
 import SettingsPage from './components/SettingsPage';
 import ManagerDashboard from './components/ManagerDashboard';
 import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboarding';
+import InviteModal from './components/InviteModal';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import type { Session } from '@supabase/supabase-js';
 
@@ -570,7 +571,7 @@ function AppShell() {
   const [checking, setChecking] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   useTheme();
-  const { teamStatus, loaded: teamLoaded } = useTeam();
+  const { teamStatus, pendingInvite, loaded: teamLoaded } = useTeam();
 
   useEffect(() => {
     const timeout = setTimeout(() => setChecking(false), 6000);
@@ -583,12 +584,12 @@ function AppShell() {
     return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
-  // Show onboarding modal once team status is known and user has no team
+  // Show onboarding only when loaded, no team, no pending invite, and not dismissed
   useEffect(() => {
-    if (teamLoaded && !teamStatus && session && shouldShowOnboarding()) {
+    if (teamLoaded && !teamStatus && !pendingInvite && session && shouldShowOnboarding()) {
       setShowOnboarding(true);
     }
-  }, [teamLoaded, teamStatus, session]);
+  }, [teamLoaded, teamStatus, pendingInvite, session]);
 
   if (checking && !isLocalDev) {
     return (
@@ -613,7 +614,10 @@ function AppShell() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
-      {showOnboarding && (
+      {pendingInvite && (
+        <InviteModal invite={pendingInvite} onDone={() => {}} />
+      )}
+      {showOnboarding && !pendingInvite && (
         <TeamOnboarding onDismiss={() => setShowOnboarding(false)} />
       )}
     </div>
