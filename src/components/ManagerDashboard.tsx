@@ -14,7 +14,7 @@ function daysSince(iso: string | null): string {
 }
 
 function statusColor(lastActive: string | null): string {
-  if (!lastActive) return '#6b7280';
+  if (!lastActive) return 'var(--text-4)';
   const days = Math.floor((Date.now() - new Date(lastActive).getTime()) / 86400000);
   if (days <= 7) return '#34d399';
   if (days <= 30) return '#fbbf24';
@@ -137,13 +137,14 @@ function AdvisorClientsDrawer({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
       zIndex: 1500, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
         width: 440, height: '100%', background: 'var(--surface)',
         borderLeft: '1px solid var(--border)', padding: '28px 24px',
         overflowY: 'auto', display: 'flex', flexDirection: 'column',
+        color: 'var(--text-1)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
@@ -152,7 +153,7 @@ function AdvisorClientsDrawer({
           </div>
           <button onClick={onClose} style={{
             background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
-            padding: '6px 12px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 13,
+            padding: '6px 12px', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13,
           }}>✕ Close</button>
         </div>
 
@@ -239,7 +240,11 @@ export default function ManagerDashboard() {
   const totalClients = activeAdvisors.reduce((s, a) => s + a.clientCount, 0);
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{
+      minHeight: '100%', background: 'var(--bg)', color: 'var(--text-1)',
+      padding: '28px 32px',
+    }}>
+    <div style={{ maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
@@ -348,6 +353,7 @@ export default function ManagerDashboard() {
           onClose={() => setSelectedAdvisor(null)}
         />
       )}
+    </div>
     </div>
   );
 }
