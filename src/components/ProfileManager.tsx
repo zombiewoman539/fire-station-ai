@@ -9,6 +9,8 @@ import {
   importProfile,
   duplicateProfile,
   saveProfile,
+  listDeletedProfiles,
+  restoreProfile,
 } from '../services/profileStorageSupabase';
 import { supabase } from '../services/supabaseClient';
 
@@ -33,6 +35,9 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedProfiles, setDeletedProfiles] = useState<(any)[]>([]);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -157,6 +162,28 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.reload();
+  };
+
+  const openRecentlyDeleted = async () => {
+    const deleted = await listDeletedProfiles().catch(() => []);
+    setDeletedProfiles(deleted);
+    setShowDeleted(true);
+  };
+
+  const handleRestore = async (id: string) => {
+    setRestoringId(id);
+    try {
+      await restoreProfile(id);
+      const [updated, restoredList] = await Promise.all([listDeletedProfiles(), listProfiles()]);
+      setDeletedProfiles(updated);
+      setProfiles(restoredList);
+      const restored = restoredList.find(p => p.id === id);
+      if (restored) onSelectProfile(restored);
+    } catch (e: any) {
+      alert('Failed to restore: ' + e.message);
+    } finally {
+      setRestoringId(null);
+    }
   };
 
   const toggleEstatePlanning = async (profile: ClientProfile, field: 'lpa' | 'will', e: React.MouseEvent) => {
@@ -394,8 +421,18 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
         })}
       </div>
 
+      {/* Recently Deleted link */}
+      <div style={{ padding: '6px 12px 0', flexShrink: 0, textAlign: 'center' }}>
+        <button
+          onClick={openRecentlyDeleted}
+          style={{ background: 'none', border: 'none', color: 'var(--text-4)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+        >
+          Recently Deleted
+        </button>
+      </div>
+
       {/* Edit Details button */}
-      <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ padding: '8px 12px 12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
         <button
           onClick={onEditDetails}
           disabled={!activeProfile}
@@ -462,6 +499,79 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
       )}
 
       <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
+
+      {/* Recently Deleted modal */}
+      {showDeleted && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100 }} onClick={() => setShowDeleted(false)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 101, width: 380, background: 'var(--surface)',
+            border: '1px solid var(--border)', borderRadius: 16,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.45)', padding: '24px 24px 20px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Recently Deleted</div>
+              <button onClick={() => setShowDeleted(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+                ×
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 16 }}>
+              Deleted clients are recoverable for 7 days.
+            </div>
+
+            {deletedProfiles.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontSize: 13, padding: '20px 0' }}>
+                No recently deleted clients.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {deletedProfiles.map((p: any) => {
+                  const daysAgo = Math.floor((Date.now() - new Date(p.deletedAt).getTime()) / 86400000);
+                  const daysLeft = 7 - daysAgo;
+                  return (
+                    <div key={p.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 12px', borderRadius: 10,
+                      background: 'var(--card)', border: '1px solid var(--border)',
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                        background: 'var(--inset)', border: '1px solid var(--border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 13, fontWeight: 700, color: 'var(--text-3)',
+                      }}>
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: daysLeft <= 2 ? '#f87171' : 'var(--text-4)', marginTop: 2 }}>
+                          {daysAgo === 0 ? 'Deleted today' : `Deleted ${daysAgo}d ago`} · {daysLeft}d left
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRestore(p.id)}
+                        disabled={restoringId === p.id}
+                        style={{
+                          padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                          background: restoringId === p.id ? 'rgba(16,185,129,0.3)' : '#10b981',
+                          border: 'none', color: '#fff', cursor: restoringId === p.id ? 'not-allowed' : 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {restoringId === p.id ? '…' : 'Restore'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

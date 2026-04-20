@@ -571,6 +571,7 @@ function AppShell() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const location = useLocation();
   useTheme();
   const { teamStatus, pendingInvite, loaded: teamLoaded } = useTeam();
 
@@ -592,18 +593,16 @@ function AppShell() {
     }
   }, [teamLoaded, teamStatus, pendingInvite, session]);
 
+  if (location.pathname === '/privacy') {
+    return <PrivacyPolicy />;
+  }
+
   if (checking && !isLocalDev) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#9ca3af' }}>
         <div style={{ fontSize: 40 }}>🔥</div>
       </div>
     );
-  }
-
-  const location = useLocation();
-
-  if (location.pathname === '/privacy') {
-    return <PrivacyPolicy />;
   }
 
   if (!session && !isLocalDev) {

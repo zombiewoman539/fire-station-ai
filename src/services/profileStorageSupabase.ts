@@ -189,6 +189,37 @@ export async function duplicateProfile(sourceId: string, newName: string): Promi
   return createProfile(newName, JSON.parse(JSON.stringify(source.inputs)));
 }
 
+/** List profiles soft-deleted within the last 7 days (recoverable). */
+export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedAt: string })[]> {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('client_profiles')
+    .select('*')
+    .not('deleted_at', 'is', null)
+    .gte('deleted_at', cutoff)
+    .order('deleted_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    inputs: migrateInputs(row.inputs as FireInputs),
+    ...parseMeta(row.meta),
+    deletedAt: row.deleted_at,
+  }));
+}
+
+/** Restore a soft-deleted profile by clearing its deleted_at timestamp. */
+export async function restoreProfile(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('client_profiles')
+    .update({ deleted_at: null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 export function exportProfile(profile: ClientProfile): string {
   return JSON.stringify(profile, null, 2);
 }
