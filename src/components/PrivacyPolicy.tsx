@@ -103,8 +103,9 @@ export default function PrivacyPolicy() {
             <h2 style={headingStyle}>6. Data Retention</h2>
             <p>
               Client profiles are retained for the duration of the advisor's active account. When an
-              advisor deletes a client profile, the data is soft-deleted and retained in our database
-              for recovery purposes. Advisors may request permanent deletion by contacting us directly.
+              advisor deletes a client profile, the record is soft-deleted and remains recoverable
+              for 7 days (to protect against accidental deletion), after which it is permanently
+              and automatically purged from the database.
             </p>
             <p>
               When an advisor's account is closed, we will delete all associated client data upon request.
