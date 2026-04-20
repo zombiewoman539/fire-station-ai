@@ -31,6 +31,7 @@ import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboardin
 import InviteModal from './components/InviteModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import type { Session } from '@supabase/supabase-js';
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
@@ -634,9 +635,11 @@ function AppShell() {
 function App() {
   return (
     <BrowserRouter>
-      <TeamProvider>
-        <AppShell />
-      </TeamProvider>
+      <SubscriptionProvider>
+        <TeamProvider>
+          <AppShell />
+        </TeamProvider>
+      </SubscriptionProvider>
     </BrowserRouter>
   );
 }

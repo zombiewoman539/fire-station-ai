@@ -38,14 +38,14 @@ Manager pays this tier. Each advisor under them pays Pro separately.
 
 ---
 
-## Stripe Product IDs (fill in after creating in Stripe dashboard)
+## Stripe Price IDs (Test mode)
 
-| Tier | Billing | Stripe Price ID |
-|---|---|---|
-| Pro | Monthly | `price_` |
-| Pro | Annual | `price_` |
-| Team | Monthly | `price_` |
-| Team | Annual | `price_` |
+| Tier | Billing | Amount | Stripe Price ID |
+|---|---|---|---|
+| Pro | Monthly | SGD 59 | `price_1TOLYyKQ4OjU0R9eXyO9p85H` |
+| Pro | Annual | SGD 590 | `price_1TOLZDKQ4OjU0R9ey7JlCVHA` |
+| Team | Monthly | SGD 149 | `price_1TOLZdKQ4OjU0R9egp11z5gX` |
+| Team | Annual | SGD 1,490 | `price_1TOLZuKQ4OjU0R9e1aYCnGvk` |
 
 ---
 
