@@ -142,3 +142,9 @@ export async function removeMember(membershipId: string): Promise<void> {
     .eq('id', membershipId);
   if (error) throw error;
 }
+
+/** Leave the current user's team (removes their own membership row). */
+export async function leaveTeam(): Promise<void> {
+  const { error } = await supabase.rpc('leave_team');
+  if (error) throw error;
+}

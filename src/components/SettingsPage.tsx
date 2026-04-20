@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { useTheme } from '../App';
+import { useTeam } from '../contexts/TeamContext';
+import { createOrganization, inviteAdvisor, leaveTeam } from '../services/teamService';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -76,6 +79,8 @@ export default function SettingsPage() {
   const [theme, toggleTheme] = useTheme();
   const [email, setEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
+  const navigate = useNavigate();
+  const { teamStatus, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
 
   // Display preferences — stored in localStorage
   const [showCash, setShowCashPref] = useState(
@@ -84,6 +89,16 @@ export default function SettingsPage() {
   const [sidebarOpen, setSidebarOpenPref] = useState(
     () => localStorage.getItem('fa-sidebar-open') === 'true'
   );
+
+  // Team section state
+  const [teamView, setTeamView] = useState<'idle' | 'create'>('idle');
+  const [orgName, setOrgName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState('');
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -105,6 +120,53 @@ export default function SettingsPage() {
     setSigningOut(true);
     await supabase.auth.signOut();
     window.location.href = '/';
+  };
+
+  const handleCreateTeam = async () => {
+    if (!orgName.trim()) { setCreateError('Enter a team name.'); return; }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await createOrganization(orgName.trim());
+      // Clear the solo-mode flag so the team tab appears in the navbar
+      localStorage.removeItem('fire-solo-mode');
+      await refreshTeam();
+      setTeamView('idle');
+      setOrgName('');
+    } catch (e: any) {
+      setCreateError(e.message || 'Something went wrong.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteMsg('');
+    try {
+      await inviteAdvisor(inviteEmail.trim());
+      setInviteMsg(`Invite sent to ${inviteEmail.trim()}.`);
+      setInviteEmail('');
+    } catch (e: any) {
+      setInviteMsg(`Error: ${e.message}`);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!window.confirm(`Leave ${teamStatus?.orgName ?? 'your team'}? You will need to be re-invited to rejoin.`)) return;
+    setLeaving(true);
+    try {
+      await leaveTeam();
+      localStorage.removeItem('fire-solo-mode');
+      await refreshTeam();
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    } finally {
+      setLeaving(false);
+    }
   };
 
   return (
@@ -172,6 +234,139 @@ export default function SettingsPage() {
               {theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode'}
             </button>
           </Row>
+        </Section>
+
+        {/* Team */}
+        <Section title="Team">
+          {!teamLoaded ? (
+            <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-4)' }}>Loading…</div>
+          ) : !teamStatus ? (
+            /* ── Solo: offer to create a team ── */
+            teamView === 'create' ? (
+              <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '16px' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>Name your team</div>
+                <input
+                  type="text"
+                  value={orgName}
+                  onChange={e => setOrgName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
+                  placeholder="e.g. Zenith Advisory"
+                  autoFocus
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                    borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                    color: 'var(--text-1)', outline: 'none', marginBottom: 8,
+                  }}
+                />
+                {createError && <div style={{ color: '#f87171', fontSize: 12, marginBottom: 10 }}>{createError}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleCreateTeam}
+                    disabled={creating}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: 8,
+                      background: creating ? 'rgba(16,185,129,0.4)' : '#10b981',
+                      border: 'none', color: '#fff', fontSize: 13, fontWeight: 700,
+                      cursor: creating ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {creating ? 'Creating…' : 'Create Team'}
+                  </button>
+                  <button
+                    onClick={() => { setTeamView('idle'); setOrgName(''); setCreateError(''); }}
+                    style={{
+                      padding: '9px 16px', borderRadius: 8, background: 'none',
+                      border: '1px solid var(--border)', color: 'var(--text-4)',
+                      fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <Row label="Team" description="You're currently using FIRE Station solo.">
+                <button
+                  onClick={() => setTeamView('create')}
+                  style={{
+                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+                    borderRadius: 8, color: '#34d399', fontSize: 12, fontWeight: 600,
+                    padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Create a Team
+                </button>
+              </Row>
+            )
+          ) : teamStatus.role === 'manager' ? (
+            /* ── Manager: show org + quick invite ── */
+            <>
+              <Row label={teamStatus.orgName} description="You are the manager of this team.">
+                <button
+                  onClick={() => navigate('/team')}
+                  style={{
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+                    padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Manage team →
+                </button>
+              </Row>
+              <div style={{
+                background: 'var(--surface)', borderRadius: 10, padding: '14px 16px', marginTop: 2,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 8 }}>Quick invite</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                    placeholder="advisor@example.com"
+                    style={{
+                      flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                      borderRadius: 8, padding: '8px 12px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={handleInvite}
+                    disabled={inviting}
+                    style={{
+                      padding: '8px 16px', background: '#10b981', border: 'none', borderRadius: 8,
+                      color: '#fff', fontSize: 12, fontWeight: 700,
+                      cursor: inviting ? 'not-allowed' : 'pointer', opacity: inviting ? 0.6 : 1,
+                    }}
+                  >
+                    {inviting ? '…' : 'Invite'}
+                  </button>
+                </div>
+                {inviteMsg && (
+                  <div style={{
+                    marginTop: 8, fontSize: 12,
+                    color: inviteMsg.startsWith('Error') ? '#f87171' : '#34d399',
+                  }}>{inviteMsg}</div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ── Advisor: show org + leave ── */
+            <Row label={teamStatus.orgName} description="You are an advisor in this team.">
+              <button
+                onClick={handleLeaveTeam}
+                disabled={leaving}
+                style={{
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: 8, color: '#f87171', fontSize: 12, fontWeight: 600,
+                  padding: '7px 14px', cursor: leaving ? 'not-allowed' : 'pointer',
+                  opacity: leaving ? 0.6 : 1, whiteSpace: 'nowrap',
+                }}
+              >
+                {leaving ? 'Leaving…' : 'Leave team'}
+              </button>
+            </Row>
+          )}
         </Section>
 
         {/* Display preferences */}
