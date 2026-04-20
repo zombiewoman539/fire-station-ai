@@ -7,6 +7,15 @@ interface Props {
   clientName: string;
 }
 
+function esc(s: string | null | undefined): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const FREQ_LABEL: Record<string, string> = {
   monthly: 'Monthly', quarterly: 'Quarterly', 'semi-annual': 'Semi-Annual', annual: 'Annual',
 };
@@ -64,9 +73,9 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
     const payTerm = p.premiumPaymentTerm === 'limited' ? `Limited ${p.premiumLimitedYears} yrs` : 'Whole Life';
     return `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
-        <div style="font-weight:600;color:#111827;">${p.name}</div>
-        ${p.insurer ? `<div style="font-size:11px;color:#6b7280;margin-top:1px;">${p.insurer}</div>` : ''}
-        ${p.policyNumber ? `<div style="font-size:10px;color:#9ca3af;">Policy No. ${p.policyNumber}</div>` : ''}
+        <div style="font-weight:600;color:#111827;">${esc(p.name)}</div>
+        ${p.insurer ? `<div style="font-size:11px;color:#6b7280;margin-top:1px;">${esc(p.insurer)}</div>` : ''}
+        ${p.policyNumber ? `<div style="font-size:10px;color:#9ca3af;">Policy No. ${esc(p.policyNumber)}</div>` : ''}
       </td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">${statusBadge(p.policyStatus)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-transform:capitalize;vertical-align:top;">${p.policyType.replace('-', ' ')}</td>
@@ -107,7 +116,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
     if (p.recurringCost > 0) parts.push(`${formatSGD(p.recurringCost)}/yr × ${p.recurringYears} yrs`);
     if (p.repeatEveryYears > 0) parts.push(`repeats every ${p.repeatEveryYears} yrs`);
     return `<tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${p.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${esc(p.name)}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${p.age}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${p.lumpSum > 0 ? formatSGD(p.lumpSum) : '—'}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${p.recurringCost > 0 ? formatSGD(p.recurringCost) : '—'}</td>
@@ -125,7 +134,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
 <html>
 <head>
 <meta charset="utf-8">
-<title>FIRE Report - ${clientName}</title>
+<title>FIRE Report - ${esc(clientName)}</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1f2937; margin: 0; padding: 40px; }
   .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
@@ -150,7 +159,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
 <div class="header">
   <div>
     <div class="logo">🔥 <span>FIRE</span> Station</div>
-    <div style="color:#6b7280;font-size:13px;margin-top:2px;">Financial Independence Report for <strong>${clientName}</strong></div>
+    <div style="color:#6b7280;font-size:13px;margin-top:2px;">Financial Independence Report for <strong>${esc(clientName)}</strong></div>
   </div>
   <div style="text-align:right;">
     <div style="color:#9ca3af;font-size:12px;">${today}</div>
