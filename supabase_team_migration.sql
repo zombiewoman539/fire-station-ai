@@ -195,3 +195,32 @@ GRANT EXECUTE ON FUNCTION public.my_active_role() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.create_organization(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.invite_advisor(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.accept_pending_invite() TO authenticated;
+
+-- ============================================================
+-- Audit log — tracks all writes to client_profiles
+-- RLS enabled with no SELECT policy: only viewable via Supabase dashboard
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.audit_log (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID,
+  action      TEXT,
+  table_name  TEXT,
+  record_id   UUID,
+  changed_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION public.log_profile_changes()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.audit_log (user_id, action, table_name, record_id)
+  VALUES (auth.uid(), TG_OP, TG_TABLE_NAME, COALESCE(NEW.id, OLD.id));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_audit_client_profiles ON public.client_profiles;
+CREATE TRIGGER tr_audit_client_profiles
+  AFTER INSERT OR UPDATE OR DELETE ON public.client_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.log_profile_changes();
+
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
