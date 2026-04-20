@@ -62,20 +62,7 @@ function parseMeta(meta: any): Pick<ClientProfile, 'lastMeetingDate' | 'nextRevi
   };
 }
 
-// Purge records that were soft-deleted more than 7 days ago.
-// Called on every listProfiles() so cleanup happens automatically over time.
-async function purgeExpiredDeletions(): Promise<void> {
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  await supabase
-    .from('client_profiles')
-    .delete()
-    .lt('deleted_at', cutoff);
-  // Ignore errors — purge is best-effort, not critical
-}
-
 export async function listProfiles(): Promise<ClientProfile[]> {
-  // Purge expired soft-deletes in the background on every load
-  purgeExpiredDeletions().catch(() => {});
 
   const { data, error } = await supabase
     .from('client_profiles')

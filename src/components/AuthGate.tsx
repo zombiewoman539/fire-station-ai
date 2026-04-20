@@ -217,8 +217,15 @@ export default function AuthGate({ onAuth }: Props) {
           </button>
         </form>
 
+        {/* Privacy policy link */}
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <a href="/privacy" style={{ fontSize: 12, color: '#6b7280', textDecoration: 'none' }}>
+            Privacy Policy
+          </a>
+        </div>
+
         {/* Footer links */}
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13 }}>
+        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 13 }}>
           {mode === 'login' && (
             <>
               <button onClick={() => { setMode('forgot'); setError(''); setMessage(''); }}

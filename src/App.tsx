@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
 import { calculate } from './calculations';
@@ -29,6 +29,7 @@ import SettingsPage from './components/SettingsPage';
 import ManagerDashboard from './components/ManagerDashboard';
 import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboarding';
 import InviteModal from './components/InviteModal';
+import PrivacyPolicy from './components/PrivacyPolicy';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import type { Session } from '@supabase/supabase-js';
 
@@ -599,6 +600,12 @@ function AppShell() {
     );
   }
 
+  const location = useLocation();
+
+  if (location.pathname === '/privacy') {
+    return <PrivacyPolicy />;
+  }
+
   if (!session && !isLocalDev) {
     return <AuthGate onAuth={() => {}} />;
   }
@@ -612,6 +619,7 @@ function AppShell() {
           <Route path="/dashboard" element={<AdvisorDashboard />} />
           <Route path="/team" element={<ManagerDashboard />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
         </Routes>
       </div>
       {pendingInvite && (
