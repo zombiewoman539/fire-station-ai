@@ -31,6 +31,7 @@ import InviteModal from './components/InviteModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import PlansPage from './components/PlansPage';
 import LandingPage from './components/LandingPage';
+import TasksPage from './components/TasksPage';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
 import { createCheckoutSession, PRICES } from './services/subscriptionService';
@@ -706,6 +707,7 @@ function AppShell() {
           <Route path="/team" element={<ManagerDashboard />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/plans" element={<PlansPage />} />
+          <Route path="/tasks" element={<TasksPage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
         </Routes>
       </div>
