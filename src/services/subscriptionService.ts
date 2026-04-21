@@ -32,9 +32,11 @@ export async function getMySubscription(): Promise<Subscription | null> {
   };
 }
 
-export async function createCheckoutSession(priceId: string): Promise<string> {
+export async function createCheckoutSession(priceId: string, returnUrl?: string): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
+
+  const url = returnUrl ?? `${window.location.origin}/plans`;
 
   const response = await fetch(
     `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/create-checkout-session`,
@@ -44,10 +46,7 @@ export async function createCheckoutSession(priceId: string): Promise<string> {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        priceId,
-        returnUrl: `${window.location.origin}/settings`,
-      }),
+      body: JSON.stringify({ priceId, returnUrl: url }),
     }
   );
 
@@ -56,8 +55,23 @@ export async function createCheckoutSession(priceId: string): Promise<string> {
   return data.url;
 }
 
-export async function openCustomerPortal(): Promise<void> {
-  // Redirect to Stripe customer portal for managing/cancelling subscription
-  // For now, direct to settings — full portal integration can be added later
-  window.location.href = '/settings';
+export async function createPortalSession(returnUrl?: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const response = await fetch(
+    `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/create-portal-session`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ returnUrl: returnUrl ?? `${window.location.origin}/plans` }),
+    }
+  );
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  window.location.href = data.url;
 }

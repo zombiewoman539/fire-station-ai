@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTeam } from '../contexts/TeamContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 
 const tabs = [
   {
@@ -36,6 +37,7 @@ const settingsTab = {
 
 export default function NavBar() {
   const { isManager, teamStatus } = useTeam();
+  const { tier, loaded: subLoaded } = useSubscription();
 
   return (
     <div style={{
@@ -98,8 +100,26 @@ export default function NavBar() {
         </NavLink>
       )}
 
-      {/* Settings — pushed to right */}
+      {/* Upgrade pill — Starter users only */}
       <div style={{ flex: 1 }} />
+      {subLoaded && tier === 'starter' && (
+        <NavLink
+          to="/plans"
+          style={({ isActive }) => ({
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 8,
+            fontSize: 13, fontWeight: 700,
+            textDecoration: 'none',
+            background: isActive ? 'rgba(79,70,229,0.2)' : 'rgba(79,70,229,0.1)',
+            color: '#a5b4fc',
+            border: '1px solid rgba(79,70,229,0.3)',
+          })}
+        >
+          ⚡ Upgrade
+        </NavLink>
+      )}
+
+      {/* Settings */}
       <NavLink
         to={settingsTab.to}
         style={({ isActive }) => ({

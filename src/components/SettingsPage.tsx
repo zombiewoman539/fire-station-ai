@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { useTheme } from '../App';
 import { useTeam } from '../contexts/TeamContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { createPortalSession } from '../services/subscriptionService';
 import { createOrganization, inviteAdvisor, leaveTeam } from '../services/teamService';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -79,8 +81,10 @@ export default function SettingsPage() {
   const [theme, toggleTheme] = useTheme();
   const [email, setEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
   const navigate = useNavigate();
   const { teamStatus, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
+  const { tier, subscription, loaded: subLoaded } = useSubscription();
 
   // Display preferences — stored in localStorage
   const [showCash, setShowCashPref] = useState(
@@ -234,6 +238,53 @@ export default function SettingsPage() {
               {theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode'}
             </button>
           </Row>
+        </Section>
+
+        {/* Subscription */}
+        <Section title="Subscription">
+          {!subLoaded ? (
+            <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-4)' }}>Loading…</div>
+          ) : (
+            <Row
+              label={`${tier.charAt(0).toUpperCase() + tier.slice(1)} plan`}
+              description={
+                subscription?.status === 'active' && subscription.currentPeriodEnd
+                  ? `Renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-SG', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                  : tier === 'starter' ? 'Free — upgrade for unlimited clients and more features' : undefined
+              }
+            >
+              {tier === 'starter' ? (
+                <button
+                  onClick={() => navigate('/plans')}
+                  style={{
+                    background: 'rgba(79,70,229,0.12)', border: '1px solid rgba(79,70,229,0.3)',
+                    borderRadius: 8, color: '#a5b4fc', fontSize: 12, fontWeight: 700,
+                    padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  ⚡ Upgrade
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setPortalLoading(true);
+                    try { await createPortalSession(`${window.location.origin}/settings`); }
+                    catch { navigate('/plans'); }
+                    finally { setPortalLoading(false); }
+                  }}
+                  disabled={portalLoading}
+                  style={{
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+                    padding: '7px 14px', cursor: portalLoading ? 'not-allowed' : 'pointer',
+                    opacity: portalLoading ? 0.6 : 1, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {portalLoading ? 'Loading…' : 'Manage billing →'}
+                </button>
+              )}
+            </Row>
+          )}
         </Section>
 
         {/* Team */}

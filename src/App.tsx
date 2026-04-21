@@ -30,6 +30,7 @@ import ManagerDashboard from './components/ManagerDashboard';
 import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboarding';
 import InviteModal from './components/InviteModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import PlansPage from './components/PlansPage';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
 import { createCheckoutSession, PRICES } from './services/subscriptionService';
@@ -704,6 +705,7 @@ function AppShell() {
           <Route path="/dashboard" element={<ProRoute><AdvisorDashboard /></ProRoute>} />
           <Route path="/team" element={<ManagerDashboard />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/plans" element={<PlansPage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
         </Routes>
       </div>
