@@ -81,7 +81,7 @@ export default function AuthGate({ onAuth }: Props) {
     <div>
       <div style={{
         width: '100%',
-        maxWidth: 400,
+        maxWidth: 480,
         background: 'rgba(9,23,42,0.92)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
