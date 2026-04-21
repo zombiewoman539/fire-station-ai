@@ -596,12 +596,6 @@ function TeamTasksTab({ advisors }: { advisors: AdvisorSummary[] }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const emailByUserId = useMemo(() => {
-    const map: Record<string, string> = {};
-    advisors.forEach(a => { if (a.userId) map[a.userId] = a.email; });
-    return map;
-  }, [advisors]);
-
   const grouped = useMemo(() => {
     const g: Record<string, Task[]> = {};
     for (const t of tasks) {
