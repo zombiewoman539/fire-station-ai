@@ -47,7 +47,6 @@ function useWindowWidth() {
   return width;
 }
 
-const STARTER_MAX_PROFILES = 3;
 
 function UpgradeBanner({ message, onUpgrade }: { message: string; onUpgrade: () => void }) {
   return (
@@ -83,7 +82,7 @@ function Dashboard() {
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [upgradeBanner, setUpgradeBanner] = useState('');
-  const { isPro, tier } = useSubscription();
+  const { isPro } = useSubscription();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('fa-sidebar-open') !== 'true'
   );
