@@ -13,6 +13,10 @@ import {
   restoreProfile,
 } from '../services/profileStorageSupabase';
 import { supabase } from '../services/supabaseClient';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { createCheckoutSession, PRICES } from '../services/subscriptionService';
+
+const STARTER_MAX = 3;
 
 export interface ProfileSummary {
   onTrack: boolean;
@@ -36,6 +40,8 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [showDeleted, setShowDeleted] = useState(false);
+  const { isPro } = useSubscription();
+  const atLimit = !isPro && profiles.length >= STARTER_MAX;
   const [deletedProfiles, setDeletedProfiles] = useState<(any)[]>([]);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +59,18 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
   useEffect(() => { refresh(); }, [refresh]);
 
   const handleNew = async () => {
+    if (atLimit) {
+      const go = window.confirm(
+        `You've reached the ${STARTER_MAX}-client limit on the free plan.\n\nUpgrade to Pro for unlimited clients. Go to upgrade now?`
+      );
+      if (go) {
+        try {
+          const url = await createCheckoutSession(PRICES.pro_monthly);
+          window.location.href = url;
+        } catch { window.location.href = '/settings'; }
+      }
+      return;
+    }
     const name = prompt('Client name:');
     if (!name?.trim()) return;
     try {
@@ -236,8 +254,9 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
             </button>
             {/* New client */}
             <button onClick={handleNew}
-              style={{ background: '#10b981', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600 }}>
-              + New
+              title={atLimit ? `Free plan limit: ${STARTER_MAX} clients. Upgrade for unlimited.` : 'New client'}
+              style={{ background: atLimit ? '#4f46e5' : '#10b981', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600 }}>
+              {atLimit ? '⚡ Upgrade' : '+ New'}
             </button>
           </div>
         </div>
