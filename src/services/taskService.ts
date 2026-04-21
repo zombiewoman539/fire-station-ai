@@ -46,6 +46,7 @@ export async function createTask(params: {
   clientName?: string;
   dueDate?: string;
   notes?: string;
+  assignedTo?: string; // if omitted, defaults to current user
 }): Promise<Task> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -54,7 +55,7 @@ export async function createTask(params: {
     .from('tasks')
     .insert({
       created_by: user.id,
-      assigned_to: user.id,
+      assigned_to: params.assignedTo ?? user.id,
       client_profile_id: params.clientProfileId ?? null,
       client_name: params.clientName ?? null,
       title: params.title,

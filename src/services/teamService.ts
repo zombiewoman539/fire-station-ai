@@ -167,3 +167,49 @@ export async function leaveTeam(): Promise<void> {
   const { error } = await supabase.rpc('leave_team');
   if (error) throw error;
 }
+
+/** Transfer a client profile from one advisor to another (manager only). */
+export async function transferClient(profileId: string, toUserId: string): Promise<void> {
+  const { error } = await supabase.rpc('transfer_client', {
+    p_profile_id: profileId,
+    p_to_user_id: toUserId,
+  });
+  if (error) throw error;
+}
+
+export interface TeamProfile {
+  id: string;
+  name: string;
+  updatedAt: string;
+  advisorUserId: string;
+  advisorEmail: string;
+  meta: any;
+  inputs: any;
+}
+
+/** Get all non-deleted client profiles across the whole team (manager only). */
+export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
+  const [membersResult, profilesResult] = await Promise.all([
+    supabase.from('team_memberships').select('user_id, email').eq('status', 'active'),
+    supabase
+      .from('client_profiles')
+      .select('id, name, updated_at, user_id, meta, inputs')
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false }),
+  ]);
+
+  const emailByUserId: Record<string, string> = {};
+  for (const m of membersResult.data ?? []) {
+    if (m.user_id) emailByUserId[m.user_id] = m.email;
+  }
+
+  return (profilesResult.data ?? []).map(p => ({
+    id: p.id,
+    name: p.name,
+    updatedAt: p.updated_at,
+    advisorUserId: p.user_id,
+    advisorEmail: emailByUserId[p.user_id] ?? p.user_id,
+    meta: p.meta,
+    inputs: p.inputs,
+  }));
+}
