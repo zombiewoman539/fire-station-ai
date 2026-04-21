@@ -15,7 +15,6 @@ import ChartPanel from './components/ChartPanel';
 import ProfileManager from './components/ProfileManager';
 import EditModal from './components/EditModal';
 import ToggleBar from './components/ToggleBar';
-import AuthGate from './components/AuthGate';
 import InsightsPanel from './components/InsightsPanel';
 import MilestoneTracker from './components/MilestoneTracker';
 import PresentationMode from './components/PresentationMode';
@@ -31,6 +30,7 @@ import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboardin
 import InviteModal from './components/InviteModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import PlansPage from './components/PlansPage';
+import LandingPage from './components/LandingPage';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
 import { createCheckoutSession, PRICES } from './services/subscriptionService';
@@ -693,7 +693,7 @@ function AppShell() {
   }
 
   if (!session && !isLocalDev) {
-    return <AuthGate onAuth={() => {}} />;
+    return <LandingPage />;
   }
 
   return (
