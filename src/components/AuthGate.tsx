@@ -78,22 +78,15 @@ export default function AuthGate({ onAuth }: Props) {
   const handleSubmit = mode === 'login' ? handleLogin : mode === 'signup' ? handleSignup : handleForgot;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    }}>
+    <div>
       <div style={{
         width: '100%',
         maxWidth: 400,
-        background: '#1f2937',
+        background: '#09172a',
         borderRadius: 16,
-        border: '1px solid #374151',
+        border: '1px solid rgba(255,255,255,0.09)',
         padding: '40px 32px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -105,7 +98,7 @@ export default function AuthGate({ onAuth }: Props) {
             🔥
           </div>
           <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: 0 }}>FIRE Goals Mapper</h1>
-          <p style={{ color: '#6b7280', fontSize: 13, marginTop: 4 }}>Singapore Financial Planner</p>
+          <p style={{ color: '#4a6275', fontSize: 13, marginTop: 4 }}>Singapore Financial Planner</p>
         </div>
 
         {/* Title */}
@@ -155,9 +148,9 @@ export default function AuthGate({ onAuth }: Props) {
 
             {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
-              <div style={{ flex: 1, height: 1, background: '#374151' }} />
-              <span style={{ color: '#4b5563', fontSize: 12 }}>or</span>
-              <div style={{ flex: 1, height: 1, background: '#374151' }} />
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.07)' }} />
+              <span style={{ color: '#3a5268', fontSize: 12 }}>or</span>
+              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.07)' }} />
             </div>
           </>
         )}
@@ -165,7 +158,7 @@ export default function AuthGate({ onAuth }: Props) {
         {/* Form */}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', color: '#9ca3af', fontSize: 13, marginBottom: 6, fontWeight: 500 }}>
+            <label style={{ display: 'block', color: '#7a9ab0', fontSize: 13, marginBottom: 6, fontWeight: 500 }}>
               Email
             </label>
             <input
@@ -176,7 +169,7 @@ export default function AuthGate({ onAuth }: Props) {
               placeholder="you@example.com"
               style={{
                 width: '100%', padding: '10px 14px', borderRadius: 8,
-                background: '#111827', border: '1px solid #374151', color: '#fff',
+                background: '#050e1c', border: '1px solid rgba(255,255,255,0.09)', color: '#fff',
                 fontSize: 14, outline: 'none', boxSizing: 'border-box',
               }}
             />
@@ -184,7 +177,7 @@ export default function AuthGate({ onAuth }: Props) {
 
           {mode !== 'forgot' && (
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', color: '#9ca3af', fontSize: 13, marginBottom: 6, fontWeight: 500 }}>
+              <label style={{ display: 'block', color: '#7a9ab0', fontSize: 13, marginBottom: 6, fontWeight: 500 }}>
                 Password
               </label>
               <input
@@ -196,7 +189,7 @@ export default function AuthGate({ onAuth }: Props) {
                 minLength={6}
                 style={{
                   width: '100%', padding: '10px 14px', borderRadius: 8,
-                  background: '#111827', border: '1px solid #374151', color: '#fff',
+                  background: '#050e1c', border: '1px solid rgba(255,255,255,0.09)', color: '#fff',
                   fontSize: 14, outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -208,7 +201,7 @@ export default function AuthGate({ onAuth }: Props) {
             disabled={loading}
             style={{
               width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
-              background: loading ? '#374151' : 'linear-gradient(135deg, #10b981, #059669)',
+              background: loading ? 'rgba(255,255,255,0.08)' : '#f97316',
               color: '#fff', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'opacity 0.2s',
             }}
@@ -219,7 +212,7 @@ export default function AuthGate({ onAuth }: Props) {
 
         {/* Privacy policy link */}
         <div style={{ marginTop: 20, textAlign: 'center' }}>
-          <a href="/privacy" style={{ fontSize: 12, color: '#6b7280', textDecoration: 'none' }}>
+          <a href="/privacy" style={{ fontSize: 12, color: '#4a6275', textDecoration: 'none' }}>
             Privacy Policy
           </a>
         </div>
@@ -229,30 +222,30 @@ export default function AuthGate({ onAuth }: Props) {
           {mode === 'login' && (
             <>
               <button onClick={() => { setMode('forgot'); setError(''); setMessage(''); }}
-                style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 13 }}>
+                style={{ background: 'none', border: 'none', color: '#4a6275', cursor: 'pointer', fontSize: 13 }}>
                 Forgot password?
               </button>
-              <div style={{ marginTop: 12, color: '#6b7280' }}>
+              <div style={{ marginTop: 12, color: '#4a6275' }}>
                 Don't have an account?{' '}
                 <button onClick={() => { setMode('signup'); setError(''); setMessage(''); }}
-                  style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  style={{ background: 'none', border: 'none', color: '#f97316', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   Sign up
                 </button>
               </div>
             </>
           )}
           {mode === 'signup' && (
-            <div style={{ color: '#6b7280' }}>
+            <div style={{ color: '#4a6275' }}>
               Already have an account?{' '}
               <button onClick={() => { setMode('login'); setError(''); setMessage(''); }}
-                style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                style={{ background: 'none', border: 'none', color: '#f97316', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                 Sign in
               </button>
             </div>
           )}
           {mode === 'forgot' && (
             <button onClick={() => { setMode('login'); setError(''); setMessage(''); }}
-              style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              style={{ background: 'none', border: 'none', color: '#f97316', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
               Back to sign in
             </button>
           )}
