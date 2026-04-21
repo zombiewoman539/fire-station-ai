@@ -82,11 +82,13 @@ export default function AuthGate({ onAuth }: Props) {
       <div style={{
         width: '100%',
         maxWidth: 400,
-        background: '#09172a',
-        borderRadius: 16,
-        border: '1px solid rgba(255,255,255,0.09)',
+        background: 'rgba(9,23,42,0.92)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderRadius: 20,
+        border: '1px solid rgba(249,115,22,0.18)',
         padding: '40px 32px',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(249,115,22,0.06)',
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>

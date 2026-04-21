@@ -360,7 +360,9 @@ export default function LandingPage() {
           onClick={(e) => { if (e.target === e.currentTarget) setShowAuth(false); }}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.82)',
+            background: 'rgba(3,9,18,0.75)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
             zIndex: 1000,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
