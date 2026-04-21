@@ -78,16 +78,15 @@ export default function AuthGate({ onAuth }: Props) {
   const handleSubmit = mode === 'login' ? handleLogin : mode === 'signup' ? handleSignup : handleForgot;
 
   return (
-    <div>
+    <div style={{ width: 'min(560px, calc(100vw - 48px))' }}>
       <div style={{
         width: '100%',
-        maxWidth: 480,
         background: 'rgba(9,23,42,0.92)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         borderRadius: 20,
         border: '1px solid rgba(249,115,22,0.18)',
-        padding: '40px 32px',
+        padding: '48px 44px',
         boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(249,115,22,0.06)',
       }}>
         {/* Logo */}
