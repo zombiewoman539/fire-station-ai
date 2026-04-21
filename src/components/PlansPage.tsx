@@ -42,8 +42,8 @@ const PLANS: PlanDef[] = [
   {
     tier: 'pro',
     name: 'Pro',
-    monthlyPrice: 29,
-    annualPrice: 290,
+    monthlyPrice: 59,
+    annualPrice: 590,
     monthlyPriceId: PRICES.pro_monthly,
     annualPriceId: PRICES.pro_annual,
     accent: '#34d399',
@@ -62,8 +62,8 @@ const PLANS: PlanDef[] = [
   {
     tier: 'team',
     name: 'Team',
-    monthlyPrice: 79,
-    annualPrice: 790,
+    monthlyPrice: 149,
+    annualPrice: 1490,
     monthlyPriceId: PRICES.team_monthly,
     annualPriceId: PRICES.team_annual,
     accent: '#818cf8',

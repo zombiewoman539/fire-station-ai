@@ -112,6 +112,22 @@ Vercel picks up `build/` automatically.
 ### CPF rates
 All CPF logic lives in `calculations.ts` (lines 60–130). The rates are from **January 2026**.
 
+## Source-of-Truth Files — Read Before Coding
+
+These files contain agreed decisions. **Always read them before implementing anything in their domain:**
+
+| File | Domain |
+|---|---|
+| `TIERS.md` | Subscription tiers, pricing (SGD), feature gates, Stripe Price IDs |
+| `CLAUDE.md` (this file) | Architecture, stack, conventions |
+
+**Pricing quick-ref (from TIERS.md):**
+- Starter: Free
+- Pro: S$59/mo · S$590/yr
+- Team: S$149/mo · S$1,490/yr
+
+Do not invent or estimate these numbers — always copy from TIERS.md.
+
 ## What to Avoid
 
 - Do not add error handling for impossible states inside the calculation engine — it's pure math with validated inputs.
