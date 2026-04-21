@@ -39,18 +39,24 @@ Deno.serve(async (req) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.subscription_data?.metadata?.supabase_user_id
-          ?? session.metadata?.supabase_user_id;
-        if (!userId) break;
+        if (!session.subscription) break;
 
+        // Retrieve the subscription to get metadata — subscription_data.metadata
+        // is applied to the subscription object, not stored back on the session payload.
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
         const priceId = subscription.items.data[0].price.id;
         const tier = PRICE_TO_TIER[priceId] ?? 'pro';
 
+        // userId lives on the subscription metadata (set via subscription_data.metadata)
+        // or on the session metadata (set as a belt-and-suspenders fallback).
+        const userId = subscription.metadata?.supabase_user_id
+          ?? session.metadata?.supabase_user_id;
+        if (!userId) break;
+
         await supabase.from('subscriptions').upsert({
           user_id: userId,
           stripe_customer_id: session.customer as string,
-          stripe_subscription_id: session.subscription as string,
+          stripe_subscription_id: subscription.id,
           tier,
           status: 'active',
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
