@@ -169,6 +169,139 @@ function FollowUpBtn({ profile, advisor }: { profile: TeamProfile; advisor: Advi
   );
 }
 
+// ─── All Clients table ────────────────────────────────────────────────────────
+
+function AllClientsTable({
+  profiles,
+  advisors,
+}: {
+  profiles: TeamProfile[];
+  advisors: AdvisorSummary[];
+}) {
+  const [search, setSearch] = useState('');
+  const [advisorFilter, setAdvisorFilter] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const PAGE = 20;
+
+  const advisorOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts: { userId: string; label: string }[] = [];
+    for (const p of profiles) {
+      if (!seen.has(p.advisorUserId)) {
+        seen.add(p.advisorUserId);
+        opts.push({ userId: p.advisorUserId, label: p.advisorEmail.split('@')[0] });
+      }
+    }
+    return opts.sort((a, b) => a.label.localeCompare(b.label));
+  }, [profiles]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return profiles.filter(p => {
+      if (advisorFilter && p.advisorUserId !== advisorFilter) return false;
+      if (q && !p.name.toLowerCase().includes(q) && !p.advisorEmail.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [profiles, search, advisorFilter]);
+
+  const visible = showAll ? filtered : filtered.slice(0, PAGE);
+
+  const colHd: React.CSSProperties = {
+    fontSize: 10, fontWeight: 700, color: 'var(--text-5)',
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    padding: '8px 14px', textAlign: 'left', whiteSpace: 'nowrap',
+    borderBottom: '1px solid var(--border)',
+  };
+
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)' }}>All Clients</span>
+        <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{profiles.length} total</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <input
+            type="text"
+            placeholder="Search client or advisor…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setShowAll(false); }}
+            style={{
+              fontSize: 12, padding: '6px 12px', borderRadius: 8,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text-1)', outline: 'none', width: 210,
+            }}
+          />
+          <select
+            value={advisorFilter}
+            onChange={e => { setAdvisorFilter(e.target.value); setShowAll(false); }}
+            style={{
+              fontSize: 12, padding: '6px 10px', borderRadius: 8,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text-1)', outline: 'none', cursor: 'pointer',
+            }}
+          >
+            <option value="">All advisors</option>
+            {advisorOptions.map(o => (
+              <option key={o.userId} value={o.userId}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ color: 'var(--text-4)', fontSize: 13 }}>No clients match.</div>
+      ) : (
+        <>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={colHd}>Client</th>
+                  <th style={colHd}>Advisor</th>
+                  <th style={{ ...colHd, textAlign: 'right' }}>Last updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((profile, i) => {
+                  const d = daysSince(profile.updatedAt);
+                  const color = activityColor(profile.updatedAt);
+                  return (
+                    <tr key={profile.id} style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{profile.name}</span>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                          {profile.advisorEmail.split('@')[0]}
+                        </span>
+                      </td>
+                      <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color }}>
+                          {d !== null ? (d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d}d ago`) : '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > PAGE && !showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              style={{
+                marginTop: 10, fontSize: 12, color: 'var(--text-4)',
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              }}
+            >
+              Show all {filtered.length} clients ↓
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ManagerDashboardPage() {
@@ -308,6 +441,9 @@ export default function ManagerDashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* All Clients */}
+        <AllClientsTable profiles={teamProfiles} advisors={advisors} />
 
         {/* Leaderboard */}
         <div style={{ marginBottom: 36 }}>
