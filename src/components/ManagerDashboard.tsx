@@ -734,6 +734,20 @@ export default function ManagerDashboard() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
+  // Must be declared before early return (Rules of Hooks)
+  const [dissolving, setDissolving] = useState(false);
+  const taskStatsByAdvisor = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const map: Record<string, { open: number; doneThisMonth: number }> = {};
+    for (const t of tasks) {
+      if (!map[t.assignedTo]) map[t.assignedTo] = { open: 0, doneThisMonth: 0 };
+      if (t.status === 'todo') map[t.assignedTo].open++;
+      if (t.status === 'done' && t.completedAt && t.completedAt >= monthStart) map[t.assignedTo].doneThisMonth++;
+    }
+    return map;
+  }, [tasks]);
+
   const handleCreateOrg = async () => {
     if (!orgName.trim()) { setCreateError('Enter a team name.'); return; }
     setCreating(true);
@@ -821,7 +835,6 @@ export default function ManagerDashboard() {
     load();
   };
 
-  const [dissolving, setDissolving] = useState(false);
   const handleDissolve = async () => {
     const confirmed = window.confirm(
       `Delete the entire team "${teamStatus?.orgName}"?\n\nAll members are removed. Each advisor keeps their own client profiles — you will lose visibility into them. This cannot be undone.`
@@ -841,19 +854,6 @@ export default function ManagerDashboard() {
   const pendingAdvisors = advisors.filter(a => a.status === 'pending');
   const totalClients = activeAdvisors.reduce((s, a) => s + a.clientCount, 0);
   const totalOpenTasks = tasks.filter(t => t.status === 'todo').length;
-
-  // Task stats per advisor
-  const taskStatsByAdvisor = useMemo(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const map: Record<string, { open: number; doneThisMonth: number }> = {};
-    for (const t of tasks) {
-      if (!map[t.assignedTo]) map[t.assignedTo] = { open: 0, doneThisMonth: 0 };
-      if (t.status === 'todo') map[t.assignedTo].open++;
-      if (t.status === 'done' && t.completedAt && t.completedAt >= monthStart) map[t.assignedTo].doneThisMonth++;
-    }
-    return map;
-  }, [tasks]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'team', label: 'Team' },
