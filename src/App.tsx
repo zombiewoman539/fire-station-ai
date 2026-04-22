@@ -26,7 +26,6 @@ import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
 import SettingsPage from './components/SettingsPage';
 import ManagerDashboard from './components/ManagerDashboard';
-import TeamOnboarding, { shouldShowOnboarding } from './components/TeamOnboarding';
 import InviteModal from './components/InviteModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import PlansPage from './components/PlansPage';
@@ -659,10 +658,9 @@ function ProRoute({ children }: { children: React.ReactNode }) {
 function AppShell() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const location = useLocation();
   useTheme();
-  const { teamStatus, pendingInvite, loaded: teamLoaded } = useTeam();
+  const { pendingInvite } = useTeam();
 
   useEffect(() => {
     const timeout = setTimeout(() => setChecking(false), 6000);
@@ -674,13 +672,6 @@ function AppShell() {
     });
     return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
-
-  // Show onboarding only when loaded, no team, no pending invite, and not dismissed
-  useEffect(() => {
-    if (teamLoaded && !teamStatus && !pendingInvite && session && shouldShowOnboarding()) {
-      setShowOnboarding(true);
-    }
-  }, [teamLoaded, teamStatus, pendingInvite, session]);
 
   if (location.pathname === '/privacy') {
     return <PrivacyPolicy />;
@@ -715,9 +706,6 @@ function AppShell() {
       </div>
       {pendingInvite && (
         <InviteModal invite={pendingInvite} onDone={() => {}} />
-      )}
-      {showOnboarding && !pendingInvite && (
-        <TeamOnboarding onDismiss={() => setShowOnboarding(false)} />
       )}
     </div>
   );

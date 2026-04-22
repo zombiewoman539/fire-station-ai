@@ -3,7 +3,7 @@ import { useTeam } from '../contexts/TeamContext';
 import {
   AdvisorSummary, getAdvisorSummaries, getAdvisorProfiles,
   inviteAdvisor, removeMember, transferClient, getAllTeamProfiles, TeamProfile,
-  dissolveOrganization,
+  dissolveOrganization, createOrganization,
 } from '../services/teamService';
 import { listTasks, createTask, Task } from '../services/taskService';
 import { calculate } from '../calculations';
@@ -718,7 +718,7 @@ function TeamTasksTab({ advisors }: { advisors: AdvisorSummary[] }) {
 type Tab = 'team' | 'tasks' | 'all-clients';
 
 export default function ManagerDashboard() {
-  const { teamStatus } = useTeam();
+  const { teamStatus, refresh: refreshTeam } = useTeam();
   const [tab, setTab] = useState<Tab>('team');
   const [advisors, setAdvisors] = useState<AdvisorSummary[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -729,6 +729,24 @@ export default function ManagerDashboard() {
   const [selectedAdvisor, setSelectedAdvisor] = useState<AdvisorSummary | null>(null);
   const [assignTarget, setAssignTarget] = useState<AdvisorSummary | null>(null);
 
+  // No-team setup state
+  const [orgName, setOrgName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  const handleCreateOrg = async () => {
+    if (!orgName.trim()) { setCreateError('Enter a team name.'); return; }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await createOrganization(orgName.trim());
+      await refreshTeam();
+    } catch (e: any) {
+      setCreateError(e.message || 'Something went wrong.');
+      setCreating(false);
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     const [advisorData, taskData] = await Promise.all([getAdvisorSummaries(), listTasks()]);
@@ -738,6 +756,48 @@ export default function ManagerDashboard() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Show team setup screen if user has no org yet
+  if (!teamStatus) {
+    return (
+      <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <div style={{ width: '100%', maxWidth: 440, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>👔</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', marginBottom: 8 }}>Set up your team</div>
+          <div style={{ fontSize: 14, color: 'var(--text-4)', lineHeight: 1.6, marginBottom: 32 }}>
+            Give your team a name — this is usually your agency or practice name.
+          </div>
+          <input
+            type="text"
+            value={orgName}
+            onChange={e => setOrgName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreateOrg()}
+            placeholder="e.g. Zenith Advisory"
+            autoFocus
+            style={{
+              width: '100%', boxSizing: 'border-box', marginBottom: 12,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '13px 16px', fontSize: 15,
+              color: 'var(--text-1)', outline: 'none',
+            }}
+          />
+          {createError && <div style={{ color: '#f87171', fontSize: 13, marginBottom: 12 }}>{createError}</div>}
+          <button
+            onClick={handleCreateOrg}
+            disabled={creating}
+            style={{
+              width: '100%', padding: '13px 0', borderRadius: 10,
+              background: creating ? 'rgba(16,185,129,0.4)' : '#10b981',
+              border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+              cursor: creating ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {creating ? 'Creating…' : 'Create Team'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
