@@ -40,6 +40,21 @@ export async function listTasks(): Promise<Task[]> {
   return (data ?? []).map(rowToTask);
 }
 
+/** Returns only tasks assigned to the current user (for the personal Tasks page). */
+export async function listMyTasks(): Promise<Task[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('assigned_to', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(rowToTask);
+}
+
 export async function createTask(params: {
   title: string;
   clientProfileId?: string;

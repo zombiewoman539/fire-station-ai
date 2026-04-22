@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { listTasks, createTask, completeTask, reopenTask, deleteTask, Task } from '../services/taskService';
+import { listMyTasks, createTask, completeTask, reopenTask, deleteTask, Task } from '../services/taskService';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile } from '../profileTypes';
 
@@ -426,7 +426,7 @@ export default function TasksPage() {
   const [doneCollapsed, setDoneCollapsed] = useState(false);
 
   const load = useCallback(async () => {
-    const [taskData, profileData] = await Promise.all([listTasks(), listProfiles()]);
+    const [taskData, profileData] = await Promise.all([listMyTasks(), listProfiles()]);
     setTasks(taskData);
     setProfiles(profileData);
     setLoading(false);

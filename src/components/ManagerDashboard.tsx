@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTeam } from '../contexts/TeamContext';
 import {
   AdvisorSummary, getAdvisorSummaries, getAdvisorProfiles,
-  inviteAdvisor, removeMember, transferClient, getAllTeamProfiles, TeamProfile,
+  inviteAdvisor, removeMember, getAllTeamProfiles, TeamProfile,
   dissolveOrganization, createOrganization,
 } from '../services/teamService';
 import { listTasks, createTask, Task } from '../services/taskService';
@@ -146,90 +146,17 @@ function AssignTaskModal({ advisor, onClose, onCreated }: AssignTaskModalProps) 
   );
 }
 
-// ─── Transfer client modal ────────────────────────────────────────────────────
-
-interface TransferModalProps {
-  profile: { id: string; name: string };
-  advisors: AdvisorSummary[];
-  currentUserId: string;
-  onClose: () => void;
-  onTransferred: () => void;
-}
-
-function TransferModal({ profile, advisors, currentUserId, onClose, onTransferred }: TransferModalProps) {
-  const targets = advisors.filter(a => a.role === 'advisor' && a.status === 'active' && a.userId != null && a.userId !== currentUserId);
-  const [toUserId, setToUserId] = useState(targets[0]?.userId ?? '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!toUserId) return;
-    setSaving(true);
-    try {
-      await transferClient(profile.id, toUserId);
-      onTransferred();
-    } catch (err: any) {
-      setError(err.message);
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{
-      position: 'fixed', inset: 0, zIndex: 2000,
-      background: 'rgba(0,0,0,0.55)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-    }}>
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 400,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
-      }}>
-        <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>
-          Transfer client
-        </h2>
-        <p style={{ margin: '0 0 22px', fontSize: 13, color: 'var(--text-3)' }}>
-          Moving <strong style={{ color: 'var(--text-1)' }}>{profile.name}</strong> to a different advisor.
-        </p>
-
-        {targets.length === 0 ? (
-          <p style={{ color: '#f87171', fontSize: 13 }}>No other active advisors to transfer to.</p>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label style={labelStyle}>Transfer to</label>
-              <select value={toUserId} onChange={e => setToUserId(e.target.value)} style={inputStyle}>
-                {targets.map(a => <option key={a.userId as string} value={a.userId as string}>{a.email}</option>)}
-              </select>
-            </div>
-            {error && <div style={{ color: '#f87171', fontSize: 13 }}>{error}</div>}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={onClose} style={ghostBtn}>Cancel</button>
-              <button type="submit" disabled={saving} style={{ ...primaryBtn, background: '#f97316' }}>
-                {saving ? 'Transferring…' : 'Transfer'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Advisor clients drawer ───────────────────────────────────────────────────
 
 interface AdvisorClientsDrawerProps {
   advisor: AdvisorSummary;
-  allAdvisors: AdvisorSummary[];
   onClose: () => void;
-  onTransferred: () => void;
+  onAssignTask: () => void;
 }
 
-function AdvisorClientsDrawer({ advisor, allAdvisors, onClose, onTransferred }: AdvisorClientsDrawerProps) {
+function AdvisorClientsDrawer({ advisor, onClose, onAssignTask }: AdvisorClientsDrawerProps) {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [transferTarget, setTransferTarget] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(() => {
     if (!advisor.userId) return;
@@ -241,96 +168,76 @@ function AdvisorClientsDrawer({ advisor, allAdvisors, onClose, onTransferred }: 
 
   useEffect(() => { load(); }, [load]);
 
-  const handleTransferred = () => {
-    setTransferTarget(null);
-    load();
-    onTransferred();
-  };
-
   return (
-    <>
-      {transferTarget && (
-        <TransferModal
-          profile={transferTarget}
-          advisors={allAdvisors}
-          currentUserId={advisor.userId ?? ''}
-          onClose={() => setTransferTarget(null)}
-          onTransferred={handleTransferred}
-        />
-      )}
-      <div
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-        style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-          zIndex: 1500, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
-        }}
-      >
-        <div style={{
-          width: 460, height: '100%', background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)', padding: '28px 24px',
-          overflowY: 'auto', display: 'flex', flexDirection: 'column', color: 'var(--text-1)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                Advisor
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)' }}>{advisor.email}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-4)', marginTop: 2 }}>
-                {profiles.length} client{profiles.length !== 1 ? 's' : ''}
-              </div>
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+        zIndex: 1500, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
+      }}
+    >
+      <div style={{
+        width: 460, height: '100%', background: 'var(--surface)',
+        borderLeft: '1px solid var(--border)', padding: '28px 24px',
+        overflowY: 'auto', display: 'flex', flexDirection: 'column', color: 'var(--text-1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+              Advisor
             </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)' }}>{advisor.email}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-4)', marginTop: 2 }}>
+              {profiles.length} client{profiles.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onAssignTask} style={{
+              fontSize: 12, padding: '6px 12px', borderRadius: 8, fontWeight: 600,
+              background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)',
+              color: '#60a5fa', cursor: 'pointer',
+            }}>
+              + Assign task
+            </button>
             <button onClick={onClose} style={{
               background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
               padding: '6px 12px', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13,
             }}>✕ Close</button>
           </div>
-
-          {loading ? (
-            <div style={{ color: 'var(--text-4)', fontSize: 13 }}>Loading clients…</div>
-          ) : profiles.length === 0 ? (
-            <div style={{ color: 'var(--text-4)', fontSize: 13 }}>No clients yet.</div>
-          ) : (
-            profiles.map(p => {
-              const meta = (p.meta as any) ?? {};
-              return (
-                <div key={p.id} style={{
-                  background: 'var(--inset)', border: '1px solid var(--border)',
-                  borderRadius: 12, padding: '14px 16px', marginBottom: 10,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{p.name}</div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-5)' }}>{daysSince(p.updated_at)}</span>
-                      <button
-                        onClick={() => setTransferTarget({ id: p.id, name: p.name })}
-                        style={{
-                          fontSize: 11, padding: '3px 9px', borderRadius: 6,
-                          border: '1px solid var(--border)', background: 'transparent',
-                          color: 'var(--text-3)', cursor: 'pointer', fontWeight: 600,
-                        }}
-                      >
-                        Transfer
-                      </button>
-                    </div>
-                  </div>
-                  {meta.lastMeetingDate && (
-                    <div style={{ fontSize: 12, color: 'var(--text-4)' }}>
-                      Last meeting: {new Date(meta.lastMeetingDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
-                  )}
-                  {meta.nextReviewDate && (
-                    <div style={{ fontSize: 12, color: new Date(meta.nextReviewDate) < new Date() ? '#f87171' : '#fbbf24' }}>
-                      Next review: {new Date(meta.nextReviewDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
         </div>
+
+        {loading ? (
+          <div style={{ color: 'var(--text-4)', fontSize: 13 }}>Loading clients…</div>
+        ) : profiles.length === 0 ? (
+          <div style={{ color: 'var(--text-4)', fontSize: 13 }}>No clients yet.</div>
+        ) : (
+          profiles.map(p => {
+            const meta = (p.meta as any) ?? {};
+            return (
+              <div key={p.id} style={{
+                background: 'var(--inset)', border: '1px solid var(--border)',
+                borderRadius: 12, padding: '14px 16px', marginBottom: 10,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{p.name}</div>
+                  <span style={{ fontSize: 11, color: 'var(--text-5)' }}>{daysSince(p.updated_at)}</span>
+                </div>
+                {meta.lastMeetingDate && (
+                  <div style={{ fontSize: 12, color: 'var(--text-4)' }}>
+                    Last meeting: {new Date(meta.lastMeetingDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                )}
+                {meta.nextReviewDate && (
+                  <div style={{ fontSize: 12, color: new Date(meta.nextReviewDate) < new Date() ? '#f87171' : '#fbbf24' }}>
+                    Next review: {new Date(meta.nextReviewDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -437,7 +344,6 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'advisor' | 'updated'>('updated');
-  const [transferTarget, setTransferTarget] = useState<{ id: string; name: string; advisorUserId: string } | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -473,16 +379,6 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
 
   return (
     <div>
-      {transferTarget && (
-        <TransferModal
-          profile={transferTarget}
-          advisors={advisors}
-          currentUserId={transferTarget.advisorUserId}
-          onClose={() => setTransferTarget(null)}
-          onTransferred={() => { setTransferTarget(null); load(); }}
-        />
-      )}
-
       {/* Stats strip */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
         {[
@@ -531,10 +427,10 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
 
       {/* Table header */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px 80px',
+        display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px',
         gap: 12, padding: '6px 16px', marginBottom: 4,
       }}>
-        {['Client', 'Advisor', 'Status', 'Last updated', ''].map(h => (
+        {['Client', 'Advisor', 'Status', 'Last updated'].map(h => (
           <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
         ))}
       </div>
@@ -546,7 +442,7 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
       ) : (
         filtered.map(row => (
           <div key={row.id} style={{
-            display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px 80px',
+            display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px',
             alignItems: 'center', gap: 12,
             padding: '12px 16px', background: 'var(--surface)',
             border: '1px solid var(--border)', borderRadius: 10, marginBottom: 6,
@@ -566,16 +462,6 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
               </span>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-4)' }}>{daysSince(row.updatedAt)}</div>
-            <button
-              onClick={() => setTransferTarget({ id: row.id, name: row.name, advisorUserId: row.advisorUserId })}
-              style={{
-                fontSize: 11, padding: '4px 10px', borderRadius: 6,
-                border: '1px solid var(--border)', background: 'transparent',
-                color: 'var(--text-3)', cursor: 'pointer', fontWeight: 600,
-              }}
-            >
-              Transfer
-            </button>
           </div>
         ))
       )}
@@ -919,9 +805,8 @@ export default function ManagerDashboard() {
         {selectedAdvisor && (
           <AdvisorClientsDrawer
             advisor={selectedAdvisor}
-            allAdvisors={advisors}
             onClose={() => setSelectedAdvisor(null)}
-            onTransferred={load}
+            onAssignTask={() => { setAssignTarget(selectedAdvisor); setSelectedAdvisor(null); }}
           />
         )}
         {assignTarget && (
