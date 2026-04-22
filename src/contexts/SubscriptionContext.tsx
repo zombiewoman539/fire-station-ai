@@ -34,7 +34,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => { load(); }, [load]);
 
-  const tier: Tier = subscription?.status === 'active' ? subscription.tier : 'starter';
+  const trialActive = subscription?.trialEndsAt != null && new Date(subscription.trialEndsAt) > new Date();
+  const isActive = subscription?.status === 'active' || (subscription?.status === 'trialing' && trialActive);
+  const tier: Tier = isActive ? subscription!.tier : 'starter';
 
   return (
     <SubscriptionContext.Provider value={{

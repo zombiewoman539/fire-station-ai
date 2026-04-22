@@ -44,9 +44,18 @@ const settingsTab = {
   ),
 };
 
+const ADMIN_USER_ID = 'ef44569c-5216-4847-9b19-3b7797d13ea9';
+
 export default function NavBar() {
   const { isManager, teamStatus } = useTeam();
   const { tier, loaded: subLoaded } = useSubscription();
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    import('../services/supabaseClient').then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
+    });
+  }, []);
 
   return (
     <div style={{
@@ -106,6 +115,24 @@ export default function NavBar() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
           {teamStatus?.orgName ?? 'Team'}
+        </NavLink>
+      )}
+
+      {/* Admin link — only visible to admin user */}
+      {currentUserId === ADMIN_USER_ID && (
+        <NavLink
+          to="/admin"
+          style={({ isActive }) => ({
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 8,
+            fontSize: 13, fontWeight: 600,
+            textDecoration: 'none',
+            background: isActive ? 'rgba(239,68,68,0.12)' : 'transparent',
+            color: isActive ? '#f87171' : 'var(--text-4)',
+            border: `1px solid ${isActive ? 'rgba(239,68,68,0.3)' : 'transparent'}`,
+          })}
+        >
+          🔐 Admin
         </NavLink>
       )}
 

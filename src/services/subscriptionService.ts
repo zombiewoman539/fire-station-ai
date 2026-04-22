@@ -7,6 +7,7 @@ export interface Subscription {
   status: string;
   currentPeriodEnd: string | null;
   stripeCustomerId: string | null;
+  trialEndsAt: string | null;
 }
 
 export const PRICES = {
@@ -19,7 +20,7 @@ export const PRICES = {
 export async function getMySubscription(): Promise<Subscription | null> {
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('tier, status, current_period_end, stripe_customer_id')
+    .select('tier, status, current_period_end, stripe_customer_id, trial_ends_at')
     .maybeSingle();
 
   if (error || !data) return null;
@@ -29,6 +30,7 @@ export async function getMySubscription(): Promise<Subscription | null> {
     status: data.status,
     currentPeriodEnd: data.current_period_end,
     stripeCustomerId: data.stripe_customer_id,
+    trialEndsAt: data.trial_ends_at ?? null,
   };
 }
 
