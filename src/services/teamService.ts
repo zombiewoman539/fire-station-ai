@@ -22,11 +22,13 @@ export interface AdvisorSummary extends OrgMember {
 
 /** Returns the current user's team status, or null if they're solo. */
 export async function getMyTeamStatus(): Promise<TeamStatus | null> {
-  const { data: membership, error: mErr } = await supabase
+  const { data: memberships, error: mErr } = await supabase
     .from('team_memberships')
     .select('org_id, role')
     .eq('status', 'active')
-    .single();
+    .limit(1);
+
+  const membership = memberships?.[0] ?? null;
 
   if (mErr || !membership) return null;
 
