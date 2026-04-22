@@ -657,7 +657,7 @@ function ProRoute({ children }: { children: React.ReactNode }) {
 
 function DashboardRoute() {
   const { isManager, loaded } = useTeam();
-  const { isPro, loaded: subLoaded } = useSubscription();
+  const { loaded: subLoaded } = useSubscription();
   if (!loaded || !subLoaded) return null;
   if (isManager) return <ManagerDashboardPage />;
   return <ProRoute><AdvisorDashboard /></ProRoute>;

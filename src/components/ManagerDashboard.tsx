@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useTeam } from '../contexts/TeamContext';
 import {
   AdvisorSummary, getAdvisorSummaries, getAdvisorProfiles,
   inviteAdvisor, removeMember,
   dissolveOrganization, createOrganization,
 } from '../services/teamService';
-import { listTasks, createTask, Task } from '../services/taskService';
+import { createTask } from '../services/taskService';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
