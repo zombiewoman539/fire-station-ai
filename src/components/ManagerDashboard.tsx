@@ -764,7 +764,7 @@ export default function ManagerDashboard() {
   const [dissolving, setDissolving] = useState(false);
   const handleDissolve = async () => {
     const confirmed = window.confirm(
-      `Delete the entire team "${teamStatus?.orgName}"?\n\nAll members will be removed. Their client profiles will NOT be deleted — they'll become solo profiles. This cannot be undone.`
+      `Delete the entire team "${teamStatus?.orgName}"?\n\nAll members are removed. Each advisor keeps their own client profiles — you will lose visibility into them. This cannot be undone.`
     );
     if (!confirmed) return;
     setDissolving(true);
@@ -938,7 +938,7 @@ export default function ManagerDashboard() {
               }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>Delete this team</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-4)' }}>Removes all members. Client profiles are kept as solo profiles.</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-4)' }}>Each member keeps their own client profiles. You will lose visibility into advisors' profiles.</div>
                 </div>
                 <button
                   onClick={handleDissolve}
