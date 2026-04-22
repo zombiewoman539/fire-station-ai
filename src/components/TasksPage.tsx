@@ -18,8 +18,9 @@ function isOverdue(dueDate: string | null): boolean {
 
 function isDueToday(dueDate: string | null): boolean {
   if (!dueDate) return false;
-  const today = new Date().toISOString().split('T')[0];
-  return dueDate === today;
+  const d = new Date();
+  const localToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return dueDate === localToday;
 }
 
 // ─── New task modal ───────────────────────────────────────────────────────────

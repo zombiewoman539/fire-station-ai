@@ -156,7 +156,7 @@ interface TransferModalProps {
 }
 
 function TransferModal({ profile, advisors, currentUserId, onClose, onTransferred }: TransferModalProps) {
-  const targets = advisors.filter(a => a.role === 'advisor' && a.status === 'active' && a.userId !== currentUserId);
+  const targets = advisors.filter(a => a.role === 'advisor' && a.status === 'active' && a.userId != null && a.userId !== currentUserId);
   const [toUserId, setToUserId] = useState(targets[0]?.userId ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -199,7 +199,7 @@ function TransferModal({ profile, advisors, currentUserId, onClose, onTransferre
             <div>
               <label style={labelStyle}>Transfer to</label>
               <select value={toUserId} onChange={e => setToUserId(e.target.value)} style={inputStyle}>
-                {targets.map(a => <option key={a.userId!} value={a.userId!}>{a.email}</option>)}
+                {targets.map(a => <option key={a.userId as string} value={a.userId as string}>{a.email}</option>)}
               </select>
             </div>
             {error && <div style={{ color: '#f87171', fontSize: 13 }}>{error}</div>}
@@ -766,9 +766,9 @@ export default function ManagerDashboard() {
   const totalOpenTasks = tasks.filter(t => t.status === 'todo').length;
 
   // Task stats per advisor
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const taskStatsByAdvisor = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const map: Record<string, { open: number; doneThisMonth: number }> = {};
     for (const t of tasks) {
       if (!map[t.assignedTo]) map[t.assignedTo] = { open: 0, doneThisMonth: 0 };
@@ -776,7 +776,7 @@ export default function ManagerDashboard() {
       if (t.status === 'done' && t.completedAt && t.completedAt >= monthStart) map[t.assignedTo].doneThisMonth++;
     }
     return map;
-  }, [tasks, monthStart]);
+  }, [tasks]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'team', label: 'Team' },
@@ -819,7 +819,7 @@ export default function ManagerDashboard() {
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
           {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
+            <button key={t.id} onClick={() => { setTab(t.id); setAssignTarget(null); setSelectedAdvisor(null); }} style={{
               padding: '8px 18px', fontSize: 13, fontWeight: 600,
               border: 'none', background: 'none', cursor: 'pointer',
               color: tab === t.id ? '#10b981' : 'var(--text-4)',
