@@ -2,12 +2,10 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTeam } from '../contexts/TeamContext';
 import {
   AdvisorSummary, getAdvisorSummaries, getAdvisorProfiles,
-  inviteAdvisor, removeMember, getAllTeamProfiles, TeamProfile,
+  inviteAdvisor, removeMember,
   dissolveOrganization, createOrganization,
 } from '../services/teamService';
 import { listTasks, createTask, Task } from '../services/taskService';
-import { calculate } from '../calculations';
-import { defaultInputs } from '../defaults';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -265,17 +263,16 @@ function AdvisorClientsDrawer({ advisor, onClose, onAssignTask }: AdvisorClients
 
 interface AdvisorRowProps {
   member: AdvisorSummary;
-  taskStats: { open: number; doneThisMonth: number };
   onViewClients: () => void;
   onAssignTask: () => void;
   onRemove: () => void;
 }
 
-function AdvisorRow({ member, taskStats, onViewClients, onAssignTask, onRemove }: AdvisorRowProps) {
+function AdvisorRow({ member, onViewClients, onAssignTask, onRemove }: AdvisorRowProps) {
   const isManager = member.role === 'manager';
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: '2fr 70px 80px 80px 100px 1fr',
+      display: 'grid', gridTemplateColumns: '1fr 70px 120px 1fr',
       alignItems: 'center', gap: 12,
       padding: '14px 20px', background: 'var(--surface)',
       border: '1px solid var(--border)', borderRadius: 12, marginBottom: 8,
@@ -300,22 +297,6 @@ function AdvisorRow({ member, taskStats, onViewClients, onAssignTask, onRemove }
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)' }}>{member.clientCount}</div>
         <div style={{ fontSize: 10, color: 'var(--text-5)' }}>clients</div>
-      </div>
-
-      {/* Open tasks */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 20, fontWeight: 800, color: taskStats.open > 0 ? '#fbbf24' : 'var(--text-3)' }}>
-          {taskStats.open}
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--text-5)' }}>open tasks</div>
-      </div>
-
-      {/* Done this month */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 20, fontWeight: 800, color: taskStats.doneThisMonth > 0 ? '#34d399' : 'var(--text-3)' }}>
-          {taskStats.doneThisMonth}
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--text-5)' }}>done/mo</div>
       </div>
 
       {/* Last active */}
@@ -357,309 +338,11 @@ function AdvisorRow({ member, taskStats, onViewClients, onAssignTask, onRemove }
   );
 }
 
-// ─── All clients tab ──────────────────────────────────────────────────────────
-
-function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
-  const [teamProfiles, setTeamProfiles] = useState<TeamProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'advisor' | 'updated'>('updated');
-  const [assignTarget, setAssignTarget] = useState<{ advisor: AdvisorSummary; clientId: string; clientName: string } | null>(null);
-
-  const advisorByUserId = useMemo(() => {
-    const m: Record<string, AdvisorSummary> = {};
-    for (const a of advisors) { if (a.userId) m[a.userId] = a; }
-    return m;
-  }, [advisors]);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    getAllTeamProfiles().then(data => { setTeamProfiles(data); setLoading(false); });
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const rows = useMemo(() => {
-    return teamProfiles.map(p => {
-      let onTrack = false;
-      try {
-        const inputs = { ...defaultInputs, ...p.inputs };
-        const result = calculate(inputs);
-        onTrack = result.onTrack;
-      } catch { /* skip */ }
-      return { ...p, onTrack };
-    });
-  }, [teamProfiles]);
-
-  const filtered = useMemo(() => {
-    let r = rows;
-    if (filter === 'on-track') r = r.filter(x => x.onTrack);
-    if (filter === 'shortfall') r = r.filter(x => !x.onTrack);
-    if (sortBy === 'name') r = [...r].sort((a, b) => a.name.localeCompare(b.name));
-    if (sortBy === 'advisor') r = [...r].sort((a, b) => a.advisorEmail.localeCompare(b.advisorEmail));
-    if (sortBy === 'updated') r = [...r].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return r;
-  }, [rows, filter, sortBy]);
-
-  const onTrackCount = rows.filter(r => r.onTrack).length;
-  const shortfallCount = rows.filter(r => !r.onTrack).length;
-
-  return (
-    <div>
-      {assignTarget && (
-        <AssignTaskModal
-          advisor={assignTarget.advisor}
-          preselectedClientId={assignTarget.clientId}
-          preselectedClientName={assignTarget.clientName}
-          onClose={() => setAssignTarget(null)}
-          onCreated={() => setAssignTarget(null)}
-        />
-      )}
-
-      {/* Stats strip */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        {[
-          { label: 'Total', value: rows.length, color: '#60a5fa' },
-          { label: 'On Track', value: onTrackCount, color: '#34d399' },
-          { label: 'Shortfall', value: shortfallCount, color: '#f87171' },
-        ].map(s => (
-          <div key={s.label} style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 12, padding: '14px 20px', flex: 1, textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-5)' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['all', 'on-track', 'shortfall'] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{
-              padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-              border: '1px solid var(--border)', cursor: 'pointer',
-              background: filter === f ? '#10b981' : 'transparent',
-              color: filter === f ? '#fff' : 'var(--text-3)',
-            }}>
-              {f === 'all' ? 'All' : f === 'on-track' ? 'On track' : 'Shortfall'}
-            </button>
-          ))}
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Sort:</span>
-          {(['updated', 'name', 'advisor'] as const).map(s => (
-            <button key={s} onClick={() => setSortBy(s)} style={{
-              padding: '5px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-              border: '1px solid var(--border)', cursor: 'pointer',
-              background: sortBy === s ? 'var(--surface)' : 'transparent',
-              color: sortBy === s ? 'var(--text-1)' : 'var(--text-4)',
-            }}>
-              {s === 'updated' ? 'Recent' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table header */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px 90px',
-        gap: 12, padding: '6px 16px', marginBottom: 4,
-      }}>
-        {['Client', 'Advisor', 'Status', 'Last updated', ''].map(h => (
-          <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ color: 'var(--text-4)', fontSize: 13, padding: 16 }}>Loading all clients…</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ color: 'var(--text-4)', fontSize: 13, padding: 16 }}>No clients match this filter.</div>
-      ) : (
-        filtered.map(row => {
-          const advisor = advisorByUserId[row.advisorUserId];
-          return (
-            <div key={row.id} style={{
-              display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px 90px',
-              alignItems: 'center', gap: 12,
-              padding: '12px 16px', background: 'var(--surface)',
-              border: '1px solid var(--border)', borderRadius: 10, marginBottom: 6,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{row.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {row.advisorEmail}
-              </div>
-              <div>
-                <span style={{
-                  fontSize: 11, fontWeight: 700,
-                  padding: '3px 9px', borderRadius: 6,
-                  background: row.onTrack ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
-                  color: row.onTrack ? '#34d399' : '#f87171',
-                }}>
-                  {row.onTrack ? 'On track' : 'Shortfall'}
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-4)' }}>{daysSince(row.updatedAt)}</div>
-              {advisor ? (
-                <button
-                  onClick={() => setAssignTarget({ advisor, clientId: row.id, clientName: row.name })}
-                  style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 6, fontWeight: 600,
-                    border: '1px solid rgba(96,165,250,0.3)',
-                    background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer',
-                  }}
-                >
-                  + Task
-                </button>
-              ) : <div />}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-// ─── Tasks tab ────────────────────────────────────────────────────────────────
-
-function TeamTasksTab({ advisors }: { advisors: AdvisorSummary[] }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [assignTarget, setAssignTarget] = useState<AdvisorSummary | null>(null);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    listTasks().then(data => { setTasks(data); setLoading(false); });
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const grouped = useMemo(() => {
-    const g: Record<string, Task[]> = {};
-    for (const t of tasks) {
-      const key = t.assignedTo;
-      if (!g[key]) g[key] = [];
-      g[key].push(t);
-    }
-    return g;
-  }, [tasks]);
-
-  const activeAdvisors = advisors.filter(a => a.role === 'advisor' && a.status === 'active');
-
-  return (
-    <div>
-      {assignTarget && (
-        <AssignTaskModal
-          advisor={assignTarget}
-          onClose={() => setAssignTarget(null)}
-          onCreated={() => { setAssignTarget(null); load(); }}
-        />
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {activeAdvisors.map(a => (
-            <button key={a.id} onClick={() => setAssignTarget(a)} style={{
-              padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              border: '1px solid rgba(96,165,250,0.3)',
-              background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer',
-            }}>
-              + Assign to {a.email.split('@')[0]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={{ color: 'var(--text-4)', fontSize: 13 }}>Loading tasks…</div>
-      ) : tasks.length === 0 ? (
-        <div style={{
-          border: '1px dashed var(--border)', borderRadius: 16,
-          padding: '48px 32px', textAlign: 'center',
-        }}>
-          <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 14 }}>
-            No tasks assigned yet. Use "Assign task" on an advisor row to get started.
-          </p>
-        </div>
-      ) : (
-        activeAdvisors.map(advisor => {
-          const advisorTasks = grouped[advisor.userId ?? ''] ?? [];
-          if (advisorTasks.length === 0) return null;
-          const open = advisorTasks.filter(t => t.status === 'todo');
-          const done = advisorTasks.filter(t => t.status === 'done');
-          return (
-            <div key={advisor.id} style={{ marginBottom: 28 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}>{advisor.email}</span>
-                <span style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                  background: 'var(--border)', color: 'var(--text-4)',
-                }}>
-                  {open.length} open · {done.length} done
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {advisorTasks.map(t => {
-                  const overdue = t.dueDate && new Date(t.dueDate + 'T23:59:59') < new Date() && t.status === 'todo';
-                  return (
-                    <div key={t.id} style={{
-                      background: 'var(--surface)', border: '1px solid var(--border)',
-                      borderRadius: 10, padding: '12px 16px',
-                      opacity: t.status === 'done' ? 0.6 : 1,
-                      display: 'flex', alignItems: 'center', gap: 12,
-                    }}>
-                      <div style={{
-                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                        background: t.status === 'done' ? '#34d399' : overdue ? '#f87171' : '#fbbf24',
-                      }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
-                          textDecoration: t.status === 'done' ? 'line-through' : 'none',
-                        }}>
-                          {t.title}
-                        </div>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
-                          {t.clientName && (
-                            <span style={{ fontSize: 11, color: '#34d399' }}>{t.clientName}</span>
-                          )}
-                          {t.dueDate && (
-                            <span style={{ fontSize: 11, color: overdue ? '#f87171' : 'var(--text-4)' }}>
-                              Due {new Date(t.dueDate + 'T00:00:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600,
-                        padding: '2px 9px', borderRadius: 6,
-                        background: t.status === 'done' ? 'rgba(52,211,153,0.1)' : 'rgba(251,191,36,0.1)',
-                        color: t.status === 'done' ? '#34d399' : '#fbbf24',
-                      }}>
-                        {t.status === 'done' ? 'Done' : 'Open'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-// ─── Main dashboard ───────────────────────────────────────────────────────────
-
-type Tab = 'team' | 'tasks' | 'all-clients';
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ManagerDashboard() {
   const { teamStatus, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
-  const [tab, setTab] = useState<Tab>('team');
   const [advisors, setAdvisors] = useState<AdvisorSummary[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -674,42 +357,15 @@ export default function ManagerDashboard() {
 
   // Must be declared before early return (Rules of Hooks)
   const [dissolving, setDissolving] = useState(false);
-  const taskStatsByAdvisor = useMemo(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const map: Record<string, { open: number; doneThisMonth: number }> = {};
-    for (const t of tasks) {
-      if (!map[t.assignedTo]) map[t.assignedTo] = { open: 0, doneThisMonth: 0 };
-      if (t.status === 'todo') map[t.assignedTo].open++;
-      if (t.status === 'done' && t.completedAt && t.completedAt >= monthStart) map[t.assignedTo].doneThisMonth++;
-    }
-    return map;
-  }, [tasks]);
-
-  const handleCreateOrg = async () => {
-    if (!orgName.trim()) { setCreateError('Enter a team name.'); return; }
-    setCreating(true);
-    setCreateError('');
-    try {
-      await createOrganization(orgName.trim());
-      await refreshTeam();
-    } catch (e: any) {
-      setCreateError(e.message || 'Something went wrong.');
-      setCreating(false);
-    }
-  };
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [advisorData, taskData] = await Promise.all([getAdvisorSummaries(), listTasks()]);
-    setAdvisors(advisorData);
-    setTasks(taskData);
+    setAdvisors(await getAdvisorSummaries());
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Wait for TeamContext to finish loading before rendering anything conditional on teamStatus
   if (!teamLoaded) {
     return (
       <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -718,7 +374,6 @@ export default function ManagerDashboard() {
     );
   }
 
-  // Show team setup screen if user genuinely has no org
   if (!teamStatus) {
     return (
       <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
@@ -729,12 +384,9 @@ export default function ManagerDashboard() {
             Give your team a name — this is usually your agency or practice name.
           </div>
           <input
-            type="text"
-            value={orgName}
-            onChange={e => setOrgName(e.target.value)}
+            type="text" value={orgName} onChange={e => setOrgName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreateOrg()}
-            placeholder="e.g. Zenith Advisory"
-            autoFocus
+            placeholder="e.g. Zenith Advisory" autoFocus
             style={{
               width: '100%', boxSizing: 'border-box', marginBottom: 12,
               background: 'var(--surface)', border: '1px solid var(--border)',
@@ -743,16 +395,12 @@ export default function ManagerDashboard() {
             }}
           />
           {createError && <div style={{ color: '#f87171', fontSize: 13, marginBottom: 12 }}>{createError}</div>}
-          <button
-            onClick={handleCreateOrg}
-            disabled={creating}
-            style={{
-              width: '100%', padding: '13px 0', borderRadius: 10,
-              background: creating ? 'rgba(16,185,129,0.4)' : '#10b981',
-              border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
-              cursor: creating ? 'not-allowed' : 'pointer',
-            }}
-          >
+          <button onClick={handleCreateOrg} disabled={creating} style={{
+            width: '100%', padding: '13px 0', borderRadius: 10,
+            background: creating ? 'rgba(16,185,129,0.4)' : '#10b981',
+            border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+            cursor: creating ? 'not-allowed' : 'pointer',
+          }}>
             {creating ? 'Creating…' : 'Create Team'}
           </button>
         </div>
@@ -760,97 +408,52 @@ export default function ManagerDashboard() {
     );
   }
 
+  function handleCreateOrg() {
+    if (!orgName.trim()) { setCreateError('Enter a team name.'); return; }
+    setCreating(true); setCreateError('');
+    createOrganization(orgName.trim())
+      .then(() => refreshTeam())
+      .catch((e: any) => { setCreateError(e.message || 'Something went wrong.'); setCreating(false); });
+  }
+
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
-    setInviting(true);
-    setInviteMsg('');
+    setInviting(true); setInviteMsg('');
     try {
       await inviteAdvisor(inviteEmail.trim());
       setInviteMsg(`Invite sent to ${inviteEmail.trim()}.`);
-      setInviteEmail('');
-      load();
-    } catch (e: any) {
-      setInviteMsg(`Error: ${e.message}`);
-    } finally {
-      setInviting(false);
-    }
+      setInviteEmail(''); load();
+    } catch (e: any) { setInviteMsg(`Error: ${e.message}`); }
+    finally { setInviting(false); }
   };
 
   const handleRemove = async (member: AdvisorSummary) => {
     if (!window.confirm(`Remove ${member.email} from the team?`)) return;
-    await removeMember(member.id);
-    load();
+    await removeMember(member.id); load();
   };
 
   const handleDissolve = async () => {
-    const confirmed = window.confirm(
-      `Delete the entire team "${teamStatus?.orgName}"?\n\nAll members are removed. Each advisor keeps their own client profiles — you will lose visibility into them. This cannot be undone.`
-    );
-    if (!confirmed) return;
+    if (!window.confirm(`Delete the entire team "${teamStatus?.orgName}"?\n\nAll members are removed. Each advisor keeps their own client profiles — you will lose visibility into them. This cannot be undone.`)) return;
     setDissolving(true);
-    try {
-      await dissolveOrganization();
-      window.location.href = '/';
-    } catch (e: any) {
-      alert(`Failed to delete team: ${e.message}`);
-      setDissolving(false);
-    }
+    try { await dissolveOrganization(); window.location.href = '/'; }
+    catch (e: any) { alert(`Failed to delete team: ${e.message}`); setDissolving(false); }
   };
 
-  const activeAdvisors = advisors.filter(a => a.role === 'advisor' && a.status === 'active');
-  const pendingAdvisors = advisors.filter(a => a.status === 'pending');
-  const totalClients = activeAdvisors.reduce((s, a) => s + a.clientCount, 0);
-  const totalOpenTasks = tasks.filter(t => t.status === 'todo').length;
-
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'team', label: 'Team' },
-    { id: 'tasks', label: `Tasks${totalOpenTasks > 0 ? ` (${totalOpenTasks})` : ''}` },
-    { id: 'all-clients', label: `All Clients (${totalClients})` },
-  ];
+  const pendingCount = advisors.filter(a => a.status === 'pending').length;
 
   return (
     <div style={{ minHeight: '100%', background: 'var(--bg)', color: 'var(--text-1)', padding: '28px 32px' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-            Manager Dashboard
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)', marginBottom: 4 }}>
-            {teamStatus?.orgName}
-          </div>
-        </div>
-
-        {/* Summary cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
-          {[
-            { label: 'Active Advisors', value: activeAdvisors.length, color: '#34d399' },
-            { label: 'Total Clients', value: totalClients, color: '#60a5fa' },
-            { label: 'Open Tasks', value: totalOpenTasks, color: '#fbbf24' },
-            { label: 'Pending Invites', value: pendingAdvisors.length, color: '#a78bfa' },
-          ].map(card => (
-            <div key={card.label} style={{
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 14, padding: '18px 22px',
-            }}>
-              <div style={{ fontSize: 30, fontWeight: 800, color: card.color, marginBottom: 4 }}>{card.value}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-4)' }}>{card.label}</div>
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Team</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-1)' }}>{teamStatus?.orgName}</div>
+          {pendingCount > 0 && (
+            <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 4 }}>
+              {pendingCount} pending invite{pendingCount !== 1 ? 's' : ''} — advisors will appear once they sign in
             </div>
-          ))}
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => { setTab(t.id); setAssignTarget(null); setSelectedAdvisor(null); }} style={{
-              padding: '8px 18px', fontSize: 13, fontWeight: 600,
-              border: 'none', background: 'none', cursor: 'pointer',
-              color: tab === t.id ? '#10b981' : 'var(--text-4)',
-              borderBottom: tab === t.id ? '2px solid #10b981' : '2px solid transparent',
-              marginBottom: -1,
-            }}>{t.label}</button>
-          ))}
+          )}
         </div>
 
         {/* Modals */}
@@ -869,102 +472,87 @@ export default function ManagerDashboard() {
           />
         )}
 
-        {/* Team tab */}
-        {tab === 'team' && (
-          <>
-            {/* Invite advisor */}
-            <div style={{
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 14, padding: '18px 22px', marginBottom: 24,
+        {/* Invite */}
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 14, padding: '18px 22px', marginBottom: 24,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12 }}>Invite Advisor</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              placeholder="advisor@example.com"
+              style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 10, padding: '10px 14px', color: 'var(--text-1)', fontSize: 13, outline: 'none' }}
+            />
+            <button onClick={handleInvite} disabled={inviting} style={{
+              padding: '10px 20px', background: '#10b981', border: 'none', borderRadius: 10,
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: inviting ? 'not-allowed' : 'pointer', opacity: inviting ? 0.6 : 1,
             }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12 }}>Invite Advisor</div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleInvite()}
-                  placeholder="advisor@example.com"
-                  style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 10, padding: '10px 14px', color: 'var(--text-1)', fontSize: 13, outline: 'none' }}
-                />
-                <button onClick={handleInvite} disabled={inviting} style={{
-                  padding: '10px 20px', background: '#10b981', border: 'none', borderRadius: 10,
-                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: inviting ? 'not-allowed' : 'pointer', opacity: inviting ? 0.6 : 1,
-                }}>
-                  {inviting ? 'Sending…' : 'Send Invite'}
-                </button>
-              </div>
-              {inviteMsg && (
-                <div style={{ marginTop: 10, fontSize: 12, color: inviteMsg.startsWith('Error') ? '#f87171' : '#34d399' }}>
-                  {inviteMsg}
-                </div>
-              )}
-              <div style={{ fontSize: 11, color: 'var(--text-5)', marginTop: 8, lineHeight: 1.5 }}>
-                Added automatically when they sign in with this email.
-              </div>
+              {inviting ? 'Sending…' : 'Send Invite'}
+            </button>
+          </div>
+          {inviteMsg && (
+            <div style={{ marginTop: 10, fontSize: 12, color: inviteMsg.startsWith('Error') ? '#f87171' : '#34d399' }}>
+              {inviteMsg}
             </div>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--text-5)', marginTop: 8, lineHeight: 1.5 }}>
+            Advisor joins automatically when they sign in with this email.
+          </div>
+        </div>
 
-            {/* Team member list */}
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', marginBottom: 12 }}>Team Members</div>
-            {loading ? (
-              <div style={{ color: 'var(--text-4)', fontSize: 13 }}>Loading team…</div>
-            ) : advisors.length === 0 ? (
-              <div style={{ color: 'var(--text-4)', fontSize: 13 }}>No team members yet.</div>
-            ) : (
-              <>
-                <div style={{
-                  display: 'grid', gridTemplateColumns: '2fr 70px 80px 80px 100px 1fr',
-                  gap: 12, padding: '6px 20px', marginBottom: 4,
-                }}>
-                  {['Member', 'Clients', 'Open tasks', 'Done/mo', 'Last active', ''].map(h => (
-                    <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
-                  ))}
-                </div>
-                {advisors.map(m => (
-                  <AdvisorRow
-                    key={m.id}
-                    member={m}
-                    taskStats={taskStatsByAdvisor[m.userId ?? ''] ?? { open: 0, doneThisMonth: 0 }}
-                    onViewClients={() => setSelectedAdvisor(m)}
-                    onAssignTask={() => setAssignTarget(m)}
-                    onRemove={() => handleRemove(m)}
-                  />
-                ))}
-              </>
-            )}
-            {/* Danger zone */}
+        {/* Members */}
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', marginBottom: 12 }}>Members</div>
+        {loading ? (
+          <div style={{ color: 'var(--text-4)', fontSize: 13 }}>Loading…</div>
+        ) : advisors.length === 0 ? (
+          <div style={{ color: 'var(--text-4)', fontSize: 13 }}>No team members yet.</div>
+        ) : (
+          <>
             <div style={{
-              marginTop: 40, borderTop: '1px solid rgba(239,68,68,0.2)',
-              paddingTop: 24,
+              display: 'grid', gridTemplateColumns: '1fr 70px 120px 1fr',
+              gap: 12, padding: '6px 20px', marginBottom: 4,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                Danger zone
-              </div>
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)',
-                borderRadius: 12, padding: '16px 20px',
-              }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>Delete this team</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-4)' }}>Each member keeps their own client profiles. You will lose visibility into advisors' profiles.</div>
-                </div>
-                <button
-                  onClick={handleDissolve}
-                  disabled={dissolving}
-                  style={{
-                    padding: '8px 18px', borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)',
-                    background: 'transparent', color: '#f87171',
-                    fontSize: 13, fontWeight: 700, cursor: dissolving ? 'not-allowed' : 'pointer',
-                    opacity: dissolving ? 0.5 : 1, whiteSpace: 'nowrap',
-                  }}
-                >
-                  {dissolving ? 'Deleting…' : 'Delete team'}
-                </button>
-              </div>
+              {['Member', 'Clients', 'Last active', ''].map(h => (
+                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+              ))}
             </div>
+            {advisors.map(m => (
+              <AdvisorRow
+                key={m.id}
+                member={m}
+                onViewClients={() => setSelectedAdvisor(m)}
+                onAssignTask={() => setAssignTarget(m)}
+                onRemove={() => handleRemove(m)}
+              />
+            ))}
           </>
         )}
 
-        {tab === 'tasks' && <TeamTasksTab advisors={advisors} />}
-        {tab === 'all-clients' && <AllClientsTab advisors={advisors} />}
+        {/* Danger zone */}
+        <div style={{ marginTop: 48, borderTop: '1px solid rgba(239,68,68,0.2)', paddingTop: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+            Danger zone
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)',
+            borderRadius: 12, padding: '16px 20px',
+          }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>Delete this team</div>
+              <div style={{ fontSize: 12, color: 'var(--text-4)' }}>Each member keeps their own client profiles. You will lose visibility into advisors' profiles.</div>
+            </div>
+            <button onClick={handleDissolve} disabled={dissolving} style={{
+              padding: '8px 18px', borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)',
+              background: 'transparent', color: '#f87171',
+              fontSize: 13, fontWeight: 700, cursor: dissolving ? 'not-allowed' : 'pointer',
+              opacity: dissolving ? 0.5 : 1, whiteSpace: 'nowrap',
+            }}>
+              {dissolving ? 'Deleting…' : 'Delete team'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
