@@ -26,7 +26,6 @@ import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
 import SettingsPage from './components/SettingsPage';
 import ManagerDashboard from './components/ManagerDashboard';
-import InviteModal from './components/InviteModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import PlansPage from './components/PlansPage';
 import LandingPage from './components/LandingPage';
@@ -660,7 +659,7 @@ function AppShell() {
   const [checking, setChecking] = useState(true);
   const location = useLocation();
   useTheme();
-  const { pendingInvite } = useTeam();
+  useTeam();
 
   useEffect(() => {
     const timeout = setTimeout(() => setChecking(false), 6000);
@@ -704,9 +703,6 @@ function AppShell() {
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </div>
-      {pendingInvite && (
-        <InviteModal invite={pendingInvite} onDone={() => {}} />
-      )}
     </div>
   );
 }

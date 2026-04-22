@@ -5,7 +5,7 @@ import { useTheme } from '../App';
 import { useTeam } from '../contexts/TeamContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { createPortalSession } from '../services/subscriptionService';
-import { createOrganization, inviteAdvisor, leaveTeam } from '../services/teamService';
+import { createOrganization, inviteAdvisor, leaveTeam, acceptPendingInvite, declinePendingInvite } from '../services/teamService';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -83,7 +83,7 @@ export default function SettingsPage() {
   const [signingOut, setSigningOut] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const navigate = useNavigate();
-  const { teamStatus, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
+  const { teamStatus, pendingInvite, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
   const { tier, subscription, loaded: subLoaded } = useSubscription();
 
   // Display preferences — stored in localStorage
@@ -103,6 +103,9 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState('');
   const [leaving, setLeaving] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [inviteActionError, setInviteActionError] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -156,6 +159,30 @@ export default function SettingsPage() {
       setInviteMsg(`Error: ${e.message}`);
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleAcceptInvite = async () => {
+    setAccepting(true);
+    setInviteActionError('');
+    try {
+      await acceptPendingInvite();
+      await refreshTeam();
+    } catch (e: any) {
+      setInviteActionError(e.message || 'Something went wrong.');
+      setAccepting(false);
+    }
+  };
+
+  const handleDeclineInvite = async () => {
+    setDeclining(true);
+    setInviteActionError('');
+    try {
+      await declinePendingInvite();
+      await refreshTeam();
+    } catch (e: any) {
+      setInviteActionError(e.message || 'Something went wrong.');
+      setDeclining(false);
     }
   };
 
@@ -289,7 +316,63 @@ export default function SettingsPage() {
 
         {/* Team */}
         <Section title="Team">
-          {!teamLoaded ? (
+          {/* Pending invite — shown instead of normal team status */}
+          {pendingInvite ? (
+            <div style={{
+              background: 'var(--surface)', border: '1px solid rgba(96,165,250,0.3)',
+              borderRadius: 12, padding: '20px 20px',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
+                Team invitation
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
+                You've been invited to join <strong style={{ color: '#60a5fa' }}>{pendingInvite.orgName}</strong> as a financial advisor.
+              </div>
+
+              {/* Warning */}
+              <div style={{
+                background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)',
+                borderRadius: 9, padding: '11px 14px', marginBottom: 16,
+                fontSize: 12, color: '#fbbf24', lineHeight: 1.6,
+              }}>
+                ⚠️ If you accept, your manager will be able to view a summary of your client portfolios including names, FIRE status, and last activity. They cannot edit or delete your clients.
+              </div>
+
+              {inviteActionError && (
+                <div style={{ color: '#f87171', fontSize: 12, marginBottom: 12 }}>{inviteActionError}</div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleAcceptInvite}
+                  disabled={accepting || declining}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 9, border: 'none',
+                    background: accepting ? 'rgba(16,185,129,0.4)' : '#10b981',
+                    color: '#fff', fontSize: 13, fontWeight: 700,
+                    cursor: accepting || declining ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {accepting ? 'Joining…' : 'Accept'}
+                </button>
+                <button
+                  onClick={handleDeclineInvite}
+                  disabled={accepting || declining}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 9,
+                    background: 'transparent', border: '1px solid rgba(239,68,68,0.3)',
+                    color: '#f87171', fontSize: 13, fontWeight: 600,
+                    cursor: accepting || declining ? 'not-allowed' : 'pointer',
+                    opacity: accepting || declining ? 0.6 : 1,
+                  }}
+                >
+                  {declining ? 'Declining…' : 'Decline'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-5)', marginTop: 10 }}>
+                Declining removes the invite. You can continue using FIRE Station independently.
+              </div>
+            </div>
+          ) : !teamLoaded ? (
             <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-4)' }}>Loading…</div>
           ) : !teamStatus ? (
             /* ── Solo: offer to create a team ── */
@@ -418,7 +501,7 @@ export default function SettingsPage() {
               </button>
             </Row>
           )}
-        </Section>
+          </Section>
 
         {/* Display preferences */}
         <Section title="Display Preferences">
