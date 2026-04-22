@@ -718,7 +718,7 @@ function TeamTasksTab({ advisors }: { advisors: AdvisorSummary[] }) {
 type Tab = 'team' | 'tasks' | 'all-clients';
 
 export default function ManagerDashboard() {
-  const { teamStatus, refresh: refreshTeam } = useTeam();
+  const { teamStatus, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
   const [tab, setTab] = useState<Tab>('team');
   const [advisors, setAdvisors] = useState<AdvisorSummary[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -771,7 +771,16 @@ export default function ManagerDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Show team setup screen if user has no org yet
+  // Wait for TeamContext to finish loading before rendering anything conditional on teamStatus
+  if (!teamLoaded) {
+    return (
+      <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 32 }}>🔥</div>
+      </div>
+    );
+  }
+
+  // Show team setup screen if user genuinely has no org
   if (!teamStatus) {
     return (
       <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
