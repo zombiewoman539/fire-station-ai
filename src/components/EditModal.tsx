@@ -155,6 +155,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function PersonalSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
   const upd = (field: string, v: number) => onChange({ ...inputs, personal: { ...inputs.personal, [field]: v } });
   const updDob = (dob: string | null) => onChange({ ...inputs, personal: { ...inputs.personal, dateOfBirth: dob || null } });
+  const updStr = (field: string, v: string) => onChange({ ...inputs, personal: { ...inputs.personal, [field]: v } });
 
   // Compute live age from DOB for display
   const liveDobAge = (() => {
@@ -192,6 +193,45 @@ function PersonalSection({ inputs, onChange }: { inputs: FireInputs; onChange: (
               Currently <strong style={{ color: 'var(--text-2)' }}>{liveDobAge}</strong> years old today
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Phone + Gender */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 6, fontWeight: 600 }}>
+            Phone Number
+          </label>
+          <input
+            type="tel"
+            value={inputs.personal.phoneNumber ?? ''}
+            onChange={e => updStr('phoneNumber', e.target.value)}
+            placeholder="+65 9XXX XXXX"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+              borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 6, fontWeight: 600 }}>
+            Gender
+          </label>
+          <select
+            value={inputs.personal.gender ?? ''}
+            onChange={e => updStr('gender', e.target.value)}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+              borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="">— Not specified —</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select>
         </div>
       </div>
 

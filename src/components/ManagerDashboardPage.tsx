@@ -94,6 +94,8 @@ interface ClientRow {
   age: number | null;
   retirementAge: number | null;
   annualIncome: number | null;
+  gender: 'M' | 'F' | '' | null;
+  phoneNumber: string | null;
   // FIRE
   onTrack: boolean | null;
   fireGap: number | null;
@@ -375,6 +377,8 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
       let age: number | null = null;
       let retirementAge: number | null = null;
       let annualIncome: number | null = null;
+      let gender: 'M' | 'F' | '' | null = null;
+      let phoneNumber: string | null = null;
 
       try {
         if (p.inputs) {
@@ -382,6 +386,8 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
           age = inputs.personal?.currentAge ?? null;
           retirementAge = inputs.personal?.retirementAge ?? null;
           annualIncome = inputs.income?.annualIncome ?? null;
+          gender = (inputs.personal?.gender ?? null) as 'M' | 'F' | '' | null;
+          phoneNumber = inputs.personal?.phoneNumber ?? null;
           const r = calculate(inputs);
           onTrack = r.onTrack;
           fireNumber = r.fireNumber;
@@ -395,7 +401,7 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
 
       return {
         profile: p, advisor: advisorByUserId[p.advisorUserId],
-        age, retirementAge, annualIncome,
+        age, retirementAge, annualIncome, gender, phoneNumber,
         onTrack, fireGap, fireSurplus, moneyRunsOutAge, fireNumber, wealthAtRetirement, ins,
       };
     });
@@ -584,6 +590,9 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                         {/* Client name — same in both views */}
                         <td style={{ padding: '11px 14px' }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{row.profile.name}</div>
+                          {row.phoneNumber && (
+                            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>{row.phoneNumber}</div>
+                          )}
                         </td>
                         <td style={{ padding: '11px 14px' }}>
                           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
@@ -593,7 +602,12 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                         <td style={{ padding: '11px 14px', textAlign: 'center' }}>
                           {row.age !== null ? (
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{row.age}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
+                                {row.age}
+                                {row.gender ? (
+                                  <span style={{ fontSize: 10, color: 'var(--text-5)', marginLeft: 4 }}>({row.gender})</span>
+                                ) : null}
+                              </div>
                               {row.retirementAge && (
                                 <div style={{ fontSize: 10, color: 'var(--text-5)' }}>ret. {row.retirementAge}</div>
                               )}

@@ -3,6 +3,8 @@ export interface PersonalDetails {
   retirementAge: number;
   lifeExpectancy: number;
   dateOfBirth?: string | null; // YYYY-MM-DD — used to auto-calculate live age on dashboard
+  phoneNumber?: string;        // contact number (not used in calculations)
+  gender?: 'M' | 'F' | '';    // affects CI/life premium benchmarks and life expectancy framing
 }
 
 export interface ExpenseLineItem {
