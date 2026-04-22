@@ -3,6 +3,7 @@ import { useTeam } from '../contexts/TeamContext';
 import {
   AdvisorSummary, getAdvisorSummaries, getAdvisorProfiles,
   inviteAdvisor, removeMember, transferClient, getAllTeamProfiles, TeamProfile,
+  dissolveOrganization,
 } from '../services/teamService';
 import { listTasks, createTask, Task } from '../services/taskService';
 import { calculate } from '../calculations';
@@ -760,6 +761,22 @@ export default function ManagerDashboard() {
     load();
   };
 
+  const [dissolving, setDissolving] = useState(false);
+  const handleDissolve = async () => {
+    const confirmed = window.confirm(
+      `Delete the entire team "${teamStatus?.orgName}"?\n\nAll members will be removed. Their client profiles will NOT be deleted — they'll become solo profiles. This cannot be undone.`
+    );
+    if (!confirmed) return;
+    setDissolving(true);
+    try {
+      await dissolveOrganization();
+      window.location.href = '/';
+    } catch (e: any) {
+      alert(`Failed to delete team: ${e.message}`);
+      setDissolving(false);
+    }
+  };
+
   const activeAdvisors = advisors.filter(a => a.role === 'advisor' && a.status === 'active');
   const pendingAdvisors = advisors.filter(a => a.status === 'pending');
   const totalClients = activeAdvisors.reduce((s, a) => s + a.clientCount, 0);
@@ -906,6 +923,37 @@ export default function ManagerDashboard() {
                 ))}
               </>
             )}
+            {/* Danger zone */}
+            <div style={{
+              marginTop: 40, borderTop: '1px solid rgba(239,68,68,0.2)',
+              paddingTop: 24,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                Danger zone
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)',
+                borderRadius: 12, padding: '16px 20px',
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>Delete this team</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-4)' }}>Removes all members. Client profiles are kept as solo profiles.</div>
+                </div>
+                <button
+                  onClick={handleDissolve}
+                  disabled={dissolving}
+                  style={{
+                    padding: '8px 18px', borderRadius: 9, border: '1px solid rgba(239,68,68,0.4)',
+                    background: 'transparent', color: '#f87171',
+                    fontSize: 13, fontWeight: 700, cursor: dissolving ? 'not-allowed' : 'pointer',
+                    opacity: dissolving ? 0.5 : 1, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {dissolving ? 'Deleting…' : 'Delete team'}
+                </button>
+              </div>
+            </div>
           </>
         )}
 

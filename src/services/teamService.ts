@@ -168,6 +168,12 @@ export async function leaveTeam(): Promise<void> {
   if (error) throw error;
 }
 
+/** Dissolve the entire organization (manager only). Detaches all client profiles, then deletes the org. */
+export async function dissolveOrganization(): Promise<void> {
+  const { error } = await supabase.rpc('dissolve_organization');
+  if (error) throw error;
+}
+
 /** Transfer a client profile from one advisor to another (manager only). */
 export async function transferClient(profileId: string, toUserId: string): Promise<void> {
   const { error } = await supabase.rpc('transfer_client', {
