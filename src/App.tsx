@@ -22,6 +22,7 @@ import ExportReport from './components/ExportReport';
 import ScenarioPanel from './components/ScenarioPanel';
 import NavBar from './components/NavBar';
 import AdvisorDashboard from './components/AdvisorDashboard';
+import ManagerDashboardPage from './components/ManagerDashboardPage';
 import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
 import SettingsPage from './components/SettingsPage';
@@ -654,6 +655,14 @@ function ProRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function DashboardRoute() {
+  const { isManager, loaded } = useTeam();
+  const { isPro, loaded: subLoaded } = useSubscription();
+  if (!loaded || !subLoaded) return null;
+  if (isManager) return <ManagerDashboardPage />;
+  return <ProRoute><AdvisorDashboard /></ProRoute>;
+}
+
 function AppShell() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
@@ -694,7 +703,7 @@ function AppShell() {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<ProRoute><AdvisorDashboard /></ProRoute>} />
+          <Route path="/dashboard" element={<DashboardRoute />} />
           <Route path="/team" element={<ManagerDashboard />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/plans" element={<PlansPage />} />

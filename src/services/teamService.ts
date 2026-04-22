@@ -189,10 +189,17 @@ export interface TeamProfile {
   id: string;
   name: string;
   updatedAt: string;
+  createdAt: string;
   advisorUserId: string;
   advisorEmail: string;
   meta: any;
   inputs: any;
+}
+
+export interface AdvisorTarget {
+  advisorUserId: string;
+  month: string; // 'YYYY-MM'
+  targetNewClients: number;
 }
 
 /** Get all non-deleted client profiles across the whole team (manager only). */
@@ -201,7 +208,7 @@ export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
     supabase.from('team_memberships').select('user_id, email').eq('status', 'active'),
     supabase
       .from('client_profiles')
-      .select('id, name, updated_at, user_id, meta, inputs')
+      .select('id, name, updated_at, created_at, user_id, meta, inputs')
       .is('deleted_at', null)
       .order('updated_at', { ascending: false }),
   ]);
@@ -215,9 +222,46 @@ export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
     id: p.id,
     name: p.name,
     updatedAt: p.updated_at,
+    createdAt: p.created_at,
     advisorUserId: p.user_id,
     advisorEmail: emailByUserId[p.user_id] ?? p.user_id,
     meta: p.meta,
     inputs: p.inputs,
   }));
+}
+
+/** Get all monthly targets for the current org (manager only). */
+export async function getAdvisorTargets(month: string): Promise<AdvisorTarget[]> {
+  const { data, error } = await supabase
+    .from('advisor_targets')
+    .select('advisor_user_id, month, target_new_clients')
+    .eq('month', month);
+
+  if (error || !data) return [];
+  return data.map(row => ({
+    advisorUserId: row.advisor_user_id,
+    month: row.month,
+    targetNewClients: row.target_new_clients,
+  }));
+}
+
+/** Set (upsert) a monthly new-client target for an advisor (manager only). */
+export async function setAdvisorTarget(advisorUserId: string, month: string, targetNewClients: number): Promise<void> {
+  const { data: mem } = await supabase
+    .from('team_memberships')
+    .select('org_id')
+    .eq('status', 'active')
+    .limit(1);
+
+  const orgId = mem?.[0]?.org_id;
+  if (!orgId) throw new Error('No active team');
+
+  const { error } = await supabase
+    .from('advisor_targets')
+    .upsert(
+      { org_id: orgId, advisor_user_id: advisorUserId, month, target_new_clients: targetNewClients, updated_at: new Date().toISOString() },
+      { onConflict: 'org_id,advisor_user_id,month' }
+    );
+
+  if (error) throw error;
 }

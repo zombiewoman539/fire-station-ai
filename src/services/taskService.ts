@@ -10,6 +10,7 @@ export interface Task {
   notes: string;
   dueDate: string | null;   // ISO date string "YYYY-MM-DD"
   status: 'todo' | 'done';
+  priority: 'normal' | 'urgent';
   createdAt: string;
   completedAt: string | null;
 }
@@ -25,6 +26,7 @@ function rowToTask(row: any): Task {
     notes: row.notes ?? '',
     dueDate: row.due_date ?? null,
     status: row.status as 'todo' | 'done',
+    priority: (row.priority ?? 'normal') as 'normal' | 'urgent',
     createdAt: row.created_at,
     completedAt: row.completed_at ?? null,
   };
@@ -62,6 +64,7 @@ export async function createTask(params: {
   dueDate?: string;
   notes?: string;
   assignedTo?: string; // if omitted, defaults to current user
+  priority?: 'normal' | 'urgent';
 }): Promise<Task> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -77,6 +80,7 @@ export async function createTask(params: {
       notes: params.notes ?? '',
       due_date: params.dueDate ?? null,
       status: 'todo',
+      priority: params.priority ?? 'normal',
     })
     .select()
     .single();
@@ -87,7 +91,7 @@ export async function createTask(params: {
 
 export async function updateTask(
   id: string,
-  updates: Partial<Pick<Task, 'title' | 'notes' | 'dueDate' | 'status' | 'completedAt' | 'assignedTo'>>,
+  updates: Partial<Pick<Task, 'title' | 'notes' | 'dueDate' | 'status' | 'completedAt' | 'assignedTo' | 'priority'>>,
 ): Promise<void> {
   const dbUpdates: Record<string, any> = {};
 
@@ -97,6 +101,7 @@ export async function updateTask(
   if (updates.status !== undefined)      dbUpdates.status = updates.status;
   if (updates.completedAt !== undefined) dbUpdates.completed_at = updates.completedAt;
   if (updates.assignedTo !== undefined)  dbUpdates.assigned_to = updates.assignedTo;
+  if (updates.priority !== undefined)    dbUpdates.priority = updates.priority;
 
   const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
   if (error) throw error;

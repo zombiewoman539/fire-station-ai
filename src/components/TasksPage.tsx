@@ -269,6 +269,16 @@ function TaskCard({ task, onComplete, onReopen, onDelete }: TaskCardProps) {
         {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {task.priority === 'urgent' && !done && (
+              <span style={{
+                fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 5,
+                background: 'rgba(248,113,113,0.15)', color: '#f87171',
+                border: '1px solid rgba(248,113,113,0.3)', letterSpacing: '0.05em',
+                flexShrink: 0,
+              }}>
+                URGENT
+              </span>
+            )}
             <span style={{
               fontSize: 14, fontWeight: 600,
               color: done ? 'var(--text-3)' : 'var(--text-1)',
@@ -465,7 +475,9 @@ export default function TasksPage() {
   const todo = tasks
     .filter(t => t.status === 'todo')
     .sort((a, b) => {
-      // Overdue first, then by due date, then undated
+      // Urgent first, then overdue, then by due date, then undated
+      if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
+      if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
       if (!a.dueDate && !b.dueDate) return 0;
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;

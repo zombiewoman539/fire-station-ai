@@ -63,6 +63,7 @@ function AssignTaskModal({ advisor, preselectedClientId, preselectedClientName, 
   const [clientId, setClientId] = useState(preselectedClientId ?? '');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -86,6 +87,7 @@ function AssignTaskModal({ advisor, preselectedClientId, preselectedClientName, 
         clientName: client?.name ?? preselectedClientName ?? undefined,
         dueDate: dueDate || undefined,
         notes: notes.trim() || undefined,
+        priority,
       });
       onCreated();
     } catch (err: any) {
@@ -124,6 +126,22 @@ function AssignTaskModal({ advisor, preselectedClientId, preselectedClientName, 
               <option value="">— No client —</option>
               {clientProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Priority</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['normal', 'urgent'] as const).map(p => (
+                <button key={p} type="button" onClick={() => setPriority(p)} style={{
+                  flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', border: '1px solid',
+                  background: priority === p ? (p === 'urgent' ? 'rgba(248,113,113,0.15)' : 'rgba(52,211,153,0.12)') : 'transparent',
+                  color: priority === p ? (p === 'urgent' ? '#f87171' : '#34d399') : 'var(--text-4)',
+                  borderColor: priority === p ? (p === 'urgent' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.3)') : 'var(--border)',
+                }}>
+                  {p === 'urgent' ? '🔴 Urgent' : '⚪ Normal'}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label style={labelStyle}>Due date <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
