@@ -51,14 +51,16 @@ const primaryBtn: React.CSSProperties = {
 
 interface AssignTaskModalProps {
   advisor: AdvisorSummary;
+  preselectedClientId?: string;
+  preselectedClientName?: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
-function AssignTaskModal({ advisor, onClose, onCreated }: AssignTaskModalProps) {
+function AssignTaskModal({ advisor, preselectedClientId, preselectedClientName, onClose, onCreated }: AssignTaskModalProps) {
   const [title, setTitle] = useState('');
   const [clientProfiles, setClientProfiles] = useState<any[]>([]);
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(preselectedClientId ?? '');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -81,7 +83,7 @@ function AssignTaskModal({ advisor, onClose, onCreated }: AssignTaskModalProps) 
         title: title.trim(),
         assignedTo: advisor.userId,
         clientProfileId: clientId || undefined,
-        clientName: client?.name ?? undefined,
+        clientName: client?.name ?? preselectedClientName ?? undefined,
         dueDate: dueDate || undefined,
         notes: notes.trim() || undefined,
       });
@@ -344,6 +346,13 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'on-track' | 'shortfall'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'advisor' | 'updated'>('updated');
+  const [assignTarget, setAssignTarget] = useState<{ advisor: AdvisorSummary; clientId: string; clientName: string } | null>(null);
+
+  const advisorByUserId = useMemo(() => {
+    const m: Record<string, AdvisorSummary> = {};
+    for (const a of advisors) { if (a.userId) m[a.userId] = a; }
+    return m;
+  }, [advisors]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -379,6 +388,16 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
 
   return (
     <div>
+      {assignTarget && (
+        <AssignTaskModal
+          advisor={assignTarget.advisor}
+          preselectedClientId={assignTarget.clientId}
+          preselectedClientName={assignTarget.clientName}
+          onClose={() => setAssignTarget(null)}
+          onCreated={() => setAssignTarget(null)}
+        />
+      )}
+
       {/* Stats strip */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
         {[
@@ -427,10 +446,10 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
 
       {/* Table header */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px',
+        display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px 90px',
         gap: 12, padding: '6px 16px', marginBottom: 4,
       }}>
-        {['Client', 'Advisor', 'Status', 'Last updated'].map(h => (
+        {['Client', 'Advisor', 'Status', 'Last updated', ''].map(h => (
           <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
         ))}
       </div>
@@ -440,30 +459,45 @@ function AllClientsTab({ advisors }: { advisors: AdvisorSummary[] }) {
       ) : filtered.length === 0 ? (
         <div style={{ color: 'var(--text-4)', fontSize: 13, padding: 16 }}>No clients match this filter.</div>
       ) : (
-        filtered.map(row => (
-          <div key={row.id} style={{
-            display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px',
-            alignItems: 'center', gap: 12,
-            padding: '12px 16px', background: 'var(--surface)',
-            border: '1px solid var(--border)', borderRadius: 10, marginBottom: 6,
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{row.name}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {row.advisorEmail}
+        filtered.map(row => {
+          const advisor = advisorByUserId[row.advisorUserId];
+          return (
+            <div key={row.id} style={{
+              display: 'grid', gridTemplateColumns: '2fr 2fr 100px 100px 90px',
+              alignItems: 'center', gap: 12,
+              padding: '12px 16px', background: 'var(--surface)',
+              border: '1px solid var(--border)', borderRadius: 10, marginBottom: 6,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{row.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.advisorEmail}
+              </div>
+              <div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700,
+                  padding: '3px 9px', borderRadius: 6,
+                  background: row.onTrack ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
+                  color: row.onTrack ? '#34d399' : '#f87171',
+                }}>
+                  {row.onTrack ? 'On track' : 'Shortfall'}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-4)' }}>{daysSince(row.updatedAt)}</div>
+              {advisor ? (
+                <button
+                  onClick={() => setAssignTarget({ advisor, clientId: row.id, clientName: row.name })}
+                  style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 6, fontWeight: 600,
+                    border: '1px solid rgba(96,165,250,0.3)',
+                    background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer',
+                  }}
+                >
+                  + Task
+                </button>
+              ) : <div />}
             </div>
-            <div>
-              <span style={{
-                fontSize: 11, fontWeight: 700,
-                padding: '3px 9px', borderRadius: 6,
-                background: row.onTrack ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
-                color: row.onTrack ? '#34d399' : '#f87171',
-              }}>
-                {row.onTrack ? 'On track' : 'Shortfall'}
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-4)' }}>{daysSince(row.updatedAt)}</div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
