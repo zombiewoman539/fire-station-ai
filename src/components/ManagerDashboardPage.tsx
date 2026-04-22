@@ -2,9 +2,11 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTeam } from '../contexts/TeamContext';
 import {
   getAdvisorSummaries, getAllTeamProfiles, getAdvisorTargets, setAdvisorTarget,
+  getAdvisorProfiles,
   AdvisorSummary, TeamProfile, AdvisorTarget,
 } from '../services/teamService';
 import { listTasks, createTask, Task } from '../services/taskService';
+import { calculate, formatSGD } from '../calculations';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -169,19 +171,202 @@ function FollowUpBtn({ profile, advisor }: { profile: TeamProfile; advisor: Advi
   );
 }
 
+// ─── Assign task modal (dashboard version) ───────────────────────────────────
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6,
+};
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', borderRadius: 8,
+  border: '1px solid var(--border)', background: 'var(--bg)',
+  color: 'var(--text-1)', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const,
+};
+const ghostBtn: React.CSSProperties = {
+  padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
+  background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+};
+const primaryBtn: React.CSSProperties = {
+  padding: '8px 18px', borderRadius: 8, border: 'none',
+  background: '#10b981', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+};
+
+function DashboardAssignModal({
+  advisor,
+  preselectedClientId,
+  preselectedClientName,
+  onClose,
+  onCreated,
+}: {
+  advisor: AdvisorSummary;
+  preselectedClientId: string;
+  preselectedClientName: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [clientProfiles, setClientProfiles] = useState<any[]>([]);
+  const [clientId, setClientId] = useState(preselectedClientId);
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (advisor.userId) getAdvisorProfiles(advisor.userId).then(setClientProfiles);
+  }, [advisor.userId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !advisor.userId) return;
+    setSaving(true);
+    setError('');
+    try {
+      const client = clientProfiles.find(p => p.id === clientId);
+      await createTask({
+        title: title.trim(),
+        assignedTo: advisor.userId,
+        clientProfileId: clientId || undefined,
+        clientName: client?.name ?? preselectedClientName ?? undefined,
+        dueDate: dueDate || undefined,
+        notes: notes.trim() || undefined,
+        priority,
+      });
+      onCreated();
+    } catch (err: any) {
+      setError(err.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000,
+        background: 'rgba(0,0,0,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+    >
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 16, padding: '28px 32px', width: '100%', maxWidth: 440,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+      }}>
+        <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>Assign task</h2>
+        <p style={{ margin: '0 0 22px', fontSize: 13, color: 'var(--text-3)' }}>To: {advisor.email}</p>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={labelStyle}>Task</label>
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Review coverage gap" required style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Client</label>
+            <select value={clientId} onChange={e => setClientId(e.target.value)} style={inputStyle}>
+              <option value="">— No client —</option>
+              {clientProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Priority</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['normal', 'urgent'] as const).map(p => (
+                <button key={p} type="button" onClick={() => setPriority(p)} style={{
+                  flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', border: '1px solid',
+                  background: priority === p ? (p === 'urgent' ? 'rgba(248,113,113,0.15)' : 'rgba(52,211,153,0.12)') : 'transparent',
+                  color: priority === p ? (p === 'urgent' ? '#f87171' : '#34d399') : 'var(--text-4)',
+                  borderColor: priority === p ? (p === 'urgent' ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.3)') : 'var(--border)',
+                }}>
+                  {p === 'urgent' ? '🔴 Urgent' : '⚪ Normal'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Due date <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
+            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Notes <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Context for the advisor…" rows={3}
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+          </div>
+          {error && <div style={{ color: '#f87171', fontSize: 13 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+            <button type="button" onClick={onClose} style={ghostBtn}>Cancel</button>
+            <button type="submit" disabled={saving || !title.trim()} style={primaryBtn}>
+              {saving ? 'Assigning…' : 'Assign task'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── All Clients table ────────────────────────────────────────────────────────
+
+interface ClientRow {
+  profile: TeamProfile;
+  advisor: AdvisorSummary | undefined;
+  onTrack: boolean | null;
+  gap: number | null;
+  moneyRunsOutAge: number | undefined;
+  fireNumber: number | null;
+  wealthAtRetirement: number | null;
+}
 
 function AllClientsTable({
   profiles,
   advisors,
+  onTaskCreated,
 }: {
   profiles: TeamProfile[];
   advisors: AdvisorSummary[];
+  onTaskCreated: () => void;
 }) {
   const [search, setSearch] = useState('');
   const [advisorFilter, setAdvisorFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'gap' | 'ontrack'>('all');
   const [showAll, setShowAll] = useState(false);
-  const PAGE = 20;
+  const [assignRow, setAssignRow] = useState<ClientRow | null>(null);
+  const PAGE = 25;
+
+  const advisorByUserId = useMemo(() => {
+    const map: Record<string, AdvisorSummary> = {};
+    for (const a of advisors) { if (a.userId) map[a.userId] = a; }
+    return map;
+  }, [advisors]);
+
+  const rows: ClientRow[] = useMemo(() => {
+    return profiles.map(p => {
+      let onTrack: boolean | null = null;
+      let gap: number | null = null;
+      let moneyRunsOutAge: number | undefined;
+      let fireNumber: number | null = null;
+      let wealthAtRetirement: number | null = null;
+      try {
+        if (p.inputs) {
+          const r = calculate(p.inputs);
+          onTrack = r.onTrack;
+          fireNumber = r.fireNumber;
+          wealthAtRetirement = r.wealthAtRetirement;
+          gap = onTrack ? null : r.fireNumber - r.wealthAtRetirement;
+          moneyRunsOutAge = r.moneyRunsOutAge;
+        }
+      } catch { /* inputs incomplete */ }
+      return { profile: p, advisor: advisorByUserId[p.advisorUserId], onTrack, gap, moneyRunsOutAge, fireNumber, wealthAtRetirement };
+    }).sort((a, b) => {
+      // Off-track first, sorted by gap size descending
+      if (a.onTrack === false && b.onTrack !== false) return -1;
+      if (a.onTrack !== false && b.onTrack === false) return 1;
+      if (a.gap !== null && b.gap !== null) return b.gap - a.gap;
+      return 0;
+    });
+  }, [profiles, advisorByUserId]);
 
   const advisorOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -197,14 +382,19 @@ function AllClientsTable({
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return profiles.filter(p => {
-      if (advisorFilter && p.advisorUserId !== advisorFilter) return false;
-      if (q && !p.name.toLowerCase().includes(q) && !p.advisorEmail.toLowerCase().includes(q)) return false;
+    return rows.filter(r => {
+      if (advisorFilter && r.profile.advisorUserId !== advisorFilter) return false;
+      if (statusFilter === 'gap' && r.onTrack !== false) return false;
+      if (statusFilter === 'ontrack' && r.onTrack !== true) return false;
+      if (q && !r.profile.name.toLowerCase().includes(q) && !r.profile.advisorEmail.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [profiles, search, advisorFilter]);
+  }, [rows, search, advisorFilter, statusFilter]);
 
   const visible = showAll ? filtered : filtered.slice(0, PAGE);
+
+  const gapCount = rows.filter(r => r.onTrack === false).length;
+  const onTrackCount = rows.filter(r => r.onTrack === true).length;
 
   const colHd: React.CSSProperties = {
     fontSize: 10, fontWeight: 700, color: 'var(--text-5)',
@@ -215,19 +405,58 @@ function AllClientsTable({
 
   return (
     <div style={{ marginBottom: 36 }}>
+      {assignRow && assignRow.advisor && (
+        <DashboardAssignModal
+          advisor={assignRow.advisor}
+          preselectedClientId={assignRow.profile.id}
+          preselectedClientName={assignRow.profile.name}
+          onClose={() => setAssignRow(null)}
+          onCreated={() => { setAssignRow(null); onTaskCreated(); }}
+        />
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)' }}>All Clients</span>
         <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{profiles.length} total</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        {gapCount > 0 && (
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 9px', borderRadius: 20 }}>
+            {gapCount} with gap
+          </span>
+        )}
+
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Status filter pills */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {([
+              { key: 'all', label: 'All' },
+              { key: 'gap', label: `Gap (${gapCount})` },
+              { key: 'ontrack', label: `On track (${onTrackCount})` },
+            ] as const).map(f => (
+              <button key={f.key} onClick={() => { setStatusFilter(f.key); setShowAll(false); }} style={{
+                fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                fontWeight: 700, border: '1px solid',
+                background: statusFilter === f.key
+                  ? (f.key === 'gap' ? 'rgba(248,113,113,0.15)' : f.key === 'ontrack' ? 'rgba(52,211,153,0.12)' : 'rgba(96,165,250,0.12)')
+                  : 'transparent',
+                color: statusFilter === f.key
+                  ? (f.key === 'gap' ? '#f87171' : f.key === 'ontrack' ? '#34d399' : '#60a5fa')
+                  : 'var(--text-5)',
+                borderColor: statusFilter === f.key
+                  ? (f.key === 'gap' ? 'rgba(248,113,113,0.4)' : f.key === 'ontrack' ? 'rgba(52,211,153,0.3)' : 'rgba(96,165,250,0.3)')
+                  : 'var(--border)',
+              }}>{f.label}</button>
+            ))}
+          </div>
+
           <input
             type="text"
-            placeholder="Search client or advisor…"
+            placeholder="Search…"
             value={search}
             onChange={e => { setSearch(e.target.value); setShowAll(false); }}
             style={{
               fontSize: 12, padding: '6px 12px', borderRadius: 8,
               border: '1px solid var(--border)', background: 'var(--surface)',
-              color: 'var(--text-1)', outline: 'none', width: 210,
+              color: 'var(--text-1)', outline: 'none', width: 160,
             }}
           />
           <select
@@ -257,27 +486,77 @@ function AllClientsTable({
                 <tr>
                   <th style={colHd}>Client</th>
                   <th style={colHd}>Advisor</th>
-                  <th style={{ ...colHd, textAlign: 'right' }}>Last updated</th>
+                  <th style={{ ...colHd, textAlign: 'center' }}>FIRE Status</th>
+                  <th style={{ ...colHd, textAlign: 'right' }}>Gap / Surplus</th>
+                  <th style={{ ...colHd, textAlign: 'center' }}>Last updated</th>
+                  <th style={{ ...colHd, textAlign: 'right' }}></th>
                 </tr>
               </thead>
               <tbody>
-                {visible.map((profile, i) => {
-                  const d = daysSince(profile.updatedAt);
-                  const color = activityColor(profile.updatedAt);
+                {visible.map((row, i) => {
+                  const d = daysSince(row.profile.updatedAt);
+                  const updColor = activityColor(row.profile.updatedAt);
+                  const surplus = row.onTrack === true && row.fireNumber !== null && row.wealthAtRetirement !== null
+                    ? row.wealthAtRetirement - row.fireNumber
+                    : null;
                   return (
-                    <tr key={profile.id} style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                    <tr key={row.profile.id} style={{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
                       <td style={{ padding: '11px 14px' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{profile.name}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{row.profile.name}</span>
                       </td>
                       <td style={{ padding: '11px 14px' }}>
                         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                          {profile.advisorEmail.split('@')[0]}
+                          {row.profile.advisorEmail.split('@')[0]}
+                        </span>
+                      </td>
+                      <td style={{ padding: '11px 14px', textAlign: 'center' }}>
+                        {row.onTrack === null ? (
+                          <span style={{ fontSize: 11, color: 'var(--text-5)' }}>—</span>
+                        ) : row.onTrack ? (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, color: '#34d399',
+                            background: 'rgba(52,211,153,0.1)', padding: '2px 9px', borderRadius: 20,
+                          }}>On track</span>
+                        ) : (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, color: '#f87171',
+                            background: 'rgba(248,113,113,0.1)', padding: '2px 9px', borderRadius: 20,
+                          }}>
+                            Gap{row.moneyRunsOutAge ? ` · runs out at ${row.moneyRunsOutAge}` : ''}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                        {row.gap !== null ? (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#f87171' }}>
+                            -{formatSGD(row.gap)}
+                          </span>
+                        ) : surplus !== null ? (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>
+                            +{formatSGD(surplus)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: 'var(--text-5)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '11px 14px', textAlign: 'center' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: updColor }}>
+                          {d !== null ? (d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d}d ago`) : '—'}
                         </span>
                       </td>
                       <td style={{ padding: '11px 14px', textAlign: 'right' }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color }}>
-                          {d !== null ? (d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d}d ago`) : '—'}
-                        </span>
+                        {row.advisor && (
+                          <button
+                            onClick={() => setAssignRow(row)}
+                            style={{
+                              fontSize: 11, padding: '4px 11px', borderRadius: 6, fontWeight: 700,
+                              cursor: 'pointer', border: '1px solid rgba(96,165,250,0.3)',
+                              background: 'rgba(96,165,250,0.08)', color: '#60a5fa',
+                            }}
+                          >
+                            + Task
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -443,7 +722,7 @@ export default function ManagerDashboardPage() {
         </div>
 
         {/* All Clients */}
-        <AllClientsTable profiles={teamProfiles} advisors={advisors} />
+        <AllClientsTable profiles={teamProfiles} advisors={advisors} onTaskCreated={load} />
 
         {/* Leaderboard */}
         <div style={{ marginBottom: 36 }}>
