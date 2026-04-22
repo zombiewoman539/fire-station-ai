@@ -54,4 +54,13 @@ export const defaultInputs: FireInputs = {
     lpa: false,
     will: false,
   },
+  hospitalPlan: {
+    hasMediShieldLife: true,
+    hasISP: false,
+    ispInsurer: '',
+    ispWardClass: '',
+    hasRider: false,
+    annualPremiumMedisave: 0,
+    annualPremiumCash: 0,
+  },
 };

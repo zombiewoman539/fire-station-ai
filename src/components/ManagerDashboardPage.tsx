@@ -53,6 +53,11 @@ interface InsuranceSummary {
   eciGap: number;
   annualPremium: number;
   signalScore: number; // 0–100: composite buying-opportunity score
+  // Hospital plan
+  hasMSL: boolean | null;        // null = not filled in yet
+  hasISP: boolean | null;
+  hasRider: boolean | null;
+  ispWardClass: string;
 }
 
 function computeInsurance(inputs: FireInputs, daysSinceUpdate: number): InsuranceSummary {
@@ -76,14 +81,22 @@ function computeInsurance(inputs: FireInputs, daysSinceUpdate: number): Insuranc
   const ciGap    = Math.max(0, recCI    - totalCI);
   const eciGap   = Math.max(0, recECI   - totalECI);
 
-  // Signal score: bigger gaps = higher score, review overdue adds points
-  const deathScore  = recDeath > 0 ? Math.min(35, (deathGap / recDeath) * 35) : 0;
-  const ciScore     = recCI    > 0 ? Math.min(30, (ciGap    / recCI)    * 30) : 0;
-  const eciScore    = recECI   > 0 ? Math.min(15, (eciGap   / recECI)   * 15) : 0;
-  const reviewScore = daysSinceUpdate > 180 ? 10 : daysSinceUpdate > 90 ? 5 : 0;
-  const signalScore = Math.round(deathScore + ciScore + eciScore + reviewScore);
+  // Hospital plan
+  const hp = inputs.hospitalPlan;
+  const hasMSL     = hp ? hp.hasMediShieldLife : null;
+  const hasISP     = hp ? hp.hasISP : null;
+  const hasRider   = hp ? hp.hasRider : null;
+  const ispWardClass = hp?.ispWardClass ?? '';
 
-  return { totalDeath, totalTPD, totalCI, totalECI, deathGap, tpdGap, ciGap, eciGap, annualPremium, signalScore };
+  // Signal score: bigger gaps = higher score, no ISP adds points, review overdue adds points
+  const deathScore  = recDeath > 0 ? Math.min(30, (deathGap / recDeath) * 30) : 0;
+  const ciScore     = recCI    > 0 ? Math.min(25, (ciGap    / recCI)    * 25) : 0;
+  const eciScore    = recECI   > 0 ? Math.min(15, (eciGap   / recECI)   * 15) : 0;
+  const ispScore    = hasISP === false ? 20 : hasISP === true && hasRider === false ? 10 : 0;
+  const reviewScore = daysSinceUpdate > 180 ? 10 : daysSinceUpdate > 90 ? 5 : 0;
+  const signalScore = Math.round(deathScore + ciScore + eciScore + ispScore + reviewScore);
+
+  return { totalDeath, totalTPD, totalCI, totalECI, deathGap, tpdGap, ciGap, eciGap, annualPremium, signalScore, hasMSL, hasISP, hasRider, ispWardClass };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -576,6 +589,7 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                       <th style={{ ...colHd('deathGap', 'center') }} onClick={() => handleSort('deathGap')}>Death Gap <SortArrow k="deathGap" /></th>
                       <th style={{ ...colHd('ciGap', 'center') }} onClick={() => handleSort('ciGap')}>CI Gap <SortArrow k="ciGap" /></th>
                       <th style={{ ...colHd('eciGap', 'center') }} onClick={() => handleSort('eciGap')}>ECI Gap <SortArrow k="eciGap" /></th>
+                      <th style={{ ...colHd('name', 'center') }}>Hospital Plan</th>
                       <th style={{ ...colHd('signal', 'center') }} onClick={() => handleSort('signal')}>Signal <SortArrow k="signal" /></th>
                       <th style={{ ...colHd('name'), textAlign: 'right' }}></th>
                     </tr>
@@ -672,6 +686,23 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                                   rec={(row.annualIncome ?? 0) * BENCH.eci}
                                   label={`rec. ${formatSGD((row.annualIncome ?? 0) * BENCH.eci)}`} />
                               ) : <span style={{ color: 'var(--text-5)', fontSize: 12 }}>—</span>}
+                            </td>
+                            <td style={{ padding: '11px 14px', textAlign: 'center' }}>
+                              {row.ins?.hasISP === null ? (
+                                <span style={{ fontSize: 11, color: 'var(--text-5)' }}>—</span>
+                              ) : row.ins?.hasISP === false ? (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 8px', borderRadius: 20 }}>No ISP</span>
+                              ) : row.ins?.hasRider === false ? (
+                                <div>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '2px 8px', borderRadius: 20 }}>No rider</span>
+                                  {row.ins.ispWardClass && <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>Class {row.ins.ispWardClass}</div>}
+                                </div>
+                              ) : (
+                                <div>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 20 }}>ISP + Rider</span>
+                                  {row.ins?.ispWardClass && <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>Class {row.ins.ispWardClass}</div>}
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: '11px 14px', textAlign: 'center' }}>
                               {row.ins ? <SignalBadge score={row.ins.signalScore} /> : <span style={{ color: 'var(--text-5)', fontSize: 12 }}>—</span>}
@@ -782,6 +813,8 @@ export default function ManagerDashboardPage() {
     let totalCIGap = 0;
     let highSignal = 0;
     let needsReview = 0;
+    let noISP = 0;
+    let noRider = 0;
 
     for (const p of teamProfiles) {
       const ds = daysSince(p.updatedAt) ?? 0;
@@ -795,10 +828,12 @@ export default function ManagerDashboardPage() {
           totalDeathGap += ins.deathGap;
           totalCIGap    += ins.ciGap;
           if (ins.signalScore >= 60) highSignal++;
+          if (ins.hasISP === false) noISP++;
+          if (ins.hasISP === true && ins.hasRider === false) noRider++;
         }
       } catch { /* skip */ }
     }
-    return { noDeathCover, noCICover, noECICover, totalDeathGap, totalCIGap, highSignal, needsReview };
+    return { noDeathCover, noCICover, noECICover, totalDeathGap, totalCIGap, highSignal, needsReview, noISP, noRider };
   }, [teamProfiles, reviewThreshold]);
 
   const summary = useMemo(() => ({
@@ -863,42 +898,21 @@ export default function ManagerDashboardPage() {
         </div>
 
         {/* Insurance intelligence cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 32 }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 14, padding: '14px 20px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              Insurance Intel
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10, marginBottom: 32 }}>
+          {[
+            { label: 'No death cover',       value: intelSummary.noDeathCover,           color: '#f87171', border: 'rgba(248,113,113,0.2)' },
+            { label: 'No CI cover',          value: intelSummary.noCICover,              color: '#fbbf24', border: 'rgba(251,191,36,0.2)' },
+            { label: 'No ECI cover',         value: intelSummary.noECICover,             color: '#a78bfa', border: 'rgba(167,139,250,0.2)' },
+            { label: 'No ISP',               value: intelSummary.noISP,                  color: '#f87171', border: 'rgba(248,113,113,0.2)' },
+            { label: 'ISP — no rider',       value: intelSummary.noRider,                color: '#fbbf24', border: 'rgba(251,191,36,0.2)' },
+            { label: 'Total death gap',      value: formatSGD(intelSummary.totalDeathGap), color: '#f87171', border: 'rgba(248,113,113,0.2)' },
+            { label: 'High signal (≥60)',    value: intelSummary.highSignal,              color: '#fbbf24', border: 'rgba(251,191,36,0.2)' },
+          ].map(c => (
+            <div key={c.label} style={{ background: 'var(--surface)', border: `1px solid ${c.border}`, borderRadius: 14, padding: '12px 14px' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: c.color, marginBottom: 2 }}>{c.value}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-4)', lineHeight: 1.3 }}>{c.label}</div>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#f87171' }}>{intelSummary.noDeathCover}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)' }}>No death cover</div>
-          </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 14, padding: '14px 20px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              CI Cover
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#fbbf24' }}>{intelSummary.noCICover}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)' }}>No CI cover</div>
-          </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 14, padding: '14px 20px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              ECI Cover
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#a78bfa' }}>{intelSummary.noECICover}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)' }}>No ECI cover</div>
-          </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 14, padding: '14px 20px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              Total Death Gap
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#f87171' }}>{formatSGD(intelSummary.totalDeathGap)}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)' }}>Unprotected across book</div>
-          </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 14, padding: '14px 20px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              High Signal
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#fbbf24' }}>{intelSummary.highSignal}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)' }}>Clients score ≥60</div>
-          </div>
+          ))}
         </div>
 
         {/* All Clients */}

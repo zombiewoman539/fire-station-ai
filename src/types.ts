@@ -73,6 +73,16 @@ export interface InsurancePolicy {
   fundAllocations: FundAllocation[]; // ILP sub-fund breakdown (empty for non-ILP)
 }
 
+export interface HospitalPlan {
+  hasMediShieldLife: boolean;          // mandatory for SC/PR — always default true
+  hasISP: boolean;                     // Integrated Shield Plan (private upgrade)
+  ispInsurer: string;                  // AIA | NTUC Income | HSBC Life | Great Eastern | Prudential | Raffles
+  ispWardClass: 'B1' | 'A' | 'Private' | '';
+  hasRider: boolean;                   // rider = zero co-payment — the key upsell
+  annualPremiumMedisave: number;       // ISP base portion deducted from MA
+  annualPremiumCash: number;           // rider must be 100% cash
+}
+
 export interface EstatePlanning {
   lpa: boolean;  // Lasting Power of Attorney done
   will: boolean; // Will done
@@ -104,6 +114,7 @@ export interface FireInputs {
   policies: InsurancePolicy[];
   purchases: MajorPurchase[];
   estatePlanning: EstatePlanning;
+  hospitalPlan?: HospitalPlan;
 }
 
 export interface YearData {
