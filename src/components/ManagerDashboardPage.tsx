@@ -432,7 +432,8 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
     for (const p of profiles) {
       if (!seen.has(p.advisorUserId)) {
         seen.add(p.advisorUserId);
-        opts.push({ userId: p.advisorUserId, label: p.advisorEmail.split('@')[0] });
+        const label = p.advisorEmail ? p.advisorEmail.split('@')[0] : 'Advisor removed';
+        opts.push({ userId: p.advisorUserId, label });
       }
     }
     return opts.sort((a, b) => a.label.localeCompare(b.label));
@@ -578,7 +579,7 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                       <th style={{ ...colHd('fireGap', 'center') }} onClick={() => handleSort('fireGap')}>FIRE Status <SortArrow k="fireGap" /></th>
                       <th style={{ ...colHd('fireGap', 'right') }} onClick={() => handleSort('fireGap')}>Gap / Surplus <SortArrow k="fireGap" /></th>
                       <th style={{ ...colHd('lastSeen', 'center') }} onClick={() => handleSort('lastSeen')}>Last seen <SortArrow k="lastSeen" /></th>
-                      <th style={{ ...colHd('name'), textAlign: 'right' }}></th>
+                      <th style={{ ...colHd('name'), textAlign: 'right', cursor: 'default', background: 'transparent' }}></th>
                     </tr>
                   ) : (
                     <tr>
@@ -609,9 +610,13 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                           )}
                         </td>
                         <td style={{ padding: '11px 14px' }}>
-                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                            {row.profile.advisorEmail.split('@')[0]}
-                          </span>
+                          {row.profile.advisorEmail ? (
+                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                              {row.profile.advisorEmail.split('@')[0]}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--text-5)', fontStyle: 'italic' }}>Advisor removed</span>
+                          )}
                         </td>
                         <td style={{ padding: '11px 14px', textAlign: 'center' }}>
                           {row.age !== null ? (

@@ -224,7 +224,7 @@ export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
     updatedAt: p.updated_at,
     createdAt: p.created_at,
     advisorUserId: p.user_id,
-    advisorEmail: emailByUserId[p.user_id] ?? p.user_id,
+    advisorEmail: emailByUserId[p.user_id] ?? '',
     meta: p.meta,
     inputs: p.inputs,
   }));

@@ -433,6 +433,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
   const [completeTarget, setCompleteTarget] = useState<Task | null>(null);
+  const [todoCollapsed, setTodoCollapsed] = useState(false);
   const [doneCollapsed, setDoneCollapsed] = useState(false);
 
   const load = useCallback(async () => {
@@ -563,20 +564,22 @@ export default function TasksPage() {
                 <SectionHeader
                   label="To do"
                   count={todo.length}
-                  collapsed={false}
-                  onToggle={() => {}}
+                  collapsed={todoCollapsed}
+                  onToggle={() => setTodoCollapsed(c => !c)}
                 />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {todo.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={t => setCompleteTarget(t)}
-                      onReopen={handleReopen}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
+                {!todoCollapsed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {todo.map(task => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onComplete={t => setCompleteTarget(t)}
+                        onReopen={handleReopen}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
