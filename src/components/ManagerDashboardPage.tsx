@@ -840,13 +840,17 @@ export default function ManagerDashboardPage() {
     return { noDeathCover, noCICover, noECICover, totalDeathGap, totalCIGap, highSignal, needsReview, noISP, noRider };
   }, [teamProfiles, reviewThreshold]);
 
-  const summary = useMemo(() => ({
-    activeFAs: advisors.filter(a => a.role === 'advisor' && a.status === 'active').length,
-    totalClients: teamProfiles.length,
-    newThisMonth: teamProfiles.filter(p => p.createdAt >= monthStart).length,
-    openTasks: tasks.filter(t => t.status === 'todo').length,
-    urgentTasks: tasks.filter(t => t.status === 'todo' && t.priority === 'urgent').length,
-  }), [advisors, tasks, teamProfiles, monthStart]);
+  const summary = useMemo(() => {
+    const orgUserIds = new Set(advisors.map(a => a.userId).filter(Boolean) as string[]);
+    const orgTasks = tasks.filter(t => orgUserIds.has(t.assignedTo) || orgUserIds.has(t.createdBy));
+    return {
+      activeFAs: advisors.filter(a => a.role === 'advisor' && a.status === 'active').length,
+      totalClients: teamProfiles.length,
+      newThisMonth: teamProfiles.filter(p => p.createdAt >= monthStart).length,
+      openTasks: orgTasks.filter(t => t.status === 'todo').length,
+      urgentTasks: orgTasks.filter(t => t.status === 'todo' && t.priority === 'urgent').length,
+    };
+  }, [advisors, tasks, teamProfiles, monthStart]);
 
   const handleTargetSaved = (advisorUserId: string, newVal: number) => {
     setTargets(prev => {

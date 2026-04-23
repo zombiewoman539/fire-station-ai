@@ -655,6 +655,27 @@ function ProRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const ADMIN_USER_ID = 'ef44569c-5216-4847-9b19-3b7797d13ea9';
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const [userId, setUserId] = React.useState<string | null | undefined>(undefined);
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
+  }, []);
+  if (userId === undefined) return null; // loading
+  if (userId !== ADMIN_USER_ID) {
+    return (
+      <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Access denied</div>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function DashboardRoute() {
   const { isManager, loaded } = useTeam();
   const { loaded: subLoaded } = useSubscription();
@@ -709,7 +730,7 @@ function AppShell() {
           <Route path="/plans" element={<PlansPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
         </Routes>
       </div>
     </div>

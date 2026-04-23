@@ -51,6 +51,7 @@ function migrateInputs(inputs: any): FireInputs {
       lpa: inputs.estatePlanning?.lpa ?? false,
       will: inputs.estatePlanning?.will ?? false,
     },
+    hospitalPlan: inputs.hospitalPlan ?? defaultInputs.hospitalPlan,
   };
 }
 
@@ -65,10 +66,13 @@ function parseMeta(meta: any): Pick<ClientProfile, 'lastMeetingDate' | 'nextRevi
 // Purge records that were soft-deleted more than 7 days ago.
 // Called on every listProfiles() so cleanup happens automatically over time.
 async function purgeExpiredDeletions(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   await supabase
     .from('client_profiles')
     .delete()
+    .eq('user_id', user.id)
     .lt('deleted_at', cutoff);
 }
 
