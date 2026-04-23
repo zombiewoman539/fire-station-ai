@@ -96,8 +96,8 @@ export default function NavBar() {
         </NavLink>
       ))}
 
-      {/* Team tab — Team-tier users and existing managers */}
-      {(isManager || tier === 'team') && (
+      {/* Team tab — managers only */}
+      {isManager && (
         <NavLink
           to="/team"
           style={({ isActive }) => ({

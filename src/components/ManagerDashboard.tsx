@@ -374,6 +374,19 @@ export default function ManagerDashboard() {
     );
   }
 
+  // Advisors who navigate to /team directly should not see org admin UI
+  if (teamStatus && teamStatus.role !== 'manager') {
+    return (
+      <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 6 }}>Manager access only</div>
+          <div style={{ fontSize: 13, color: 'var(--text-4)' }}>This page is for team managers.</div>
+        </div>
+      </div>
+    );
+  }
+
   if (!teamStatus) {
     return (
       <div style={{ minHeight: '100%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>

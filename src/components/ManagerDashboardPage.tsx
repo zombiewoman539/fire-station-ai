@@ -572,7 +572,7 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                   {view === 'fire' ? (
                     <tr>
                       <th style={colHd('name')} onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>
-                      <th style={colHd('name')}>Advisor</th>
+                      <th style={{ ...colHd('name'), cursor: 'default', color: 'var(--text-5)', background: 'transparent' }}>Advisor</th>
                       <th style={{ ...colHd('age', 'center') }} onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>
                       <th style={{ ...colHd('income', 'right') }} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>
                       <th style={{ ...colHd('fireGap', 'center') }} onClick={() => handleSort('fireGap')}>FIRE Status <SortArrow k="fireGap" /></th>
@@ -583,15 +583,15 @@ function AllClientsTable({ profiles, advisors, onTaskCreated }: {
                   ) : (
                     <tr>
                       <th style={colHd('name')} onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>
-                      <th style={colHd('name')}>Advisor</th>
+                      <th style={{ ...colHd('name'), cursor: 'default', color: 'var(--text-5)', background: 'transparent' }}>Advisor</th>
                       <th style={{ ...colHd('age', 'center') }} onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>
                       <th style={{ ...colHd('income', 'right') }} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>
                       <th style={{ ...colHd('deathGap', 'center') }} onClick={() => handleSort('deathGap')}>Death Gap <SortArrow k="deathGap" /></th>
                       <th style={{ ...colHd('ciGap', 'center') }} onClick={() => handleSort('ciGap')}>CI Gap <SortArrow k="ciGap" /></th>
                       <th style={{ ...colHd('eciGap', 'center') }} onClick={() => handleSort('eciGap')}>ECI Gap <SortArrow k="eciGap" /></th>
-                      <th style={{ ...colHd('name', 'center') }}>Hospital Plan</th>
+                      <th style={{ ...colHd('name', 'center'), cursor: 'default', color: 'var(--text-5)', background: 'transparent' }}>Hospital Plan</th>
                       <th style={{ ...colHd('signal', 'center') }} onClick={() => handleSort('signal')}>Signal <SortArrow k="signal" /></th>
-                      <th style={{ ...colHd('name'), textAlign: 'right' }}></th>
+                      <th style={{ ...colHd('name'), textAlign: 'right', cursor: 'default', background: 'transparent' }}></th>
                     </tr>
                   )}
                 </thead>
@@ -800,8 +800,7 @@ export default function ManagerDashboardPage() {
     return teamProfiles
       .filter(p => p.updatedAt < staleThreshold)
       .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
-      .map(p => ({ profile: p, advisor: advisorByUserId[p.advisorUserId] }))
-      .filter(x => x.advisor);
+      .map(p => ({ profile: p, advisor: advisorByUserId[p.advisorUserId] ?? null }));
   }, [teamProfiles, staleThreshold, advisors]);
 
   // Insurance portfolio intel — computed once across all team profiles
@@ -1035,7 +1034,10 @@ export default function ManagerDashboardPage() {
                           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{profile.name}</span>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{advisor.email}</span>
+                          {advisor
+                            ? <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{advisor.email}</span>
+                            : <span style={{ fontSize: 12, color: 'var(--text-5)', fontStyle: 'italic' }}>Advisor removed</span>
+                          }
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: d !== null && d > 60 ? '#f87171' : '#fbbf24' }}>
@@ -1043,7 +1045,7 @@ export default function ManagerDashboardPage() {
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <FollowUpBtn profile={profile} advisor={advisor} />
+                          {advisor && <FollowUpBtn profile={profile} advisor={advisor} />}
                         </td>
                       </tr>
                     );

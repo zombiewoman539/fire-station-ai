@@ -607,7 +607,7 @@ function HospitalPlanSection({ inputs, onChange }: { inputs: FireInputs; onChang
             <div>
               <label style={fieldLabel}>Annual Medisave Premium (S$)</label>
               <input
-                type="number" min={0} value={hp.annualPremiumMedisave || ''}
+                type="number" min={0} value={hp.annualPremiumMedisave > 0 ? hp.annualPremiumMedisave : ''}
                 onChange={e => upd({ annualPremiumMedisave: parseFloat(e.target.value) || 0 })}
                 placeholder="0"
                 style={fieldInput}
@@ -617,7 +617,7 @@ function HospitalPlanSection({ inputs, onChange }: { inputs: FireInputs; onChang
             <div>
               <label style={fieldLabel}>Annual Cash Premium (S$)</label>
               <input
-                type="number" min={0} value={hp.annualPremiumCash || ''}
+                type="number" min={0} value={hp.annualPremiumCash > 0 ? hp.annualPremiumCash : ''}
                 onChange={e => upd({ annualPremiumCash: parseFloat(e.target.value) || 0 })}
                 placeholder="0"
                 style={fieldInput}
