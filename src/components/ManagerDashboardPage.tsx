@@ -842,8 +842,8 @@ export default function ManagerDashboardPage() {
 
   const summary = useMemo(() => ({
     activeFAs: advisors.filter(a => a.role === 'advisor' && a.status === 'active').length,
-    totalClients: leaderboard.reduce((s, r) => s + r.totalClients, 0),
-    newThisMonth: leaderboard.reduce((s, r) => s + r.newClientsThisMonth, 0),
+    totalClients: teamProfiles.length,
+    newThisMonth: teamProfiles.filter(p => p.createdAt >= monthStart).length,
     openTasks: tasks.filter(t => t.status === 'todo').length,
     urgentTasks: tasks.filter(t => t.status === 'todo' && t.priority === 'urgent').length,
   }), [advisors, leaderboard, tasks]);
