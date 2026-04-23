@@ -846,7 +846,7 @@ export default function ManagerDashboardPage() {
     newThisMonth: teamProfiles.filter(p => p.createdAt >= monthStart).length,
     openTasks: tasks.filter(t => t.status === 'todo').length,
     urgentTasks: tasks.filter(t => t.status === 'todo' && t.priority === 'urgent').length,
-  }), [advisors, leaderboard, tasks, teamProfiles, monthStart]);
+  }), [advisors, tasks, teamProfiles, monthStart]);
 
   const handleTargetSaved = (advisorUserId: string, newVal: number) => {
     setTargets(prev => {
