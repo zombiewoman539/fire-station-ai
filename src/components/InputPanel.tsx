@@ -143,7 +143,7 @@ export default function InputPanel({ inputs, onChange }: Props) {
       cashValue: 0, annualGrowthRate: 3, deathSumAssured: 0, tpdSumAssured: 0, eciSumAssured: 0, ciSumAssured: 0,
       premiumAmount: 0, premiumFrequency: 'monthly' as const,
       premiumNextDueDate: null, premiumPaymentTerm: 'limited' as const, premiumLimitedYears: 20,
-      nomineeName: '', nomineeClientId: null,
+      nominees: [],
       insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
       commencementDate: null, maturityDate: null, fundAllocations: [],
     }]);

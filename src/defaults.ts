@@ -44,7 +44,7 @@ export const defaultInputs: FireInputs = {
       deathSumAssured: 200000, tpdSumAssured: 200000, eciSumAssured: 100000, ciSumAssured: 200000,
       premiumAmount: 200, premiumFrequency: 'monthly',
       premiumNextDueDate: null, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
-      nomineeName: '', nomineeClientId: null,
+      nominees: [],
       insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
       commencementDate: null, maturityDate: null, fundAllocations: [],
     },
@@ -52,6 +52,9 @@ export const defaultInputs: FireInputs = {
   purchases: defaultPurchases,
   estatePlanning: {
     lpa: false,
+    lpaDonee1: '',
+    lpaDonee2: '',
+    lpaReplacementDonee: '',
     will: false,
   },
   hospitalPlan: {

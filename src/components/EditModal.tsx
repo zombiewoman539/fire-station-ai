@@ -1,5 +1,5 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, HospitalPlan, MajorPurchase, FundAllocation, ExpenseLineItem, InvestmentBucket } from '../types';
+import { FireInputs, InsurancePolicy, HospitalPlan, MajorPurchase, FundAllocation, Nominee, ExpenseLineItem, InvestmentBucket } from '../types';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile } from '../profileTypes';
 
@@ -633,7 +633,7 @@ function HospitalPlanSection({ inputs, onChange }: { inputs: FireInputs; onChang
 
 function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: FireInputs; onChange: (i: FireInputs) => void; currentProfileId?: string }) {
   const update = (policies: InsurancePolicy[]) => onChange({ ...inputs, policies });
-  const upd = (id: string, field: keyof InsurancePolicy, val: string | number | null | FundAllocation[]) =>
+  const upd = (id: string, field: keyof InsurancePolicy, val: string | number | null | FundAllocation[] | Nominee[]) =>
     update(inputs.policies.map(p => p.id === id ? { ...p, [field]: val } : p));
 
   const [allProfiles, setAllProfiles] = React.useState<ClientProfile[]>([]);
@@ -647,7 +647,7 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
     deathSumAssured: 0, tpdSumAssured: 0, eciSumAssured: 0, ciSumAssured: 0,
     premiumAmount: 0, premiumFrequency: 'monthly',
     premiumNextDueDate: null, premiumPaymentTerm: 'limited', premiumLimitedYears: 20,
-    nomineeName: '', nomineeClientId: null,
+    nominees: [],
     insurer: '', policyNumber: '', policyStatus: 'in-force' as const,
     commencementDate: null, maturityDate: null, fundAllocations: [],
   }]);
@@ -938,58 +938,117 @@ function InsuranceSection({ inputs, onChange, currentProfileId }: { inputs: Fire
 
           {/* Nomination */}
           <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, marginTop: 4 }}>
-            <SectionLabel>Nomination</SectionLabel>
-            {/* Link to existing FIRE Station client */}
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
-                Link to FIRE Station client
-              </label>
-              <select
-                value={p.nomineeClientId ?? ''}
-                onChange={e => {
-                  const val = e.target.value;
-                  const linked = allProfiles.find(c => c.id === val);
-                  upd(p.id, 'nomineeClientId', val || null);
-                  if (linked) upd(p.id, 'nomineeName', linked.name);
-                  if (!val) upd(p.id, 'nomineeName', '');
-                }}
-                style={{
-                  width: '100%', background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-                  borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
-                }}
-              >
-                <option value="">— Not linked —</option>
-                {allProfiles.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <SectionLabel>Nomination</SectionLabel>
+              {(() => {
+                const total = (p.nominees || []).reduce((s, n) => s + (n.percentage || 0), 0);
+                return total > 0 && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: Math.abs(total - 100) < 0.01 ? '#34d399' : '#fbbf24',
+                  }}>
+                    {total.toFixed(0)}% allocated
+                  </span>
+                );
+              })()}
             </div>
-            {/* Free-text nominee name */}
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
-                Nominee name {p.nomineeClientId && <span style={{ color: '#34d399', fontSize: 10 }}>(auto-filled from linked client)</span>}
-              </label>
-              <input
-                value={p.nomineeName}
-                onChange={e => upd(p.id, 'nomineeName', e.target.value)}
-                placeholder="e.g. Spouse, Child..."
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-                  borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
-                }}
-              />
-              {p.nomineeClientId && p.nomineeName && (
-                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, color: '#34d399' }}>●</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Linked to <strong style={{ color: 'var(--text-2)' }}>{p.nomineeName}</strong> in FIRE Station</span>
-                  <button onClick={() => { upd(p.id, 'nomineeClientId', null); }}
-                    style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', fontSize: 11 }}>
-                    Unlink
-                  </button>
+            {(p.nominees || []).map((n, ni) => (
+              <div key={ni} style={{
+                background: 'var(--inset)', border: '1px solid var(--border-soft)',
+                borderRadius: 10, padding: '10px 12px', marginBottom: 8,
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                  <input
+                    type="text"
+                    placeholder="Nominee name"
+                    value={n.name}
+                    onChange={e => {
+                      const nominees = [...(p.nominees || [])];
+                      nominees[ni] = { ...nominees[ni], name: e.target.value };
+                      upd(p.id, 'nominees', nominees);
+                    }}
+                    style={{
+                      flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                      borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      min={0} max={100} step={1}
+                      value={n.percentage}
+                      onChange={e => {
+                        const nominees = [...(p.nominees || [])];
+                        nominees[ni] = { ...nominees[ni], percentage: Math.max(0, Math.min(100, Number(e.target.value))) };
+                        upd(p.id, 'nominees', nominees);
+                      }}
+                      style={{
+                        width: 56, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                        borderRadius: 8, padding: '6px 8px', color: 'var(--text-1)', fontSize: 13,
+                        outline: 'none', textAlign: 'right',
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: 'var(--text-4)' }}>%</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const nominees = (p.nominees || []).filter((_, i) => i !== ni);
+                      upd(p.id, 'nominees', nominees);
+                    }}
+                    style={{
+                      background: 'none', border: 'none', color: 'var(--text-5)', fontSize: 16,
+                      cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0,
+                    }}
+                  >×</button>
                 </div>
-              )}
-            </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <select
+                    value={n.clientId ?? ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const linked = allProfiles.find(c => c.id === val);
+                      const nominees = [...(p.nominees || [])];
+                      nominees[ni] = { ...nominees[ni], clientId: val || null, ...(linked ? { name: linked.name } : {}) };
+                      upd(p.id, 'nominees', nominees);
+                    }}
+                    style={{
+                      flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                      borderRadius: 8, padding: '5px 10px', color: 'var(--text-3)', fontSize: 12, outline: 'none',
+                    }}
+                  >
+                    <option value="">Link to FIRE Station client (optional)</option>
+                    {allProfiles.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  {n.clientId && (
+                    <button
+                      onClick={() => {
+                        const nominees = [...(p.nominees || [])];
+                        nominees[ni] = { ...nominees[ni], clientId: null };
+                        upd(p.id, 'nominees', nominees);
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', fontSize: 11, flexShrink: 0 }}
+                    >
+                      Unlink
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const nominees: Nominee[] = [...(p.nominees || []), { name: '', percentage: 0, clientId: null }];
+                upd(p.id, 'nominees', nominees);
+              }}
+              style={{
+                marginTop: 4, background: 'none', border: '1px dashed var(--border-mid)',
+                borderRadius: 8, padding: '5px 12px', fontSize: 12, color: 'var(--text-4)',
+                cursor: 'pointer', width: '100%',
+              }}
+            >
+              + Add Nominee
+            </button>
           </div>
         </div>
       ))}
@@ -1048,13 +1107,16 @@ function PurchasesSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', fontSize: 16, padding: 4 }}>✕</button>
           </div>
 
+          {(() => {
+            const isHousing = /hdb|condo|flat|house|home|property|bto|apartment|reno/i.test(p.name);
+            return (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <NumberField label="Age" value={p.age} small onChange={v => upd(p.id, 'age', v)} />
             <NumberField label="Lump Sum" value={p.lumpSum} prefix="S$" small
               tip="One-off payment at the specified age. Deducted from investments first, then cash."
               onChange={v => upd(p.id, 'lumpSum', v)} />
-            <NumberField label="Recurring / yr" value={p.recurringCost} prefix="S$" small
-              tip="Annual cost that recurs for a set number of years."
+            <NumberField label={isHousing ? 'Mortgage / yr' : 'Recurring / yr'} value={p.recurringCost} prefix="S$" small
+              tip={isHousing ? 'Annual mortgage repayment for this property.' : 'Annual cost that recurs for a set number of years.'}
               onChange={v => upd(p.id, 'recurringCost', v)} />
             <NumberField label="For years" value={p.recurringYears} small
               tip="Number of years the recurring cost applies."
@@ -1063,6 +1125,8 @@ function PurchasesSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
               tip="If set, the lump sum repeats every N years (e.g. car renewal every 10 years). Set 0 for no repeat."
               onChange={v => upd(p.id, 'repeatEveryYears', v)} />
           </div>
+            );
+          })()}
         </div>
       ))}
 
@@ -1101,6 +1165,8 @@ function PurchasesSection({ inputs, onChange }: { inputs: FireInputs; onChange: 
 function EstatePlanningSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
   const ep = inputs.estatePlanning ?? { lpa: false, will: false };
   const upd = (field: 'lpa' | 'will', val: boolean) =>
+    onChange({ ...inputs, estatePlanning: { ...ep, [field]: val } });
+  const updText = (field: 'lpaDonee1' | 'lpaDonee2' | 'lpaReplacementDonee', val: string) =>
     onChange({ ...inputs, estatePlanning: { ...ep, [field]: val } });
 
   const ToggleCard = ({ field, label, description, icon }: { field: 'lpa' | 'will'; label: string; description: string; icon: string }) => {
@@ -1147,9 +1213,52 @@ function EstatePlanningSection({ inputs, onChange }: { inputs: FireInputs; onCha
       <ToggleCard
         field="lpa"
         label="Lasting Power of Attorney (LPA)"
-        description="Authorises a trusted person to make decisions on the client's behalf if they lose mental capacity. Registered with the Office of the Public Guardian, Singapore."
+        description="Authorises trusted persons to make decisions on the client's behalf if they lose mental capacity. Registered with the Office of the Public Guardian, Singapore."
         icon="⚖️"
       />
+      {ep.lpa && (
+        <div style={{
+          marginTop: -8, marginBottom: 14, padding: '14px 16px',
+          background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)',
+          borderTop: 'none', borderRadius: '0 0 12px 12px',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+            Donees (up to 2) + Replacement Donee
+          </div>
+          {(['lpaDonee1', 'lpaDonee2'] as const).map((field, i) => (
+            <div key={field} style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
+                Donee {i + 1}{i === 0 ? '' : ' (optional)'}
+              </label>
+              <input
+                value={ep[field] ?? ''}
+                onChange={e => updText(field, e.target.value)}
+                placeholder={`Donee ${i + 1} full name`}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                  borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+                }}
+              />
+            </div>
+          ))}
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
+              Replacement Donee (optional)
+            </label>
+            <input
+              value={ep.lpaReplacementDonee ?? ''}
+              onChange={e => updText('lpaReplacementDonee', e.target.value)}
+              placeholder="Replacement donee full name"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                borderRadius: 8, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+              }}
+            />
+          </div>
+        </div>
+      )}
       <ToggleCard
         field="will"
         label="Will"

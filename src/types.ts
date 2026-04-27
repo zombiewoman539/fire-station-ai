@@ -47,6 +47,12 @@ export interface FundAllocation {
   percentage: number; // 0–100
 }
 
+export interface Nominee {
+  name: string;
+  percentage: number;   // 0–100, all nominees must sum to 100
+  clientId: string | null; // optional link to another FIRE Station client
+}
+
 export interface InsurancePolicy {
   id: string;
   name: string;
@@ -62,8 +68,7 @@ export interface InsurancePolicy {
   premiumNextDueDate: string | null;  // YYYY-MM-DD — next payment date (recurs per frequency)
   premiumPaymentTerm: 'whole-life' | 'limited';
   premiumLimitedYears: number;
-  nomineeName: string;           // free-text nominee name
-  nomineeClientId: string | null; // linked FIRE Station client ID (optional)
+  nominees: Nominee[];            // beneficiaries — must sum to 100%
   // Policy management fields
   insurer: string;               // insurance company name
   policyNumber: string;          // contract/policy number
@@ -84,8 +89,11 @@ export interface HospitalPlan {
 }
 
 export interface EstatePlanning {
-  lpa: boolean;  // Lasting Power of Attorney done
-  will: boolean; // Will done
+  lpa: boolean;
+  lpaDonee1?: string;          // up to 2 donees (Singapore OPG rules)
+  lpaDonee2?: string;
+  lpaReplacementDonee?: string; // 1 replacement donee
+  will: boolean;
 }
 
 export type ScenarioType = 'none' | 'critical-illness' | 'tpd' | 'death';

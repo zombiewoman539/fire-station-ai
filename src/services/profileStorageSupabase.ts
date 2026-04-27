@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ClientProfile } from '../profileTypes';
-import { FireInputs, InsurancePolicy } from '../types';
+import { FireInputs, InsurancePolicy, Nominee } from '../types';
 import { defaultInputs } from '../defaults';
 
 // Migrate old profiles to new schema
@@ -38,8 +38,11 @@ function migrateInputs(inputs: any): FireInputs {
       premiumNextDueDate: p.premiumNextDueDate ?? null,
       premiumPaymentTerm: p.premiumPaymentTerm ?? 'limited',
       premiumLimitedYears: p.premiumLimitedYears ?? 0,
-      nomineeName: p.nomineeName ?? '',
-      nomineeClientId: p.nomineeClientId ?? null,
+      nominees: p.nominees
+        ? (p.nominees as Nominee[])
+        : p.nomineeName
+          ? [{ name: p.nomineeName as string, percentage: 100, clientId: (p.nomineeClientId ?? null) as string | null }]
+          : [],
       insurer: p.insurer ?? '',
       policyNumber: p.policyNumber ?? '',
       policyStatus: p.policyStatus ?? 'in-force',
@@ -49,6 +52,9 @@ function migrateInputs(inputs: any): FireInputs {
     })),
     estatePlanning: {
       lpa: inputs.estatePlanning?.lpa ?? false,
+      lpaDonee1: inputs.estatePlanning?.lpaDonee1 ?? '',
+      lpaDonee2: inputs.estatePlanning?.lpaDonee2 ?? '',
+      lpaReplacementDonee: inputs.estatePlanning?.lpaReplacementDonee ?? '',
       will: inputs.estatePlanning?.will ?? false,
     },
     hospitalPlan: inputs.hospitalPlan ?? defaultInputs.hospitalPlan,
