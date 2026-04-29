@@ -1,7 +1,36 @@
 import { supabase } from './supabaseClient';
-import { ClientProfile } from '../profileTypes';
+import { ClientProfile, NoteEntry } from '../profileTypes';
 import { FireInputs, InsurancePolicy, Nominee } from '../types';
 import { defaultInputs } from '../defaults';
+
+function newId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `note-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function parseNoteEntries(meta: any, fallbackTimestamp: string): NoteEntry[] {
+  if (Array.isArray(meta?.noteEntries)) {
+    return meta.noteEntries
+      .filter((e: any) => e && typeof e.body === 'string')
+      .map((e: any) => ({
+        id: typeof e.id === 'string' ? e.id : newId(),
+        createdAt: typeof e.createdAt === 'string' ? e.createdAt : fallbackTimestamp,
+        updatedAt: typeof e.updatedAt === 'string' ? e.updatedAt : undefined,
+        body: e.body,
+      }));
+  }
+  // Legacy: a single notes string becomes one entry
+  if (typeof meta?.notes === 'string' && meta.notes.trim().length > 0) {
+    return [{
+      id: newId(),
+      createdAt: fallbackTimestamp,
+      body: meta.notes,
+    }];
+  }
+  return [];
+}
 
 // Migrate old profiles to new schema
 function migrateInputs(inputs: any): FireInputs {
@@ -61,11 +90,15 @@ function migrateInputs(inputs: any): FireInputs {
   };
 }
 
-function parseMeta(meta: any): Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'> {
+function parseMeta(
+  meta: any,
+  fallbackTimestamp: string,
+): Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'> {
   return {
     lastMeetingDate: meta?.lastMeetingDate ?? null,
     nextReviewDate: meta?.nextReviewDate ?? null,
     notes: meta?.notes ?? '',
+    noteEntries: parseNoteEntries(meta, fallbackTimestamp),
   };
 }
 
@@ -100,7 +133,7 @@ export async function listProfiles(): Promise<ClientProfile[]> {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
-    ...parseMeta(row.meta),
+    ...parseMeta(row.meta, row.updated_at),
   }));
 }
 
@@ -120,7 +153,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
-    ...parseMeta(data.meta),
+    ...parseMeta(data.meta, data.updated_at),
   };
 }
 
@@ -138,7 +171,7 @@ export async function saveProfile(profile: ClientProfile): Promise<void> {
       meta: {
         lastMeetingDate: profile.lastMeetingDate ?? null,
         nextReviewDate: profile.nextReviewDate ?? null,
-        notes: profile.notes ?? '',
+        noteEntries: profile.noteEntries ?? [],
       },
       updated_at: new Date().toISOString(),
     });
@@ -169,7 +202,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
-    ...parseMeta(data.meta),
+    ...parseMeta(data.meta, data.updated_at),
   };
 }
 
@@ -216,7 +249,7 @@ export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedA
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
-    ...parseMeta(row.meta),
+    ...parseMeta(row.meta, row.updated_at),
     deletedAt: row.deleted_at,
   }));
 }

@@ -1,7 +1,10 @@
 import React from 'react';
 import { FireInputs, InsurancePolicy, HospitalPlan, MajorPurchase, FundAllocation, Nominee, ExpenseLineItem, InvestmentBucket } from '../types';
 import { listProfiles } from '../services/profileStorageSupabase';
-import { ClientProfile } from '../profileTypes';
+import { ClientProfile, NoteEntry } from '../profileTypes';
+import NotesLog from './NotesLog';
+import NewTaskModal from './NewTaskModal';
+import { Task, listTasks, completeTask, reopenTask, deleteTask } from '../services/taskService';
 
 interface Props {
   open: boolean;
@@ -11,7 +14,7 @@ interface Props {
   clientName?: string;
   currentProfileId?: string;
   profile?: ClientProfile | null;
-  onProfileMetaChange?: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'>>) => void;
+  onProfileMetaChange?: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => void;
 }
 
 type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases' | 'estate' | 'activity';
@@ -1271,16 +1274,69 @@ function EstatePlanningSection({ inputs, onChange }: { inputs: FireInputs; onCha
 
 function ActivitySection({ profile, onMetaChange }: {
   profile: ClientProfile | null | undefined;
-  onMetaChange: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'>>) => void;
+  onMetaChange: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => void;
 }) {
   const lastMeeting = profile?.lastMeetingDate ?? '';
   const nextReview = profile?.nextReviewDate ?? '';
-  const notes = profile?.notes ?? '';
+  const noteEntries: NoteEntry[] = profile?.noteEntries ?? [];
 
   const daysSinceMeeting = lastMeeting ? Math.floor((Date.now() - new Date(lastMeeting).getTime()) / 86400000) : null;
   const reviewDate = nextReview ? new Date(nextReview) : null;
   const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
   const daysUntilReview = reviewDate ? Math.ceil((reviewDate.getTime() - Date.now()) / 86400000) : null;
+
+  // Tasks for this client
+  const [tasks, setTasks] = React.useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = React.useState(false);
+  const [showTaskModal, setShowTaskModal] = React.useState(false);
+  const [taskModalSeed, setTaskModalSeed] = React.useState<string | undefined>(undefined);
+
+  const refreshTasks = React.useCallback(async () => {
+    if (!profile?.id) return;
+    setTasksLoading(true);
+    try {
+      const all = await listTasks();
+      setTasks(all.filter(t => t.clientProfileId === profile.id));
+    } catch (e) {
+      console.error('Load tasks failed:', e);
+    } finally {
+      setTasksLoading(false);
+    }
+  }, [profile?.id]);
+
+  React.useEffect(() => {
+    if (profile?.id) refreshTasks();
+    else setTasks([]);
+  }, [profile?.id, refreshTasks]);
+
+  const openTasks = tasks.filter(t => t.status === 'todo').sort((a, b) => {
+    if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
+    if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate < b.dueDate ? -1 : 1;
+  });
+
+  const handleToggleTask = async (task: Task) => {
+    if (task.status === 'todo') {
+      await completeTask(task.id, task.notes);
+      setTasks(prev => prev.map(t =>
+        t.id === task.id ? { ...t, status: 'done', completedAt: new Date().toISOString() } : t,
+      ));
+    } else {
+      await reopenTask(task.id);
+      setTasks(prev => prev.map(t =>
+        t.id === task.id ? { ...t, status: 'todo', completedAt: null } : t,
+      ));
+    }
+  };
+
+  const handleDeleteTask = async (task: Task) => {
+    if (!window.confirm(`Delete "${task.title}"?`)) return;
+    await deleteTask(task.id);
+    setTasks(prev => prev.filter(t => t.id !== task.id));
+  };
 
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
@@ -1313,7 +1369,7 @@ function ActivitySection({ profile, onMetaChange }: {
       </div>
 
       {/* Next Review */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 24 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
           Next Review Date
         </label>
@@ -1333,22 +1389,127 @@ function ActivitySection({ profile, onMetaChange }: {
         </div>
       </div>
 
-      {/* Notes */}
-      <div>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
-          Advisor Notes
-        </label>
-        <textarea
-          value={notes}
-          onChange={e => onMetaChange({ notes: e.target.value })}
-          placeholder="Client preferences, key concerns, action items, follow-ups…"
-          rows={8}
-          style={{
-            ...inputStyle,
-            resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6,
+      {/* Notes log */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)' }}>
+            Notes
+          </label>
+        </div>
+        <NotesLog
+          entries={noteEntries}
+          onChange={(next) => onMetaChange({ noteEntries: next })}
+          onTurnIntoTask={(body) => {
+            setTaskModalSeed(body);
+            setShowTaskModal(true);
           }}
         />
       </div>
+
+      {/* Tasks for this client */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)' }}>
+            Open tasks {openTasks.length > 0 && (
+              <span style={{ marginLeft: 6, color: 'var(--text-4)', fontWeight: 500 }}>· {openTasks.length}</span>
+            )}
+          </label>
+          <button
+            type="button"
+            onClick={() => { setTaskModalSeed(undefined); setShowTaskModal(true); }}
+            disabled={!profile?.id}
+            style={{
+              padding: '5px 12px', borderRadius: 7,
+              border: 'none', cursor: profile?.id ? 'pointer' : 'not-allowed',
+              background: '#10b981', color: '#fff',
+              fontSize: 12, fontWeight: 600,
+              opacity: profile?.id ? 1 : 0.5,
+            }}
+          >
+            + New task
+          </button>
+        </div>
+
+        {tasksLoading ? (
+          <div style={{ fontSize: 12, color: 'var(--text-4)', padding: '12px 0' }}>Loading…</div>
+        ) : openTasks.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '20px 16px',
+            fontSize: 12, color: 'var(--text-4)',
+            border: '1px dashed var(--border)', borderRadius: 10,
+          }}>
+            No open tasks for this client.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {openTasks.map(task => {
+              const overdue = task.dueDate && new Date(task.dueDate + 'T23:59:59') < new Date();
+              const today = task.dueDate && (() => {
+                const d = new Date();
+                const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                return task.dueDate === t;
+              })();
+              const dueColor = overdue ? '#f87171' : today ? '#fbbf24' : 'var(--text-3)';
+              return (
+                <div key={task.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 8, padding: '8px 12px',
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTask(task)}
+                    title="Mark done"
+                    style={{
+                      width: 18, height: 18, borderRadius: 5,
+                      border: '1.5px solid var(--border)',
+                      background: 'transparent', cursor: 'pointer', flexShrink: 0,
+                    }}
+                  />
+                  {task.priority === 'urgent' && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4,
+                      background: 'rgba(248,113,113,0.15)', color: '#f87171',
+                      border: '1px solid rgba(248,113,113,0.3)', letterSpacing: '0.05em',
+                    }}>URGENT</span>
+                  )}
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)' }}>
+                    {task.title}
+                  </span>
+                  {task.dueDate && (
+                    <span style={{ fontSize: 11, color: dueColor, whiteSpace: 'nowrap' }}>
+                      {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTask(task)}
+                    title="Delete"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-3)', fontSize: 14, padding: '0 2px',
+                    }}
+                  >×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {showTaskModal && profile?.id && (
+        <NewTaskModal
+          initialClientProfileId={profile.id}
+          initialClientName={profile.name}
+          initialNotes={taskModalSeed}
+          onClose={() => { setShowTaskModal(false); setTaskModalSeed(undefined); }}
+          onCreated={() => {
+            setShowTaskModal(false);
+            setTaskModalSeed(undefined);
+            refreshTasks();
+          }}
+        />
+      )}
     </div>
   );
 }

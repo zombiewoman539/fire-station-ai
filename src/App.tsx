@@ -113,6 +113,7 @@ function Dashboard() {
             lastMeetingDate: null,
             nextReviewDate: null,
             notes: '',
+            noteEntries: [],
           };
           setActiveProfile(localProfile);
           clearTimeout(timeout);
@@ -232,8 +233,8 @@ function Dashboard() {
     setSaveStatus('idle');
   }, []);
 
-  // Updates CRM meta fields (lastMeetingDate, nextReviewDate, notes) and saves
-  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes'>>) => {
+  // Updates CRM meta fields (lastMeetingDate, nextReviewDate, notes, noteEntries) and saves
+  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => {
     if (!activeProfile) return;
     const updated = { ...activeProfile, ...updates, updatedAt: new Date().toISOString() };
     setActiveProfile(updated);
