@@ -157,25 +157,6 @@ function FollowUpBtn({ profile, advisor }: { profile: TeamProfile; advisor: Advi
   );
 }
 
-// ─── Assign task modal ────────────────────────────────────────────────────────
-
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6,
-};
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)',
-  background: 'var(--bg)', color: 'var(--text-1)', fontSize: 13, outline: 'none',
-  boxSizing: 'border-box' as const,
-};
-const ghostBtn: React.CSSProperties = {
-  padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
-  background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-};
-const primaryBtn: React.CSSProperties = {
-  padding: '8px 18px', borderRadius: 8, border: 'none',
-  background: '#10b981', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-};
-
 
 // ─── Main component ───────────────────────────────────────────────────────────
 

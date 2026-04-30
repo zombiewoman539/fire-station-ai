@@ -1,4 +1,4 @@
-import { FilterChip, FilterOp, FilterField } from './savedViewsTypes';
+import { FilterChip, FilterField } from './savedViewsTypes';
 import { EnrichedProfile } from './enrichProfile';
 
 /** Resolves a profile + field → comparable scalar / boolean / null. */
