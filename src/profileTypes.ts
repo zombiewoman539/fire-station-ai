@@ -5,6 +5,8 @@ export interface NoteEntry {
   createdAt: string;
   updatedAt?: string;
   body: string;
+  /** When set, this entry represents a meeting that occurred on this date (YYYY-MM-DD). */
+  meetingDate?: string;
 }
 
 export interface ClientProfile {

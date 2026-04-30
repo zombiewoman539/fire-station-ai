@@ -1276,14 +1276,43 @@ function ActivitySection({ profile, onMetaChange }: {
   profile: ClientProfile | null | undefined;
   onMetaChange: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => void;
 }) {
-  const lastMeeting = profile?.lastMeetingDate ?? '';
   const nextReview = profile?.nextReviewDate ?? '';
   const noteEntries: NoteEntry[] = profile?.noteEntries ?? [];
 
-  const daysSinceMeeting = lastMeeting ? Math.floor((Date.now() - new Date(lastMeeting).getTime()) / 86400000) : null;
+  // Derive meeting stats from the notes feed; fall back to legacy lastMeetingDate when no entries are tagged
+  const meetingEntries = noteEntries.filter(e => e.meetingDate);
+  const meetingCount = meetingEntries.length;
+  const derivedFromEntries = meetingEntries.length > 0
+    ? meetingEntries.reduce((max, e) => (e.meetingDate! > max ? e.meetingDate! : max), meetingEntries[0].meetingDate!)
+    : null;
+  const latestMeetingDate = derivedFromEntries ?? (profile?.lastMeetingDate ?? null);
+  const isLegacyMeetingDate = !derivedFromEntries && !!profile?.lastMeetingDate;
+  const daysSinceMeeting = latestMeetingDate
+    ? Math.floor((Date.now() - new Date(latestMeetingDate + 'T00:00:00').getTime()) / 86400000)
+    : null;
+
   const reviewDate = nextReview ? new Date(nextReview) : null;
   const reviewOverdue = reviewDate ? reviewDate < new Date() : false;
   const daysUntilReview = reviewDate ? Math.ceil((reviewDate.getTime() - Date.now()) / 86400000) : null;
+
+  // Auto-sync lastMeetingDate when meetings are tagged. When none are, leave the field
+  // alone so legacy values aren't clobbered on the first note edit.
+  const handleNotesChange = (next: NoteEntry[]) => {
+    const meetings = next.filter(e => e.meetingDate);
+    if (meetings.length === 0) {
+      onMetaChange({ noteEntries: next });
+      return;
+    }
+    const derivedLastMeeting = meetings.reduce(
+      (max, e) => (e.meetingDate! > max ? e.meetingDate! : max),
+      meetings[0].meetingDate!,
+    );
+    if (derivedLastMeeting !== (profile?.lastMeetingDate ?? null)) {
+      onMetaChange({ noteEntries: next, lastMeetingDate: derivedLastMeeting });
+    } else {
+      onMetaChange({ noteEntries: next });
+    }
+  };
 
   // Tasks for this client
   const [tasks, setTasks] = React.useState<Task[]>([]);
@@ -1347,24 +1376,60 @@ function ActivitySection({ profile, onMetaChange }: {
   return (
     <div>
       <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 20, lineHeight: 1.6 }}>
-        Track client meetings, schedule reviews, and keep advisor notes. None of this affects financial calculations.
+        Log meetings, keep notes, and schedule reviews. The "Last meeting" date and count come from any notes tagged as meetings.
       </div>
 
-      {/* Last Meeting */}
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
-          Last Meeting Date
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <input type="date" value={lastMeeting} onChange={e => onMetaChange({ lastMeetingDate: e.target.value || null })} style={inputStyle} />
-          {daysSinceMeeting !== null && (
-            <span style={{
-              fontSize: 12, whiteSpace: 'nowrap', fontWeight: 600,
-              color: daysSinceMeeting > 365 ? '#f87171' : daysSinceMeeting > 180 ? '#fbbf24' : '#34d399',
-            }}>
-              {daysSinceMeeting === 0 ? 'Today' : `${daysSinceMeeting} days ago`}
-            </span>
+      {/* Meeting stats — derived from the notes feed */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch', gap: 12,
+        marginBottom: 20,
+      }}>
+        <div style={{
+          flex: 1,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: '10px 14px',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>
+            Last meeting
+          </div>
+          {latestMeetingDate ? (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>
+                {new Date(latestMeetingDate + 'T00:00:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 600,
+                color: daysSinceMeeting !== null && daysSinceMeeting > 365 ? '#f87171'
+                  : daysSinceMeeting !== null && daysSinceMeeting > 180 ? '#fbbf24'
+                  : '#34d399',
+              }}>
+                {daysSinceMeeting === 0 ? 'Today' : `${daysSinceMeeting} days ago`}
+              </span>
+              {isLegacyMeetingDate && (
+                <span style={{ fontSize: 10, color: 'var(--text-4)', fontStyle: 'italic' }}>
+                  (legacy — log a meeting below to start counting)
+                </span>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-4)' }}>
+              No meetings logged yet
+            </div>
           )}
+        </div>
+        <div style={{
+          flex: '0 0 auto',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: '10px 18px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          minWidth: 90,
+        }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1 }}>
+            {meetingCount}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            {meetingCount === 1 ? 'meeting' : 'meetings'}
+          </div>
         </div>
       </div>
 
@@ -1389,16 +1454,16 @@ function ActivitySection({ profile, onMetaChange }: {
         </div>
       </div>
 
-      {/* Notes log */}
+      {/* Notes & meetings log */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)' }}>
-            Notes
+            Notes & meetings
           </label>
         </div>
         <NotesLog
           entries={noteEntries}
-          onChange={(next) => onMetaChange({ noteEntries: next })}
+          onChange={handleNotesChange}
           onTurnIntoTask={(body) => {
             setTaskModalSeed(body);
             setShowTaskModal(true);

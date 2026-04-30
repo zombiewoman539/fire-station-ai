@@ -8,6 +8,11 @@ function newId(): string {
   return `note-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function formatStamp(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -21,6 +26,16 @@ function formatStamp(iso: string): string {
   return `${datePart} · ${timePart}`;
 }
 
+function formatMeetingDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  const now = new Date();
+  return d.toLocaleDateString('en-SG', {
+    day: 'numeric',
+    month: 'short',
+    ...(d.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
+
 interface Props {
   entries: NoteEntry[];
   onChange: (next: NoteEntry[]) => void;
@@ -28,9 +43,17 @@ interface Props {
 }
 
 export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
+  // Quick-add state
   const [draft, setDraft] = React.useState('');
+  const [draftIsMeeting, setDraftIsMeeting] = React.useState(false);
+  const [draftMeetingDate, setDraftMeetingDate] = React.useState(todayISO());
+
+  // Edit state
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editingBody, setEditingBody] = React.useState('');
+  const [editingIsMeeting, setEditingIsMeeting] = React.useState(false);
+  const [editingMeetingDate, setEditingMeetingDate] = React.useState(todayISO());
+
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
   const submitDraft = () => {
@@ -40,9 +63,12 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
       id: newId(),
       createdAt: new Date().toISOString(),
       body,
+      ...(draftIsMeeting ? { meetingDate: draftMeetingDate || todayISO() } : {}),
     };
     onChange([entry, ...entries]);
     setDraft('');
+    setDraftIsMeeting(false);
+    setDraftMeetingDate(todayISO());
   };
 
   const handleDraftKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -55,6 +81,8 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
   const startEdit = (entry: NoteEntry) => {
     setEditingId(entry.id);
     setEditingBody(entry.body);
+    setEditingIsMeeting(!!entry.meetingDate);
+    setEditingMeetingDate(entry.meetingDate ?? todayISO());
   };
 
   const saveEdit = () => {
@@ -65,7 +93,14 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
       return;
     }
     onChange(entries.map(e =>
-      e.id === editingId ? { ...e, body, updatedAt: new Date().toISOString() } : e
+      e.id === editingId
+        ? {
+            ...e,
+            body,
+            updatedAt: new Date().toISOString(),
+            meetingDate: editingIsMeeting ? (editingMeetingDate || todayISO()) : undefined,
+          }
+        : e
     ));
     setEditingId(null);
   };
@@ -94,7 +129,7 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={handleDraftKey}
-          placeholder="Add a note about this client… (Cmd/Ctrl+Enter to save)"
+          placeholder={draftIsMeeting ? 'What was discussed? Next steps?' : 'Add a note about this client… (Cmd/Ctrl+Enter to save)'}
           rows={3}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -103,10 +138,36 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
             color: 'var(--text-1)', lineHeight: 1.6,
           }}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-4)' }}>
-            {entries.length} {entries.length === 1 ? 'note' : 'notes'}
-          </span>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginTop: 8, gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12, color: 'var(--text-2)', cursor: 'pointer', userSelect: 'none',
+            }}>
+              <input
+                type="checkbox"
+                checked={draftIsMeeting}
+                onChange={e => setDraftIsMeeting(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span>🗓 Meeting</span>
+            </label>
+            {draftIsMeeting && (
+              <input
+                type="date"
+                value={draftMeetingDate}
+                onChange={e => setDraftMeetingDate(e.target.value)}
+                style={{
+                  background: 'var(--bg)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '3px 6px', fontSize: 12,
+                  color: 'var(--text-1)', outline: 'none',
+                }}
+              />
+            )}
+          </div>
           <button
             type="button"
             onClick={submitDraft}
@@ -120,7 +181,7 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
               transition: 'background 0.15s',
             }}
           >
-            Add note
+            {draftIsMeeting ? 'Log meeting' : 'Add note'}
           </button>
         </div>
       </div>
@@ -132,13 +193,14 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
           fontSize: 12, color: 'var(--text-4)',
           border: '1px dashed var(--border)', borderRadius: 10,
         }}>
-          No notes yet. Add one above to start a log of conversations and observations.
+          No notes yet. Add one above to start a log of conversations and meetings.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {entries.map(entry => {
             const isEditing = editingId === entry.id;
             const isHovered = hoveredId === entry.id;
+            const isMeeting = !!entry.meetingDate;
             return (
               <div
                 key={entry.id}
@@ -146,7 +208,7 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
                 onMouseLeave={() => setHoveredId(prev => (prev === entry.id ? null : prev))}
                 style={{
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
+                  border: '1px solid ' + (isMeeting ? 'rgba(59,130,246,0.35)' : 'var(--border)'),
                   borderRadius: 10,
                   padding: '12px 14px',
                   position: 'relative',
@@ -159,10 +221,22 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
                   <span style={{
                     fontSize: 11, fontWeight: 600,
                     color: 'var(--text-3)', letterSpacing: '0.01em',
+                    display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
                   }}>
-                    {formatStamp(entry.createdAt)}
+                    {isMeeting && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+                        background: 'rgba(59,130,246,0.12)',
+                        color: '#60a5fa',
+                        border: '1px solid rgba(59,130,246,0.3)',
+                        letterSpacing: '0.04em',
+                      }}>
+                        🗓 MEETING · {formatMeetingDate(entry.meetingDate!)}
+                      </span>
+                    )}
+                    <span>{formatStamp(entry.createdAt)}</span>
                     {entry.updatedAt && (
-                      <span style={{ color: 'var(--text-4)', fontWeight: 400, marginLeft: 6 }}>
+                      <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>
                         (edited)
                       </span>
                     )}
@@ -221,21 +295,52 @@ export default function NotesLog({ entries, onChange, onTurnIntoTask }: Props) {
                         outline: 'none', resize: 'vertical', fontFamily: 'inherit',
                       }}
                     />
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
-                      <button type="button" onClick={cancelEdit} style={ghostBtnStyle}>Cancel</button>
-                      <button
-                        type="button"
-                        onClick={saveEdit}
-                        disabled={!editingBody.trim()}
-                        style={{
-                          ...ghostBtnStyle,
-                          background: editingBody.trim() ? '#10b981' : 'var(--border)',
-                          color: editingBody.trim() ? '#fff' : 'var(--text-3)',
-                          border: 'none',
-                        }}
-                      >
-                        Save
-                      </button>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      marginTop: 8, gap: 12, flexWrap: 'wrap',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <label style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          fontSize: 12, color: 'var(--text-2)', cursor: 'pointer', userSelect: 'none',
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={editingIsMeeting}
+                            onChange={e => setEditingIsMeeting(e.target.checked)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span>🗓 Meeting</span>
+                        </label>
+                        {editingIsMeeting && (
+                          <input
+                            type="date"
+                            value={editingMeetingDate}
+                            onChange={e => setEditingMeetingDate(e.target.value)}
+                            style={{
+                              background: 'var(--bg)', border: '1px solid var(--border)',
+                              borderRadius: 6, padding: '3px 6px', fontSize: 12,
+                              color: 'var(--text-1)', outline: 'none',
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" onClick={cancelEdit} style={ghostBtnStyle}>Cancel</button>
+                        <button
+                          type="button"
+                          onClick={saveEdit}
+                          disabled={!editingBody.trim()}
+                          style={{
+                            ...ghostBtnStyle,
+                            background: editingBody.trim() ? '#10b981' : 'var(--border)',
+                            color: editingBody.trim() ? '#fff' : 'var(--text-3)',
+                            border: 'none',
+                          }}
+                        >
+                          Save
+                        </button>
+                      </div>
                     </div>
                   </>
                 ) : (

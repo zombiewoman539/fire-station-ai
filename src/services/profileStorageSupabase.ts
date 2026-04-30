@@ -19,6 +19,7 @@ function parseNoteEntries(meta: any, fallbackTimestamp: string): NoteEntry[] {
         createdAt: typeof e.createdAt === 'string' ? e.createdAt : fallbackTimestamp,
         updatedAt: typeof e.updatedAt === 'string' ? e.updatedAt : undefined,
         body: e.body,
+        meetingDate: typeof e.meetingDate === 'string' ? e.meetingDate : undefined,
       }));
   }
   // Legacy: a single notes string becomes one entry
