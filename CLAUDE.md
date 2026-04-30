@@ -21,7 +21,7 @@ src/
   types.ts              — All TypeScript interfaces (FireInputs, YearData, FireResults, etc.)
   profileTypes.ts       — ClientProfile interface
   defaults.ts           — Default inputs & purchases (Singapore-typical values)
-  calculations.ts       — Core FIRE engine + CPF logic + formatSGD
+  calculations.ts       — Core FIRE engine (SWR-based) + formatSGD. No CPF logic — see "CPF (deferred)" below.
   App.tsx               — Root: AuthGate → Dashboard (layout, state, auto-save)
   components/
     InputPanel.tsx      — Left sidebar: all user inputs
@@ -65,23 +65,17 @@ The chip menu, value editor, engine, and built-in view authoring all read this m
 
 ## Key Domain Concepts
 
-### Singapore CPF
-CPF has three accounts: OA (Ordinary, 2.5%), SA (Special, 4%), MA (Medisave, 4%).
-- Contribution rates are age-banded (from Jan 2026 rates).
-- OW ceiling: S$8,000/month = S$96,000/year.
-- Extra interest: 1% on first S$60k combined (OA capped at S$20k); additional 1% for 55+.
-- BHS (Basic Healthcare Sum): S$79,000 in 2026, grows ~3.5%/yr until age 65 then fixed. MA overflow → SA.
-- CPF LIFE: estimated monthly annuity from ~age 65, input as `cpfLifeMonthly`.
+### CPF (deferred — not modelled)
+CPF logic was intentionally stripped from the engine. There is no OA/SA/MA account tracking, no age-banded contribution rates, no BHS, and no CPF LIFE annuity. Adding it back is a future feature, not a near-term concern. Until then, all FIRE numbers are pure SWR-on-take-home-pay with no SG-specific quirks.
 
 ### FIRE Number
 Calculated via SWR (Safe Withdrawal Rate, default 3.5%):
-- Net drawdown = retirement expenses − CPF LIFE annual payout
+- Net drawdown = inflated retirement expenses (no CPF LIFE deduction since CPF isn't modelled)
 - Core portfolio = net drawdown / SWR
-- Pre-65 bridge = full expenses for years between retirement and 65 (CPF LIFE not yet active)
 - +10% inflation buffer on top
 
 ### Income Model
-`annualIncome` = **gross salary**. Employee CPF is deducted to derive take-home pay. Surplus goes to investments (after 6-month cash buffer top-up).
+`annualIncome` is **take-home pay** — already net of CPF + tax. The EditModal labels it "Annual Take-Home Income after deductions and tax". Surplus goes to investments (after a cash buffer threshold).
 
 ### Scenarios (What-If)
 Four types: `none`, `critical-illness` (with CI sub-type), `tpd`, `death`. Scenarios apply insurance payouts and model income loss.
@@ -132,9 +126,6 @@ Vercel picks up `build/` automatically.
 2. Update `defaultInputs` in `defaults.ts`
 3. Add the input UI in `InputPanel.tsx`
 4. Use the value in `calculations.ts`
-
-### CPF rates
-All CPF logic lives in `calculations.ts` (lines 60–130). The rates are from **January 2026**.
 
 ## Source-of-Truth Files — Read Before Coding
 
