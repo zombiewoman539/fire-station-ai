@@ -150,7 +150,7 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
             {[
               { label: 'Wealth at Retirement', value: formatSGD(wealthAtRetirement), color: '#34d399' },
               { label: 'FIRE Number Needed',   value: formatSGD(fireNumber),          color: '#60a5fa' },
-              { label: 'Years to FIRE',        value: `${yearsToBuild} years`,         color: '#fbbf24' },
+              { label: 'Years to FIRE',        value: yearsToBuild === null ? 'Not reached' : `${yearsToBuild} years`, color: '#fbbf24' },
               { label: onTrack ? 'Surplus' : 'Shortfall', value: formatSGD(Math.abs(gap)), color: onTrack ? '#34d399' : '#f87171' },
               { label: 'Retirement Duration',  value: `${yearsInRetirement} years`,    color: '#a78bfa' },
             ].map(item => (

@@ -190,7 +190,7 @@ export function generateReportHTML(inputs: FireInputs, results: FireResults, cli
   <div class="metric"><div class="metric-label">Annual Expenses</div><div class="metric-value" style="font-size:16px;">${formatSGD(income.annualExpenses)}</div></div>
   <div class="metric"><div class="metric-label">Savings Rate</div><div class="metric-value" style="font-size:16px;">${savingsRate.toFixed(0)}%</div></div>
   <div class="metric"><div class="metric-label">Investment Return</div><div class="metric-value" style="font-size:16px;">${assets.investmentReturnRate}%</div></div>
-  <div class="metric"><div class="metric-label">Years to FIRE</div><div class="metric-value" style="font-size:16px;">${yearsToBuild} yrs</div></div>
+  <div class="metric"><div class="metric-label">Years to FIRE</div><div class="metric-value" style="font-size:16px;">${yearsToBuild === null ? 'Not reached' : `${yearsToBuild} yrs`}</div></div>
 </div>
 
 <div class="section-title">Wealth Projection</div>

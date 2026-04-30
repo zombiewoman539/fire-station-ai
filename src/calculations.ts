@@ -64,35 +64,71 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const yearlyData: YearData[] = [];
   let moneyRunsOutAge: number | undefined;
 
-  // Derive expense total from line items when present
-  const annualExpenses = income.expenseItems && income.expenseItems.length > 0
+  // Base (today's-dollar) expense total — line items override the annualExpenses fallback
+  const baseAnnualExpenses = income.expenseItems && income.expenseItems.length > 0
     ? income.expenseItems.reduce((s, item) =>
         s + (item.frequency === 'monthly' ? item.amount * 12 : item.amount), 0)
     : income.annualExpenses;
 
-  // Derive investment totals from buckets when present
+  // Per-bucket tracking: contributions go into specific buckets, each grows at its own rate.
+  // If no buckets configured, we synthesize a single virtual bucket from the legacy fields.
   const hasBuckets = assets.investmentBuckets && assets.investmentBuckets.length > 0;
-  const bucketTotalValue = hasBuckets
-    ? assets.investmentBuckets.reduce((s, b) => s + b.currentValue, 0)
-    : 0;
-  const annualInvestmentContribution = hasBuckets
-    ? assets.investmentBuckets.reduce((s, b) => s + b.monthlyContribution, 0) * 12
-    : income.annualInvestmentContribution;
-  const blendedInvestRate = hasBuckets && bucketTotalValue > 0
-    ? assets.investmentBuckets.reduce((s, b) =>
-        s + (b.currentValue / bucketTotalValue) * (b.annualReturnRate / 100), 0)
-    : assets.investmentReturnRate / 100;
+  type LiveBucket = { value: number; monthlyContribution: number; rate: number };
+  const liveBuckets: LiveBucket[] = hasBuckets
+    ? assets.investmentBuckets.map(b => ({
+        value: b.currentValue,
+        monthlyContribution: b.monthlyContribution,
+        rate: b.annualReturnRate / 100,
+      }))
+    : [{
+        value: assets.investments,
+        monthlyContribution: income.annualInvestmentContribution / 12,
+        rate: assets.investmentReturnRate / 100,
+      }];
+  const annualInvestmentContribution = liveBuckets.reduce((s, b) => s + b.monthlyContribution * 12, 0);
 
   let cash = assets.cashSavings;
-  let investments = hasBuckets ? bucketTotalValue : assets.investments;
   const inForcePolicies = policies.filter(p => p.policyStatus === 'in-force');
   let insuranceValue = inForcePolicies.reduce((s, p) => s + p.cashValue, 0);
 
   const cashRate = assets.cashReturnRate / 100;
-  const investRate = blendedInvestRate;
   const salaryGrowth = income.salaryGrowthRate / 100;
   const inflationRate = (income.inflationRate ?? 2.5) / 100;
+  const retirementReturnFactor = 1 - ((assets.retirementReturnReduction ?? 30) / 100);
   const yearsToRetirement = retirementAge - currentAge;
+
+  const totalInvestments = (): number => liveBuckets.reduce((s, b) => s + b.value, 0);
+
+  /** Distribute a deposit across buckets weighted by their monthlyContribution share. */
+  const depositToBuckets = (amount: number) => {
+    if (amount <= 0 || liveBuckets.length === 0) return;
+    const totalMonthly = liveBuckets.reduce((s, b) => s + b.monthlyContribution, 0);
+    if (totalMonthly <= 0) {
+      // No declared contribution split — distribute evenly across buckets
+      const share = amount / liveBuckets.length;
+      for (const b of liveBuckets) b.value += share;
+      return;
+    }
+    for (const b of liveBuckets) {
+      b.value += amount * (b.monthlyContribution / totalMonthly);
+    }
+  };
+
+  /** Withdraw from buckets proportionally to their current value. Returns how much was actually withdrawn (≤ amount). */
+  const withdrawFromBuckets = (amount: number): number => {
+    if (amount <= 0) return 0;
+    const total = totalInvestments();
+    if (total <= 0) return 0;
+    const taken = Math.min(amount, total);
+    if (taken === total) {
+      for (const b of liveBuckets) b.value = 0;
+      return taken;
+    }
+    for (const b of liveBuckets) {
+      b.value = Math.max(0, b.value - taken * (b.value / total));
+    }
+    return taken;
+  };
 
   // Scenario state
   const hasScenario = scenario && scenario.type !== 'none';
@@ -119,10 +155,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
           const payUntilYear = new Date(refISO).getFullYear() + p.premiumLimitedYears;
           const simYear = currentCalendarYear + yearIndex;
           if (simYear >= payUntilYear) continue;
-        } else {
-          // No reference date — fall back to years-from-today approximation
-          if (yearIndex >= p.premiumLimitedYears) continue;
         }
+        // No commencementDate or premiumNextDueDate → we don't know when the term started.
+        // Safer to keep charging premiums for the whole simulation than to assume "started today"
+        // (which silently undercharges old policies). User can fix by entering a commencementDate.
       }
       total += p.premiumAmount * (FREQ_MULT[p.premiumFrequency] ?? 12);
     }
@@ -153,10 +189,15 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     return { total, labels };
   };
 
+  /** Deduct from buckets first, then cash. Mirrors the previous "investments-then-cash" priority. */
   const deductFromLiquid = (amount: number) => {
-    investments -= amount;
-    if (investments < 0) { cash += investments; investments = 0; }
-    if (cash < 0) cash = 0;
+    if (amount <= 0) return;
+    const taken = withdrawFromBuckets(amount);
+    const remaining = amount - taken;
+    if (remaining > 0) {
+      cash -= remaining;
+      if (cash < 0) cash = 0;
+    }
   };
 
   for (let i = 0; i <= years; i++) {
@@ -201,26 +242,29 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
     // ============================================================
     // ACCUMULATION PHASE
-    // annualIncome is take-home pay — no CPF deduction needed
+    // annualIncome is take-home pay (already net of CPF + tax).
+    // Inflate base expenses each year to keep the model internally consistent
+    // with the retirement-phase inflation logic.
     // ============================================================
+    const yearsFromNow = age - currentAge;
     if (!isRetired) {
       const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
-      const totalExpenses = annualExpenses + recurringPurchaseCosts + annualPremiums;
+      const inflatedAccumulationExpenses = baseAnnualExpenses * Math.pow(1 + inflationRate, yearsFromNow);
+      const totalExpenses = inflatedAccumulationExpenses + recurringPurchaseCosts + annualPremiums;
       const surplus = takeHomePay - totalExpenses;
 
       if (surplus > 0) {
         const toInvest = Math.min(annualInvestmentContribution, surplus);
-        investments += toInvest;
+        depositToBuckets(toInvest);
         cash += surplus - toInvest;
       } else {
         const deficit = -surplus;
         if (cash >= deficit) {
           cash -= deficit;
         } else {
-          investments -= deficit - cash;
+          withdrawFromBuckets(deficit - cash);
           cash = 0;
         }
-        if (investments < 0) investments = 0;
       }
 
     // ============================================================
@@ -228,25 +272,24 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     // ============================================================
     } else {
       // Retirement expenses in today's dollars — inflate to the actual year
-      const yearsFromNow = age - currentAge;
       const inflatedExpenses = income.retirementExpenses * Math.pow(1 + inflationRate, yearsFromNow);
       const grossDrawdown = inflatedExpenses + recurringPurchaseCosts + annualPremiums;
       const totalDrawdown = Math.max(0, grossDrawdown);
 
-      const totalAvailable = Math.max(0, investments) + Math.max(0, cash);
+      const investmentsTotal = totalInvestments();
+      const totalAvailable = Math.max(0, investmentsTotal) + Math.max(0, cash);
 
       if (totalAvailable <= 0 && totalDrawdown > 0) {
         if (!moneyRunsOutAge) moneyRunsOutAge = age;
       } else if (totalDrawdown > 0) {
-        if (investments >= totalDrawdown) {
-          investments -= totalDrawdown;
-        } else {
-          cash -= totalDrawdown - investments;
-          investments = 0;
-        }
-        if (cash < 0) {
-          if (!moneyRunsOutAge) moneyRunsOutAge = age;
-          cash = 0;
+        const fromInvestments = withdrawFromBuckets(Math.min(totalDrawdown, investmentsTotal));
+        const remainder = totalDrawdown - fromInvestments;
+        if (remainder > 0) {
+          cash -= remainder;
+          if (cash < 0) {
+            if (!moneyRunsOutAge) moneyRunsOutAge = age;
+            cash = 0;
+          }
         }
       }
     }
@@ -260,27 +303,34 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
     // ============================================================
     // INTEREST / RETURNS
+    // Each bucket compounds at its own rate; in retirement, that rate is
+    // reduced by the user-controlled retirementReturnReduction (default 30%).
     // ============================================================
     if (cash > 0) cash *= (1 + cashRate);
 
-    if (investments > 0) {
-      const effectiveRate = isRetired ? investRate * 0.7 : investRate;
-      investments *= (1 + effectiveRate);
+    for (const b of liveBuckets) {
+      if (b.value <= 0) continue;
+      const effectiveRate = isRetired ? b.rate * retirementReturnFactor : b.rate;
+      b.value *= (1 + effectiveRate);
     }
 
-    // Insurance cash value growth — use in-force policies only for the average rate
-    if (insuranceValue > 0) {
-      insuranceValue *= (1 + (inForcePolicies.length > 0
-        ? inForcePolicies.reduce((s, p) => s + p.annualGrowthRate, 0) / inForcePolicies.length / 100
-        : 0));
+    // Insurance cash value growth — weighted average of in-force policies' annualGrowthRate
+    // (weighted by current cashValue so a $100k policy at 1% dominates a $1k policy at 5%).
+    if (insuranceValue > 0 && inForcePolicies.length > 0) {
+      const totalCash = inForcePolicies.reduce((s, p) => s + (p.cashValue || 0), 0);
+      const weightedRate = totalCash > 0
+        ? inForcePolicies.reduce((s, p) => s + (p.cashValue || 0) * (p.annualGrowthRate || 0), 0) / totalCash / 100
+        : 0;
+      insuranceValue *= (1 + weightedRate);
     }
 
+    const investmentsAfter = totalInvestments();
     yearlyData.push({
       age,
-      investments:    Math.max(0, Math.round(investments)),
+      investments:    Math.max(0, Math.round(investmentsAfter)),
       cash:           Math.max(0, Math.round(cash)),
       insuranceValue: Math.max(0, Math.round(insuranceValue)),
-      totalNetWorth:  Math.max(0, Math.round(investments + cash + insuranceValue)),
+      totalNetWorth:  Math.max(0, Math.round(investmentsAfter + cash + insuranceValue)),
       purchaseLabels,
     });
   }
@@ -300,7 +350,9 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const inflationBuffer = 0.10;
   const fireNumber = Math.round((netDrawdownNeeded / withdrawalRate) * (1 + inflationBuffer));
 
-  let yearsToBuild = retirementAge - currentAge;
+  // null = FIRE not reached within the simulated horizon (lifeExpectancy).
+  // Don't pre-set to retirementAge − currentAge: that silently lies when FIRE is unreachable.
+  let yearsToBuild: number | null = null;
   for (let i = 0; i < yearlyData.length; i++) {
     if (yearlyData[i].totalNetWorth >= fireNumber) { yearsToBuild = i; break; }
   }

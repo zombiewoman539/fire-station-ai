@@ -414,7 +414,7 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
               </div>
             )}
           </div>
-          <MetricCard label="Years to Build" value={`${yearsToBuild} yrs`} color="#fbbf24" />
+          <MetricCard label="Years to Build" value={yearsToBuild === null ? 'Not reached' : `${yearsToBuild} yrs`} color="#fbbf24" />
           {/* Status card */}
           <div
             className="rounded-lg flex items-center gap-2"

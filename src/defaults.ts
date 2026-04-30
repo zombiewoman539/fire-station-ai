@@ -35,6 +35,7 @@ export const defaultInputs: FireInputs = {
     cashReturnRate: 1,
     investmentReturnRate: 7,
     investmentBuckets: [],
+    retirementReturnReduction: 30,  // % — investments earn 30% less in retirement (more conservative)
   },
   policies: [
     {

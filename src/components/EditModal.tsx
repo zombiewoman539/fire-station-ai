@@ -501,6 +501,14 @@ function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i:
           </div>
         </div>
       )}
+
+      <SliderField
+        label="Retirement Return Reduction"
+        value={inputs.assets.retirementReturnReduction ?? 30}
+        min={0} max={70} step={5} unit="%"
+        tip="How much the investment return rate is reduced once retired. Reflects de-risking when income stops. Default 30% (e.g. 7% accumulation → 4.9% retirement)."
+        onChange={v => updAssets('retirementReturnReduction', v)}
+      />
     </div>
   );
 }

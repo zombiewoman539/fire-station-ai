@@ -50,11 +50,12 @@ function migrateInputs(inputs: any): FireInputs {
       withdrawalRate:                inc.withdrawalRate ?? 3.5,
     },
     assets: {
-      cashSavings:          assets.cashSavings ?? 0,
-      investments:          assets.investments ?? 0,
-      cashReturnRate:       assets.cashReturnRate ?? 1,
-      investmentReturnRate: assets.investmentReturnRate ?? 7,
-      investmentBuckets:    assets.investmentBuckets ?? [],
+      cashSavings:                assets.cashSavings ?? 0,
+      investments:                assets.investments ?? 0,
+      cashReturnRate:             assets.cashReturnRate ?? 1,
+      investmentReturnRate:       assets.investmentReturnRate ?? 7,
+      investmentBuckets:          assets.investmentBuckets ?? [],
+      retirementReturnReduction:  assets.retirementReturnReduction ?? 30,
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
       ...p,

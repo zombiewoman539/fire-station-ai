@@ -40,6 +40,9 @@ export interface Assets {
   cashReturnRate: number;
   investmentReturnRate: number;     // fallback when investmentBuckets is empty
   investmentBuckets: InvestmentBucket[]; // when non-empty, investments + rate are derived
+  /** Percentage reduction applied to investment returns once retired (0–100).
+   *  Reflects the typical de-risking when you stop earning. Default 30 (i.e. retirement rate = accumulation × 0.70). */
+  retirementReturnReduction?: number;
 }
 
 export interface FundAllocation {
@@ -147,7 +150,8 @@ export interface FireResults {
     withdrawalRate: number;
     inflationBuffer: number;
   };
-  yearsToBuild: number;
+  /** Years from currentAge until net worth first reaches the FIRE number. null = never reaches FIRE within lifeExpectancy. */
+  yearsToBuild: number | null;
   onTrack: boolean;
   moneyRunsOutAge?: number;
 }
