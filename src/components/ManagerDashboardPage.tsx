@@ -9,6 +9,7 @@ import { formatSGD } from '../calculations';
 import { FireInputs } from '../types';
 import { ClientProfile, NoteEntry } from '../profileTypes';
 import DashboardShell from './Dashboard/DashboardShell';
+import NewTaskModal from './NewTaskModal';
 import { computeInsurance } from '../insuranceCompute';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -167,6 +168,10 @@ export default function ManagerDashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [targets, setTargets] = useState<AdvisorTarget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assignTarget, setAssignTarget] = useState<{
+    profile: ClientProfile;
+    advisor: AdvisorSummary;
+  } | null>(null);
   const month = currentMonth();
 
   const load = useCallback(async () => {
@@ -290,6 +295,17 @@ export default function ManagerDashboardPage() {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg)', padding: '28px 32px' }}>
+      {assignTarget && (
+        <NewTaskModal
+          initialClientProfileId={assignTarget.profile.id}
+          initialClientName={assignTarget.profile.name}
+          assignToUserId={assignTarget.advisor.userId ?? undefined}
+          assignToLabel={assignTarget.advisor.email?.split('@')[0] ?? 'advisor'}
+          onClose={() => setAssignTarget(null)}
+          onCreated={() => { setAssignTarget(null); load(); }}
+        />
+      )}
+
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
         {/* Header */}
@@ -346,6 +362,11 @@ export default function ManagerDashboardPage() {
             dashboardKind="manager"
             profiles={teamProfiles.map(teamProfileToClientProfile)}
             tasks={tasks}
+            onRowTaskClick={(profile) => {
+              const advisorUserId = (profile as any).advisorUserId as string | undefined;
+              const advisor = advisors.find(a => a.userId === advisorUserId);
+              if (advisor) setAssignTarget({ profile, advisor });
+            }}
           />
         </div>
 

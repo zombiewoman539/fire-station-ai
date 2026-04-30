@@ -13,6 +13,10 @@ interface Props {
   initialDueDate?: string;
   /** Optional initial title. */
   initialTitle?: string;
+  /** When set, the task is assigned to this user id (manager assigning to an advisor).
+   *  Shown read-only as a chip with `assignToLabel`. */
+  assignToUserId?: string;
+  assignToLabel?: string;
   /** Pre-loaded profile list. If omitted, the component fetches its own. */
   profiles?: ClientProfile[];
   onClose: () => void;
@@ -25,6 +29,8 @@ export default function NewTaskModal({
   initialNotes,
   initialDueDate,
   initialTitle,
+  assignToUserId,
+  assignToLabel,
   profiles: profilesProp,
   onClose,
   onCreated,
@@ -39,6 +45,7 @@ export default function NewTaskModal({
   const [error, setError] = useState('');
 
   const clientLocked = !!initialClientProfileId;
+  const assigning = !!assignToUserId;
 
   useEffect(() => {
     if (profilesProp) return;
@@ -63,6 +70,7 @@ export default function NewTaskModal({
         dueDate: dueDate || undefined,
         notes: notes.trim() || undefined,
         priority,
+        assignedTo: assignToUserId,
       });
       onCreated(task);
     } catch (err: any) {
@@ -89,11 +97,23 @@ export default function NewTaskModal({
         width: '100%', maxWidth: 460,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
       }}>
-        <h2 style={{ margin: '0 0 24px', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>
+        <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>
           New task
         </h2>
+        {assigning && (
+          <p style={{ margin: '0 0 18px', fontSize: 12, color: 'var(--text-3)' }}>
+            Assigning to{' '}
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              padding: '2px 8px', borderRadius: 5,
+              background: 'rgba(96,165,250,0.12)',
+              color: '#60a5fa',
+              border: '1px solid rgba(96,165,250,0.25)',
+            }}>{assignToLabel ?? 'advisor'}</span>
+          </p>
+        )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: assigning ? 0 : 18 }}>
           {/* Title */}
           <div>
             <label style={labelStyle}>Task</label>
