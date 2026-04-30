@@ -37,7 +37,31 @@ src/
     supabaseClient.ts   — Supabase client (env vars or hardcoded fallback)
     profileStorageSupabase.ts — CRUD for ClientProfile in Supabase
     profileStorage.ts   — (legacy local storage, largely unused)
+    savedViewsService.ts — CRUD for the saved_views table
+  components/Dashboard/  — Saved-views + chip-based filter system
+    DashboardShell.tsx     — orchestrator: rail + filter bar + ClientTable
+    SavedViewsRail.tsx     — left rail (built-in / personal / team views)
+    FilterBar.tsx          — chip toolbar + search + Save buttons
+    FilterChip.tsx         — single chip pill + popover editor
+    AddFilterMenu.tsx      — cascading "+ Add filter" menu
+    ClientTable.tsx        — generic table; columnSet = advisor | fire | insurance
+    SaveViewModal.tsx      — name + scope picker
+    filterMeta.ts          — per-field metadata (label, ops, value editor, render)
+  enrichProfile.ts    — One-shot per-row computation (FIRE + insurance + activity flags)
+  filterEngine.ts     — Pure: applyFilters / applySearch / compareRows
+  builtInViews.ts     — Hardcoded system views (read-only, merged into rail at runtime)
+  insuranceCompute.ts — Insurance gap + signal-score logic (used by enrichProfile)
+  savedViewsTypes.ts  — Shared types: FilterChip, ViewConfig, SavedView, ResolvedView
 ```
+
+### Adding a new filter field
+
+To extend the dashboard with a new filter dimension:
+1. Add the field to `FilterField` in `savedViewsTypes.ts`.
+2. Surface its raw value in `EnrichedProfile` (`enrichProfile.ts`).
+3. Map `FilterField` → value in `getFieldValue()` inside `filterEngine.ts`.
+4. Add UI metadata in `FILTER_FIELDS` in `components/Dashboard/filterMeta.ts` (group, label, allowed ops, default chip, value renderer).
+The chip menu, value editor, engine, and built-in view authoring all read this metadata — no other UI changes needed.
 
 ## Key Domain Concepts
 
