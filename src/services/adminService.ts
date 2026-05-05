@@ -6,19 +6,41 @@ export interface AdminUser {
   email: string;
   createdAt: string;
   lastSignInAt: string | null;
+  /** Most-recent meaningful activity: max of sign-in, profile edit, task created/completed.
+   *  Null when the admin_list_user_activity RPC isn't available (e.g. migration not yet run). */
+  lastActiveAt: string | null;
   tier: Tier | 'starter';
   status: string;
   trialEndsAt: string | null;
 }
 
 export async function adminListUsers(): Promise<AdminUser[]> {
-  const { data, error } = await supabase.rpc('admin_list_users');
-  if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  // Fetch the base admin list and the activity overlay in parallel.
+  // If the activity RPC fails (e.g. migration not yet run), we fall back to lastSignInAt.
+  const [usersResult, activityResult] = await Promise.all([
+    supabase.rpc('admin_list_users'),
+    supabase.rpc('admin_list_user_activity').then(
+      r => r,
+      // swallow — the migration may not be deployed yet
+      () => ({ data: null as any, error: { message: 'rpc not available' } as any }),
+    ),
+  ]);
+
+  if (usersResult.error) throw usersResult.error;
+
+  const activityByUser: Record<string, string | null> = {};
+  if (!activityResult.error && Array.isArray(activityResult.data)) {
+    for (const row of activityResult.data as any[]) {
+      activityByUser[row.user_id] = row.last_active_at ?? null;
+    }
+  }
+
+  return (usersResult.data ?? []).map((row: any) => ({
     userId: row.user_id,
     email: row.email,
     createdAt: row.created_at,
     lastSignInAt: row.last_sign_in_at ?? null,
+    lastActiveAt: activityByUser[row.user_id] ?? row.last_sign_in_at ?? null,
     tier: row.tier as Tier,
     status: row.status,
     trialEndsAt: row.trial_ends_at ?? null,

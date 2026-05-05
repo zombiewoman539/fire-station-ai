@@ -10,6 +10,17 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function relativeDays(iso: string | null): string {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days}d ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 function TierBadge({ tier, status, trialEndsAt }: { tier: string; status: string; trialEndsAt: string | null }) {
   const isTrialing = status === 'trialing' && trialEndsAt && new Date(trialEndsAt) > new Date();
   const color =
@@ -314,7 +325,16 @@ export default function AdminPage() {
                 </div>
               </div>
               <div><TierBadge tier={u.tier} status={u.status} trialEndsAt={u.trialEndsAt} /></div>
-              <div style={{ fontSize: 12, color: 'var(--text-4)' }}>{formatDate(u.lastSignInAt)}</div>
+              <div title={u.lastActiveAt ? `Last activity: ${formatDate(u.lastActiveAt)}\nLast sign-in: ${formatDate(u.lastSignInAt)}` : ''}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
+                  {relativeDays(u.lastActiveAt)}
+                </div>
+                {u.lastSignInAt && (
+                  <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>
+                    signed in {relativeDays(u.lastSignInAt)}
+                  </div>
+                )}
+              </div>
               <div style={{ fontSize: 12, color: trialExpired ? '#f87171' : u.trialEndsAt ? '#a78bfa' : 'var(--text-5)' }}>
                 {u.trialEndsAt ? formatDate(u.trialEndsAt) + (trialExpired ? ' ✕' : '') : '—'}
               </div>
