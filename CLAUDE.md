@@ -24,7 +24,8 @@ src/
   calculations.ts       — Core FIRE engine (SWR-based) + formatSGD. No CPF logic — see "CPF (deferred)" below.
   App.tsx               — Root: AuthGate → Dashboard (layout, state, auto-save)
   components/
-    InputPanel.tsx      — Left sidebar: all user inputs
+    EditModal.tsx       — Primary client-input UI (modal opened from the toolbar). All inputs live here.
+    InputPanel.tsx      — Legacy / unrendered. Do NOT add new inputs here.
     ChartPanel.tsx      — Right panel: net worth chart
     ProfileManager.tsx  — Profile switcher at top of sidebar
     AuthGate.tsx        — Google OAuth login screen
@@ -96,16 +97,17 @@ Inputs auto-save to Supabase with an **800ms debounce** after each change. Save 
 ┌─────────────────────────────────────────────┐
 │  ProfileManager (top of sidebar)             │
 ├──────────────┬──────────────────────────────┤
-│  InputPanel  │  ChartPanel + toolbar         │
-│  (380px,     │  (flex-1)                     │
-│   scrollable)│                               │
+│  Sidebar     │  ChartPanel + toolbar         │
+│  (profiles + │  (flex-1)                     │
+│   nav)       │  Click "Edit" → EditModal     │
+│              │  opens (primary input UI)     │
 │              ├──────────────────────────────┤
 │              │  Bottom drawer (340px max):   │
 │              │  Insights | What If           │
 └──────────────┴──────────────────────────────┘
 ```
 
-Sidebar collapses to 0 width with a toggle button. Bottom drawer toggles between `insights` and `scenarios` tabs (clicking active tab closes it).
+Sidebar collapses to 0 width with a toggle button. Bottom drawer toggles between `insights` and `scenarios` tabs (clicking active tab closes it). Client inputs are edited inside the EditModal overlay, not in the left sidebar.
 
 ## Common Tasks
 
@@ -124,8 +126,9 @@ Vercel picks up `build/` automatically.
 ### Add a new input field
 1. Add the field to the relevant interface in `types.ts`
 2. Update `defaultInputs` in `defaults.ts`
-3. Add the input UI in `InputPanel.tsx`
+3. Add the input UI in the relevant section of `EditModal.tsx` (e.g. `AssetsSection`, `IncomeSection`, etc. — NOT `InputPanel.tsx`)
 4. Use the value in `calculations.ts`
+5. If the field affects an existing client's stored data, add a defaulted fallback in `migrateInputs()` in `services/profileStorageSupabase.ts`
 
 ## Source-of-Truth Files — Read Before Coding
 
@@ -147,5 +150,5 @@ Do not invent or estimate these numbers — always copy from TIERS.md.
 
 - Do not add error handling for impossible states inside the calculation engine — it's pure math with validated inputs.
 - Do not mock Supabase in tests — the project doesn't have integration tests yet; unit tests should test `calculations.ts` directly.
-- The `annualIncome` field is **gross salary**, not take-home. Don't confuse the two.
+- The `annualIncome` field is **take-home pay** (already net of CPF + tax). The EditModal label confirms this. Do not deduct anything else from it.
 - Tailwind v4 uses the PostCSS plugin approach, not `tailwind.config.js` — don't add one.
