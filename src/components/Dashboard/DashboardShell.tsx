@@ -15,6 +15,7 @@ import SavedViewsRail from './SavedViewsRail';
 import FilterBar from './FilterBar';
 import ClientTable from './ClientTable';
 import SaveViewModal from './SaveViewModal';
+import ColumnPicker from './ColumnPicker';
 
 interface Props {
   dashboardKind: DashboardKind;
@@ -26,7 +27,7 @@ interface Props {
 
 const STORAGE_KEY_PREFIX = 'dashboard';
 
-function storageKey(kind: DashboardKind, key: 'activeViewId' | 'draftFilters' | 'search'): string {
+function storageKey(kind: DashboardKind, key: 'activeViewId' | 'draftFilters' | 'draftVisibleColumns' | 'search'): string {
   return `${STORAGE_KEY_PREFIX}.${kind}.${key}`;
 }
 
@@ -62,6 +63,14 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   });
+  // null = no draft (use the active view's columns); 'unset' sentinel encoded as the string "__unset__"
+  // since visibleColumns can legitimately be undefined; we flatten to either an array or null-no-draft.
+  const [draftVisibleColumns, setDraftVisibleColumns] = React.useState<string[] | undefined | null>(() => {
+    const raw = localStorage.getItem(storageKey(dashboardKind, 'draftVisibleColumns'));
+    if (!raw) return null;
+    if (raw === '__all__') return undefined; // user explicitly reset to all
+    try { return JSON.parse(raw); } catch { return null; }
+  });
   const [search, setSearch] = React.useState<string>(() => localStorage.getItem(storageKey(dashboardKind, 'search')) ?? '');
   const [showSaveModal, setShowSaveModal] = React.useState<'as-new' | 'rename' | null>(null);
 
@@ -72,6 +81,11 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     if (draftFilters === null) localStorage.removeItem(storageKey(dashboardKind, 'draftFilters'));
     else localStorage.setItem(storageKey(dashboardKind, 'draftFilters'), JSON.stringify(draftFilters));
   }, [draftFilters, dashboardKind]);
+  React.useEffect(() => {
+    if (draftVisibleColumns === null) localStorage.removeItem(storageKey(dashboardKind, 'draftVisibleColumns'));
+    else if (draftVisibleColumns === undefined) localStorage.setItem(storageKey(dashboardKind, 'draftVisibleColumns'), '__all__');
+    else localStorage.setItem(storageKey(dashboardKind, 'draftVisibleColumns'), JSON.stringify(draftVisibleColumns));
+  }, [draftVisibleColumns, dashboardKind]);
   React.useEffect(() => { localStorage.setItem(storageKey(dashboardKind, 'search'), search); }, [search, dashboardKind]);
 
   // Load saved views once on mount
@@ -106,14 +120,16 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     [allViews, activeViewId, builtIns],
   );
 
-  // Effective config: draft chips override the active view's chips when set
+  // Effective config: drafts (chips, visibleColumns) override the active view when set
   const effectiveConfig: ViewConfig = React.useMemo(() => {
     if (!activeView) return DEFAULT_CONFIG_FOR_KIND[dashboardKind];
-    if (draftFilters === null) return activeView.config;
-    return { ...activeView.config, filters: draftFilters };
-  }, [activeView, draftFilters, dashboardKind]);
+    let cfg: ViewConfig = activeView.config;
+    if (draftFilters !== null) cfg = { ...cfg, filters: draftFilters };
+    if (draftVisibleColumns !== null) cfg = { ...cfg, visibleColumns: draftVisibleColumns };
+    return cfg;
+  }, [activeView, draftFilters, draftVisibleColumns, dashboardKind]);
 
-  const isModified = draftFilters !== null;
+  const isModified = draftFilters !== null || draftVisibleColumns !== null;
 
   // ─── Compute rows ──────────────────────────────────────────────────────────
   const enriched = React.useMemo(
@@ -141,6 +157,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
   const handleSelectView = (viewId: string) => {
     setActiveViewId(viewId);
     setDraftFilters(null);
+    setDraftVisibleColumns(null);
   };
 
   const handleChipsChange = (chips: FilterChip[]) => {
@@ -186,6 +203,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     });
     await refreshViews();
     setActiveViewId(newView.id);
+    setDraftVisibleColumns(null);
     setDraftFilters(null);
     setShowSaveModal(null);
   };
@@ -195,6 +213,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     await updateSavedView(activeView.id, { config: effectiveConfig });
     await refreshViews();
     setDraftFilters(null);
+    setDraftVisibleColumns(null);
   };
 
   const handleDelete = async (view: ResolvedView) => {
@@ -203,6 +222,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     if (activeViewId === view.id) {
       setActiveViewId(builtIns[0]?.id ?? '');
       setDraftFilters(null);
+      setDraftVisibleColumns(null);
     }
     await refreshViews();
   };
@@ -215,7 +235,12 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
 
   // ─── Render ────────────────────────────────────────────────────────────────
   const actions = (
-    <div style={{ display: 'flex', gap: 6, marginLeft: 6 }}>
+    <div style={{ display: 'flex', gap: 6, marginLeft: 6, alignItems: 'center' }}>
+      <ColumnPicker
+        columnSet={effectiveConfig.columnSet}
+        visibleColumns={effectiveConfig.visibleColumns}
+        onChange={(next) => setDraftVisibleColumns(next === undefined ? undefined : next)}
+      />
       {activeView && !activeView.readonly && isModified && (
         <button
           type="button"
@@ -286,6 +311,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
           sortBy={effectiveConfig.sortBy}
           sortDir={effectiveConfig.sortDir}
           onSortChange={handleSortChange}
+          visibleColumns={effectiveConfig.visibleColumns}
           onTaskClick={handleRowTaskClick}
         />
       </main>

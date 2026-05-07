@@ -5,12 +5,60 @@ import { ColumnSet } from '../../savedViewsTypes';
 import { formatSGD } from '../../calculations';
 import { INSURANCE_BENCHMARK } from '../../insuranceCompute';
 
+/** Column metadata per column set. Drives the ColumnPicker UI and the table's visible() check.
+ *  Note: the per-row "+ Task" button is rendered separately when onTaskClick is set — it's not
+ *  user-toggleable in v1 since hiding it would break the manager workflow. */
+export interface ColumnDef {
+  id: string;
+  label: string;
+  /** Sort key used by ClientTable's onSortChange callback. Omitted for non-sortable columns. */
+  sortKey?: string;
+  /** Always shown when columnSet is active (e.g. client name) — picker renders but disables toggle. */
+  required?: boolean;
+}
+
+export const COLUMNS_BY_SET: Record<ColumnSet, ColumnDef[]> = {
+  advisor: [
+    { id: 'name',          label: 'Name',                sortKey: 'name', required: true },
+    { id: 'age',           label: 'Age',                 sortKey: 'age' },
+    { id: 'retirementAge', label: 'Retire',              sortKey: 'retirementAge' },
+    { id: 'status',        label: 'Status',              sortKey: 'fireOnTrack' },
+    { id: 'wealth',        label: 'Wealth at Retirement', sortKey: 'wealth' },
+    { id: 'coverage',      label: 'Death Coverage',      sortKey: 'coverage' },
+    { id: 'lpa',           label: 'LPA' },
+    { id: 'will',          label: 'Will' },
+    { id: 'lastSeen',      label: 'Last Met',            sortKey: 'lastSeen' },
+  ],
+  fire: [
+    { id: 'name',        label: 'Client',     sortKey: 'name', required: true },
+    { id: 'advisor',     label: 'Advisor' },
+    { id: 'age',         label: 'Age',        sortKey: 'age' },
+    { id: 'income',      label: 'Income',     sortKey: 'income' },
+    { id: 'fireStatus',  label: 'FIRE Status', sortKey: 'fireOnTrack' },
+    { id: 'fireGap',     label: 'Gap / Surplus', sortKey: 'fireGap' },
+    { id: 'lastUpdated', label: 'Last seen',  sortKey: 'lastUpdated' },
+  ],
+  insurance: [
+    { id: 'name',         label: 'Client',     sortKey: 'name', required: true },
+    { id: 'advisor',      label: 'Advisor' },
+    { id: 'age',          label: 'Age',        sortKey: 'age' },
+    { id: 'income',       label: 'Income',     sortKey: 'income' },
+    { id: 'deathGap',     label: 'Death Gap',  sortKey: 'deathGap' },
+    { id: 'ciGap',        label: 'CI Gap',     sortKey: 'ciGap' },
+    { id: 'eciGap',       label: 'ECI Gap',    sortKey: 'eciGap' },
+    { id: 'hospitalPlan', label: 'Hospital Plan' },
+    { id: 'signalScore',  label: 'Signal',     sortKey: 'signalScore' },
+  ],
+};
+
 interface Props {
   rows: EnrichedProfile[];
   columnSet: ColumnSet;
   sortBy: string;
   sortDir: 'asc' | 'desc';
   onSortChange: (sortBy: string, sortDir: 'asc' | 'desc') => void;
+  /** When provided, only these column ids render; missing → all columns for the set. */
+  visibleColumns?: string[];
   /** Optional callback for the per-row "+ Task" button (manager dashboard). */
   onTaskClick?: (row: EnrichedProfile) => void;
 }
@@ -50,8 +98,17 @@ function SignalBadge({ score }: { score: number }) {
   );
 }
 
-export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortChange, onTaskClick }: Props) {
+export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortChange, visibleColumns, onTaskClick }: Props) {
   const navigate = useNavigate();
+
+  /** True if this column id should render. When visibleColumns is undefined (no view setting),
+   *  all columns show; required columns always show even if explicitly hidden. */
+  const visible = (id: string): boolean => {
+    const def = COLUMNS_BY_SET[columnSet].find(c => c.id === id);
+    if (def?.required) return true;
+    if (!visibleColumns) return true;
+    return visibleColumns.includes(id);
+  };
 
   const handleSort = (key: string) => {
     if (sortBy === key) onSortChange(key, sortDir === 'asc' ? 'desc' : 'asc');
@@ -99,41 +156,41 @@ export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortCh
           <thead>
             {columnSet === 'advisor' && (
               <tr>
-                <th style={colHd('name')}             onClick={() => handleSort('name')}>Name <SortArrow k="name" /></th>
-                <th style={colHd('age', 'center')}    onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>
-                <th style={colHd('retirementAge', 'center')} onClick={() => handleSort('retirementAge')}>Retire <SortArrow k="retirementAge" /></th>
-                <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>Status <SortArrow k="fireOnTrack" /></th>
-                <th style={colHd('wealth', 'right')}  onClick={() => handleSort('wealth')}>Wealth at Retirement <SortArrow k="wealth" /></th>
-                <th style={colHd('coverage', 'right')} onClick={() => handleSort('coverage')}>Death Coverage <SortArrow k="coverage" /></th>
-                <th style={colHdPlain('center')}>LPA</th>
-                <th style={colHdPlain('center')}>Will</th>
-                <th style={colHd('lastSeen', 'center')} onClick={() => handleSort('lastSeen')}>Last Met <SortArrow k="lastSeen" /></th>
+                {visible('name')          && <th style={colHd('name')}             onClick={() => handleSort('name')}>Name <SortArrow k="name" /></th>}
+                {visible('age')           && <th style={colHd('age', 'center')}    onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
+                {visible('retirementAge') && <th style={colHd('retirementAge', 'center')} onClick={() => handleSort('retirementAge')}>Retire <SortArrow k="retirementAge" /></th>}
+                {visible('status')        && <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>Status <SortArrow k="fireOnTrack" /></th>}
+                {visible('wealth')        && <th style={colHd('wealth', 'right')}  onClick={() => handleSort('wealth')}>Wealth at Retirement <SortArrow k="wealth" /></th>}
+                {visible('coverage')      && <th style={colHd('coverage', 'right')} onClick={() => handleSort('coverage')}>Death Coverage <SortArrow k="coverage" /></th>}
+                {visible('lpa')           && <th style={colHdPlain('center')}>LPA</th>}
+                {visible('will')          && <th style={colHdPlain('center')}>Will</th>}
+                {visible('lastSeen')      && <th style={colHd('lastSeen', 'center')} onClick={() => handleSort('lastSeen')}>Last Met <SortArrow k="lastSeen" /></th>}
                 <th style={colHdPlain('right')}></th>
               </tr>
             )}
             {columnSet === 'fire' && (
               <tr>
-                <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>
-                <th style={colHdPlain()}>Advisor</th>
-                <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>
-                <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>
-                <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>FIRE Status <SortArrow k="fireOnTrack" /></th>
-                <th style={colHd('fireGap', 'right')} onClick={() => handleSort('fireGap')}>Gap / Surplus <SortArrow k="fireGap" /></th>
-                <th style={colHd('lastUpdated', 'center')} onClick={() => handleSort('lastUpdated')}>Last seen <SortArrow k="lastUpdated" /></th>
+                {visible('name')        && <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>}
+                {visible('advisor')     && <th style={colHdPlain()}>Advisor</th>}
+                {visible('age')         && <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
+                {visible('income')      && <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>}
+                {visible('fireStatus')  && <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>FIRE Status <SortArrow k="fireOnTrack" /></th>}
+                {visible('fireGap')     && <th style={colHd('fireGap', 'right')} onClick={() => handleSort('fireGap')}>Gap / Surplus <SortArrow k="fireGap" /></th>}
+                {visible('lastUpdated') && <th style={colHd('lastUpdated', 'center')} onClick={() => handleSort('lastUpdated')}>Last seen <SortArrow k="lastUpdated" /></th>}
                 {onTaskClick && <th style={colHdPlain('right')}></th>}
               </tr>
             )}
             {columnSet === 'insurance' && (
               <tr>
-                <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>
-                <th style={colHdPlain()}>Advisor</th>
-                <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>
-                <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>
-                <th style={colHd('deathGap', 'center')} onClick={() => handleSort('deathGap')}>Death Gap <SortArrow k="deathGap" /></th>
-                <th style={colHd('ciGap', 'center')}   onClick={() => handleSort('ciGap')}>CI Gap <SortArrow k="ciGap" /></th>
-                <th style={colHd('eciGap', 'center')}  onClick={() => handleSort('eciGap')}>ECI Gap <SortArrow k="eciGap" /></th>
-                <th style={colHdPlain('center')}>Hospital Plan</th>
-                <th style={colHd('signalScore', 'center')} onClick={() => handleSort('signalScore')}>Signal <SortArrow k="signalScore" /></th>
+                {visible('name')         && <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>}
+                {visible('advisor')      && <th style={colHdPlain()}>Advisor</th>}
+                {visible('age')          && <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
+                {visible('income')       && <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>}
+                {visible('deathGap')     && <th style={colHd('deathGap', 'center')} onClick={() => handleSort('deathGap')}>Death Gap <SortArrow k="deathGap" /></th>}
+                {visible('ciGap')        && <th style={colHd('ciGap', 'center')}   onClick={() => handleSort('ciGap')}>CI Gap <SortArrow k="ciGap" /></th>}
+                {visible('eciGap')       && <th style={colHd('eciGap', 'center')}  onClick={() => handleSort('eciGap')}>ECI Gap <SortArrow k="eciGap" /></th>}
+                {visible('hospitalPlan') && <th style={colHdPlain('center')}>Hospital Plan</th>}
+                {visible('signalScore')  && <th style={colHd('signalScore', 'center')} onClick={() => handleSort('signalScore')}>Signal <SortArrow k="signalScore" /></th>}
                 {onTaskClick && <th style={colHdPlain('right')}></th>}
               </tr>
             )}
@@ -147,6 +204,7 @@ export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortCh
                 first={i === 0}
                 onView={() => handleViewClient(row.profile.id)}
                 onTaskClick={onTaskClick}
+                visible={visible}
               />
             ))}
           </tbody>
@@ -162,9 +220,10 @@ interface RowProps {
   first: boolean;
   onView: () => void;
   onTaskClick?: (row: EnrichedProfile) => void;
+  visible: (columnId: string) => boolean;
 }
 
-function ClientRow({ row, columnSet, first, onView, onTaskClick }: RowProps) {
+function ClientRow({ row, columnSet, first, onView, onTaskClick, visible }: RowProps) {
   const td: React.CSSProperties = { padding: '11px 14px', fontSize: 13, color: 'var(--text-2)', verticalAlign: 'middle' };
   const profile = row.profile;
   const advisorEmail = (profile as any).advisorEmail as string | undefined;
@@ -182,56 +241,74 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick }: RowProps) {
         onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface)'}
         onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
       >
-        <td style={{ ...td }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-              background: 'var(--inset)', border: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 700, color: 'var(--text-3)',
-            }}>{profile.name.charAt(0).toUpperCase()}</div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{profile.name}</span>
-          </div>
-        </td>
-        <td style={{ ...td, textAlign: 'center' }}>
-          {row.liveAge}
-          {profile.inputs.personal?.dateOfBirth && (
-            <span style={{ fontSize: 10, color: 'var(--text-5)', marginLeft: 4 }}>live</span>
-          )}
-        </td>
-        <td style={{ ...td, textAlign: 'center' }}>{retAge ?? '—'}</td>
-        <td style={{ ...td, textAlign: 'center' }}>
-          <span style={{
-            fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
-            background: row.fireOnTrack ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-            color: row.fireOnTrack ? '#34d399' : '#f87171',
-            border: `1px solid ${row.fireOnTrack ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-          }}>
-            {row.fireOnTrack ? '✓ On Track' : '⚠ Shortfall'}
-          </span>
-        </td>
-        <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatSGDK(row.wealthAtRetirement)}</td>
-        <td style={{ ...td, textAlign: 'right', color: row.hasMissingInsurance ? '#fbbf24' : 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
-          {row.hasMissingInsurance ? '— No coverage' : formatSGDK(row.totalDeathSA)}
-        </td>
-        <td style={{ ...td, textAlign: 'center' }}>
-          <span style={badgeStyle(lpa, '#818cf8')}>{lpa ? '✓' : '—'}</span>
-        </td>
-        <td style={{ ...td, textAlign: 'center' }}>
-          <span style={badgeStyle(will, '#818cf8')}>{will ? '✓' : '—'}</span>
-        </td>
-        <td style={{ ...td, textAlign: 'center' }}>
-          {row.daysSinceMeeting === null ? (
-            <span style={{ fontSize: 11, color: 'var(--text-5)' }}>Never</span>
-          ) : (
+        {visible('name') && (
+          <td style={{ ...td }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                background: 'var(--inset)', border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 700, color: 'var(--text-3)',
+              }}>{profile.name.charAt(0).toUpperCase()}</div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{profile.name}</span>
+            </div>
+          </td>
+        )}
+        {visible('age') && (
+          <td style={{ ...td, textAlign: 'center' }}>
+            {row.liveAge}
+            {profile.inputs.personal?.dateOfBirth && (
+              <span style={{ fontSize: 10, color: 'var(--text-5)', marginLeft: 4 }}>live</span>
+            )}
+          </td>
+        )}
+        {visible('retirementAge') && (
+          <td style={{ ...td, textAlign: 'center' }}>{retAge ?? '—'}</td>
+        )}
+        {visible('status') && (
+          <td style={{ ...td, textAlign: 'center' }}>
             <span style={{
-              fontSize: 11, fontWeight: 600,
-              color: row.daysSinceMeeting > 365 ? '#f87171' : row.daysSinceMeeting > 180 ? '#fbbf24' : 'var(--text-3)',
+              fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+              background: row.fireOnTrack ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+              color: row.fireOnTrack ? '#34d399' : '#f87171',
+              border: `1px solid ${row.fireOnTrack ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
             }}>
-              {row.daysSinceMeeting === 0 ? 'Today' : `${row.daysSinceMeeting}d ago`}
+              {row.fireOnTrack ? '✓ On Track' : '⚠ Shortfall'}
             </span>
-          )}
-        </td>
+          </td>
+        )}
+        {visible('wealth') && (
+          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatSGDK(row.wealthAtRetirement)}</td>
+        )}
+        {visible('coverage') && (
+          <td style={{ ...td, textAlign: 'right', color: row.hasMissingInsurance ? '#fbbf24' : 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+            {row.hasMissingInsurance ? '— No coverage' : formatSGDK(row.totalDeathSA)}
+          </td>
+        )}
+        {visible('lpa') && (
+          <td style={{ ...td, textAlign: 'center' }}>
+            <span style={badgeStyle(lpa, '#818cf8')}>{lpa ? '✓' : '—'}</span>
+          </td>
+        )}
+        {visible('will') && (
+          <td style={{ ...td, textAlign: 'center' }}>
+            <span style={badgeStyle(will, '#818cf8')}>{will ? '✓' : '—'}</span>
+          </td>
+        )}
+        {visible('lastSeen') && (
+          <td style={{ ...td, textAlign: 'center' }}>
+            {row.daysSinceMeeting === null ? (
+              <span style={{ fontSize: 11, color: 'var(--text-5)' }}>Never</span>
+            ) : (
+              <span style={{
+                fontSize: 11, fontWeight: 600,
+                color: row.daysSinceMeeting > 365 ? '#f87171' : row.daysSinceMeeting > 180 ? '#fbbf24' : 'var(--text-3)',
+              }}>
+                {row.daysSinceMeeting === 0 ? 'Today' : `${row.daysSinceMeeting}d ago`}
+              </span>
+            )}
+          </td>
+        )}
         <td style={{ ...td, textAlign: 'right' }}>
           <button
             onClick={e => { e.stopPropagation(); onView(); }}
@@ -252,92 +329,116 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick }: RowProps) {
   const gender = row.profile.inputs.personal?.gender ?? '';
   return (
     <tr style={{ borderTop: first ? 'none' : '1px solid var(--border)' }}>
-      <td style={td}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{profile.name}</div>
-        {phoneNumber && <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>{phoneNumber}</div>}
-      </td>
-      <td style={td}>
-        {advisorEmail ? (
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{advisorEmail.split('@')[0]}</span>
-        ) : (
-          <span style={{ fontSize: 12, color: 'var(--text-5)', fontStyle: 'italic' }}>Advisor removed</span>
-        )}
-      </td>
-      <td style={{ ...td, textAlign: 'center' }}>
-        {ageCell !== null ? (
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
-              {ageCell}{gender && <span style={{ fontSize: 10, color: 'var(--text-5)', marginLeft: 4 }}>({gender})</span>}
+      {visible('name') && (
+        <td style={td}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{profile.name}</div>
+          {phoneNumber && <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>{phoneNumber}</div>}
+        </td>
+      )}
+      {visible('advisor') && (
+        <td style={td}>
+          {advisorEmail ? (
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{advisorEmail.split('@')[0]}</span>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--text-5)', fontStyle: 'italic' }}>Advisor removed</span>
+          )}
+        </td>
+      )}
+      {visible('age') && (
+        <td style={{ ...td, textAlign: 'center' }}>
+          {ageCell !== null ? (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
+                {ageCell}{gender && <span style={{ fontSize: 10, color: 'var(--text-5)', marginLeft: 4 }}>({gender})</span>}
+              </div>
+              {retCell !== null && <div style={{ fontSize: 10, color: 'var(--text-5)' }}>ret. {retCell}</div>}
             </div>
-            {retCell !== null && <div style={{ fontSize: 10, color: 'var(--text-5)' }}>ret. {retCell}</div>}
-          </div>
-        ) : <span style={{ color: 'var(--text-5)', fontSize: 12 }}>—</span>}
-      </td>
-      <td style={{ ...td, textAlign: 'right' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
-          {row.annualIncome ? formatSGD(row.annualIncome) : '—'}
-        </span>
-      </td>
+          ) : <span style={{ color: 'var(--text-5)', fontSize: 12 }}>—</span>}
+        </td>
+      )}
+      {visible('income') && (
+        <td style={{ ...td, textAlign: 'right' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
+            {row.annualIncome ? formatSGD(row.annualIncome) : '—'}
+          </span>
+        </td>
+      )}
 
       {columnSet === 'fire' && (
         <>
-          <td style={{ ...td, textAlign: 'center' }}>
-            {row.fireOnTrack ? (
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399',
-                background: 'rgba(52,211,153,0.1)', padding: '2px 9px', borderRadius: 20 }}>On track</span>
-            ) : (
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#f87171',
-                background: 'rgba(248,113,113,0.1)', padding: '2px 9px', borderRadius: 20 }}>
-                Gap{row.results.moneyRunsOutAge ? ` · age ${row.results.moneyRunsOutAge}` : ''}
+          {visible('fireStatus') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              {row.fireOnTrack ? (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399',
+                  background: 'rgba(52,211,153,0.1)', padding: '2px 9px', borderRadius: 20 }}>On track</span>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#f87171',
+                  background: 'rgba(248,113,113,0.1)', padding: '2px 9px', borderRadius: 20 }}>
+                  Gap{row.results.moneyRunsOutAge ? ` · age ${row.results.moneyRunsOutAge}` : ''}
+                </span>
+              )}
+            </td>
+          )}
+          {visible('fireGap') && (
+            <td style={{ ...td, textAlign: 'right' }}>
+              {row.fireGap !== null ? (
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#f87171' }}>-{formatSGD(row.fireGap)}</span>
+              ) : row.fireSurplus !== null ? (
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>+{formatSGD(row.fireSurplus)}</span>
+              ) : <span style={{ fontSize: 12, color: 'var(--text-5)' }}>—</span>}
+            </td>
+          )}
+          {visible('lastUpdated') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: lastUpdatedColor(row.daysSinceUpdate) }}>
+                {row.daysSinceUpdate === 0 ? 'Today' : row.daysSinceUpdate === 1 ? 'Yesterday' : `${row.daysSinceUpdate}d ago`}
               </span>
-            )}
-          </td>
-          <td style={{ ...td, textAlign: 'right' }}>
-            {row.fireGap !== null ? (
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#f87171' }}>-{formatSGD(row.fireGap)}</span>
-            ) : row.fireSurplus !== null ? (
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>+{formatSGD(row.fireSurplus)}</span>
-            ) : <span style={{ fontSize: 12, color: 'var(--text-5)' }}>—</span>}
-          </td>
-          <td style={{ ...td, textAlign: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: lastUpdatedColor(row.daysSinceUpdate) }}>
-              {row.daysSinceUpdate === 0 ? 'Today' : row.daysSinceUpdate === 1 ? 'Yesterday' : `${row.daysSinceUpdate}d ago`}
-            </span>
-          </td>
+            </td>
+          )}
         </>
       )}
 
       {columnSet === 'insurance' && (
         <>
-          <td style={{ ...td, textAlign: 'center' }}>
-            <GapCell gap={row.insurance.deathGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.death} />
-          </td>
-          <td style={{ ...td, textAlign: 'center' }}>
-            <GapCell gap={row.insurance.ciGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.ci} />
-          </td>
-          <td style={{ ...td, textAlign: 'center' }}>
-            <GapCell gap={row.insurance.eciGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.eci} />
-          </td>
-          <td style={{ ...td, textAlign: 'center' }}>
-            {row.insurance.hasISP === null ? (
-              <span style={{ fontSize: 11, color: 'var(--text-5)' }}>—</span>
-            ) : row.insurance.hasISP === false ? (
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 8px', borderRadius: 20 }}>No ISP</span>
-            ) : row.insurance.hasRider === false ? (
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '2px 8px', borderRadius: 20 }}>No rider</span>
-                {row.insurance.ispWardClass && <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>Class {row.insurance.ispWardClass}</div>}
-              </div>
-            ) : (
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 20 }}>ISP + Rider</span>
-                {row.insurance.ispWardClass && <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>Class {row.insurance.ispWardClass}</div>}
-              </div>
-            )}
-          </td>
-          <td style={{ ...td, textAlign: 'center' }}>
-            <SignalBadge score={row.insurance.signalScore} />
-          </td>
+          {visible('deathGap') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              <GapCell gap={row.insurance.deathGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.death} />
+            </td>
+          )}
+          {visible('ciGap') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              <GapCell gap={row.insurance.ciGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.ci} />
+            </td>
+          )}
+          {visible('eciGap') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              <GapCell gap={row.insurance.eciGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.eci} />
+            </td>
+          )}
+          {visible('hospitalPlan') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              {row.insurance.hasISP === null ? (
+                <span style={{ fontSize: 11, color: 'var(--text-5)' }}>—</span>
+              ) : row.insurance.hasISP === false ? (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 8px', borderRadius: 20 }}>No ISP</span>
+              ) : row.insurance.hasRider === false ? (
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '2px 8px', borderRadius: 20 }}>No rider</span>
+                  {row.insurance.ispWardClass && <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>Class {row.insurance.ispWardClass}</div>}
+                </div>
+              ) : (
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 20 }}>ISP + Rider</span>
+                  {row.insurance.ispWardClass && <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>Class {row.insurance.ispWardClass}</div>}
+                </div>
+              )}
+            </td>
+          )}
+          {visible('signalScore') && (
+            <td style={{ ...td, textAlign: 'center' }}>
+              <SignalBadge score={row.insurance.signalScore} />
+            </td>
+          )}
         </>
       )}
 

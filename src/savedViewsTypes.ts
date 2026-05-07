@@ -38,6 +38,8 @@ export interface ViewConfig {
   sortBy: string;
   sortDir: 'asc' | 'desc';
   columnSet: ColumnSet;
+  /** When set, only these column ids render in ClientTable; undefined = full default set. */
+  visibleColumns?: string[];
 }
 
 export interface SavedView {
