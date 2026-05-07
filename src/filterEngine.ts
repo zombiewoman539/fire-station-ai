@@ -19,6 +19,7 @@ function getFieldValue(row: EnrichedProfile, field: FilterField): number | boole
     case 'daysUntilReview':  return row.daysUntilReview;
     case 'hasOpenTask':      return row.hasOpenTask;
     case 'hasNotes':         return row.hasNotes;
+    case 'nextPremiumDueDays': return row.nearestDueDays;       // null = no in-force premium in next 90d
     case 'advisor':          return (row.profile as any).advisorUserId ?? null;
     default:                 return null;
   }
@@ -61,16 +62,17 @@ function evaluateChip(row: EnrichedProfile, chip: FilterChip): boolean {
       return v > n;
     }
     case 'within': {
-      // For daysSinceMeeting: "met within N days"; for daysUntilReview: "due within N days"
+      // For daysSinceMeeting: "met within N days"; for daysUntilReview / nextPremiumDueDays: "due within N days"
       const n = chip.value as number;
       if (typeof v !== 'number') return false;
       if (chip.field === 'daysSinceMeeting') return v <= n;
       if (chip.field === 'daysUntilReview') return v >= 0 && v <= n;
+      if (chip.field === 'nextPremiumDueDays') return v >= 0 && v <= n;
       return v >= 0 && v <= n;
     }
     case 'overdue': {
-      // Only meaningful for daysUntilReview: < 0 means past due
-      if (chip.field === 'daysUntilReview') {
+      // Past due: < 0 days. Meaningful for daysUntilReview AND nextPremiumDueDays.
+      if (chip.field === 'daysUntilReview' || chip.field === 'nextPremiumDueDays') {
         return typeof v === 'number' && v < 0;
       }
       return false;

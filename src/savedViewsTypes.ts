@@ -12,6 +12,8 @@ export type FilterField =
   | 'hasIsp' | 'hasRider'
   // Activity
   | 'daysSinceMeeting' | 'daysUntilReview' | 'hasOpenTask' | 'hasNotes'
+  // Premiums
+  | 'nextPremiumDueDays'
   // Manager-only
   | 'advisor';
 

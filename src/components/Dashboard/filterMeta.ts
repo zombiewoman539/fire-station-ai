@@ -135,6 +135,12 @@ export const FILTER_FIELDS: FilterFieldMeta[] = [
     defaultChip: () => ({ field: 'hasNotes', op: 'is', value: true }),
     renderValue: (c) => `${c.op === 'is' ? '' : 'not '}${BOOL_LABEL(c.value)}`,
   },
+  {
+    field: 'nextPremiumDueDays', group: 'Activity', label: 'Next premium due',
+    ops: ['within', 'overdue'], valueKind: 'overdue',
+    defaultChip: () => ({ field: 'nextPremiumDueDays', op: 'within', value: 30 }),
+    renderValue: (c) => c.op === 'overdue' ? 'overdue' : `due in ≤ ${c.value}d`,
+  },
 ];
 
 export function metaFor(field: FilterField): FilterFieldMeta | undefined {

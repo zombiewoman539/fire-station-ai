@@ -60,6 +60,17 @@ export const BUILT_IN_VIEWS: ResolvedView[] = [
     },
     readonly: true,
   },
+  {
+    id: 'builtin:advisor.premiumsDueSoon',
+    name: '💳 Premiums due ≤30d',
+    origin: 'builtin',
+    dashboardKind: 'advisor',
+    config: {
+      filters: [chip('nextPremiumDueDays', 'within', 30)],
+      sortBy: 'name', sortDir: 'asc', columnSet: 'advisor',
+    },
+    readonly: true,
+  },
   // ── Manager dashboard built-ins ─────────────────────────────────────────────
   {
     id: 'builtin:manager.allFire',
