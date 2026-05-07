@@ -6,9 +6,11 @@ interface Props {
   chip: FilterChipType;
   onChange: (next: FilterChipType) => void;
   onRemove: () => void;
+  /** Available tag values for tag-typed chips. Empty when not a tag chip. */
+  tagSuggestions?: string[];
 }
 
-export default function FilterChip({ chip, onChange, onRemove }: Props) {
+export default function FilterChip({ chip, onChange, onRemove, tagSuggestions }: Props) {
   const [editing, setEditing] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
   const [popoverPos, setPopoverPos] = React.useState<{ top: number; left: number } | null>(null);
@@ -75,7 +77,7 @@ export default function FilterChip({ chip, onChange, onRemove }: Props) {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-4)', marginBottom: 8 }}>
             {meta.label}
           </div>
-          <ChipEditor chip={chip} ops={meta.ops} valueKind={meta.valueKind} onChange={onChange} />
+          <ChipEditor chip={chip} ops={meta.ops} valueKind={meta.valueKind} onChange={onChange} tagSuggestions={tagSuggestions} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 10 }}>
             <button
               type="button"
@@ -98,11 +100,12 @@ export default function FilterChip({ chip, onChange, onRemove }: Props) {
 interface EditorProps {
   chip: FilterChipType;
   ops: FilterOp[];
-  valueKind: 'numberRange' | 'numberSingle' | 'boolean' | 'days' | 'overdue' | 'string';
+  valueKind: 'numberRange' | 'numberSingle' | 'boolean' | 'days' | 'overdue' | 'string' | 'tag';
   onChange: (next: FilterChipType) => void;
+  tagSuggestions?: string[];
 }
 
-function ChipEditor({ chip, ops, valueKind, onChange }: EditorProps) {
+function ChipEditor({ chip, ops, valueKind, onChange, tagSuggestions }: EditorProps) {
   const setOp = (op: FilterOp) => {
     let value: FilterChipType['value'] = chip.value;
     // When switching between range and scalar ops, coerce value
@@ -117,6 +120,9 @@ function ChipEditor({ chip, ops, valueKind, onChange }: EditorProps) {
       value = true;
     }
     if (op === 'overdue') value = 0;
+    if ((op === 'in' || op === 'notIn') && typeof chip.value !== 'string') {
+      value = '';
+    }
     onChange({ ...chip, op, value });
   };
 
@@ -196,6 +202,17 @@ function ChipEditor({ chip, ops, valueKind, onChange }: EditorProps) {
       {chip.op === 'overdue' && (
         <div style={{ fontSize: 11, color: 'var(--text-3)' }}>No value needed — matches any past-due date.</div>
       )}
+
+      {valueKind === 'tag' && (chip.op === 'in' || chip.op === 'notIn') && (
+        <select
+          value={typeof chip.value === 'string' ? chip.value : ''}
+          onChange={e => setValue(e.target.value)}
+          style={inputStyle}
+        >
+          <option value="">— pick a tag —</option>
+          {(tagSuggestions ?? []).map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      )}
     </div>
   );
 }
@@ -211,5 +228,7 @@ function opLabel(op: FilterOp): string {
     case 'olderThan': return 'older than';
     case 'within':    return 'within';
     case 'overdue':   return 'overdue';
+    case 'in':        return 'is';
+    case 'notIn':     return 'is not';
   }
 }

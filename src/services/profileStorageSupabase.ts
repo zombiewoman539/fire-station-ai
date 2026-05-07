@@ -135,6 +135,7 @@ export async function listProfiles(): Promise<ClientProfile[]> {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
+    tags: Array.isArray(row.tags) ? row.tags : [],
     ...parseMeta(row.meta, row.updated_at),
   }));
 }
@@ -155,6 +156,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
+    tags: Array.isArray(data.tags) ? data.tags : [],
     ...parseMeta(data.meta, data.updated_at),
   };
 }
@@ -170,6 +172,7 @@ export async function saveProfile(profile: ClientProfile): Promise<void> {
       user_id: user.id,
       name: profile.name,
       inputs: profile.inputs,
+      tags: profile.tags ?? [],
       meta: {
         lastMeetingDate: profile.lastMeetingDate ?? null,
         nextReviewDate: profile.nextReviewDate ?? null,
@@ -192,6 +195,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
       name,
       inputs: inputs || defaultInputs,
       meta: {},
+      tags: [],
     })
     .select()
     .single();
@@ -204,6 +208,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
+    tags: Array.isArray(data.tags) ? data.tags : [],
     ...parseMeta(data.meta, data.updated_at),
   };
 }
@@ -251,6 +256,7 @@ export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedA
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
+    tags: Array.isArray(row.tags) ? row.tags : [],
     ...parseMeta(row.meta, row.updated_at),
     deletedAt: row.deleted_at,
   }));

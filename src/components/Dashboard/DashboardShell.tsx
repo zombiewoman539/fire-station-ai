@@ -137,6 +137,13 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     [profiles, tasks],
   );
 
+  // Tag suggestions = union of tags across all loaded profiles
+  const tagSuggestions = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const p of profiles) for (const t of p.tags ?? []) set.add(t);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [profiles]);
+
   const rowsForActiveView = React.useMemo(() => {
     let rows = applyFilters(enriched, effectiveConfig.filters);
     rows = applySearch(rows, search);
@@ -303,6 +310,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
           search={search}
           onSearchChange={setSearch}
           actions={actions}
+          tagSuggestions={tagSuggestions}
         />
 
         <ClientTable

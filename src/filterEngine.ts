@@ -26,6 +26,15 @@ function getFieldValue(row: EnrichedProfile, field: FilterField): number | boole
 }
 
 function evaluateChip(row: EnrichedProfile, chip: FilterChip): boolean {
+  // Tags are an array on the profile, not a scalar — handle them outside the scalar-value switch.
+  if (chip.field === 'tag') {
+    const tags = (row.profile.tags ?? []).map(t => t.toLowerCase());
+    const target = (typeof chip.value === 'string' ? chip.value : '').toLowerCase();
+    if (!target) return chip.op === 'notIn';
+    const present = tags.includes(target);
+    return chip.op === 'in' ? present : !present;
+  }
+
   const v = getFieldValue(row, chip.field);
 
   // Null handling: a profile without the field generally fails the predicate,

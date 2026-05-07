@@ -63,6 +63,7 @@ export function createProfile(name: string, inputs?: FireInputs): ClientProfile 
     nextReviewDate: null,
     notes: '',
     noteEntries: [],
+    tags: [],
   };
   saveProfile(profile);
   return profile;
@@ -99,6 +100,7 @@ export function importProfile(json: string): ClientProfile {
     nextReviewDate: null,
     notes: '',
     noteEntries: [],
+    tags: [],
   };
   saveProfile(profile);
   return profile;

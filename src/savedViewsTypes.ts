@@ -14,13 +14,16 @@ export type FilterField =
   | 'daysSinceMeeting' | 'daysUntilReview' | 'hasOpenTask' | 'hasNotes'
   // Premiums
   | 'nextPremiumDueDays'
+  // Tags (membership test against profile.tags array)
+  | 'tag'
   // Manager-only
   | 'advisor';
 
 export type FilterOp =
   | 'between' | 'gt' | 'lt' | 'eq'
   | 'is' | 'isNot'                           // booleans
-  | 'olderThan' | 'within' | 'overdue';      // date helpers
+  | 'olderThan' | 'within' | 'overdue'       // date helpers
+  | 'in' | 'notIn';                          // string-array membership (tags)
 
 export type FilterValue = number | string | boolean | [number, number];
 

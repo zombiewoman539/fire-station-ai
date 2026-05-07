@@ -198,6 +198,7 @@ export interface TeamProfile {
   advisorEmail: string;
   meta: any;
   inputs: any;
+  tags: string[];
 }
 
 export interface AdvisorTarget {
@@ -212,7 +213,7 @@ export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
     supabase.from('team_memberships').select('user_id, email').eq('status', 'active'),
     supabase
       .from('client_profiles')
-      .select('id, name, updated_at, created_at, user_id, meta, inputs')
+      .select('id, name, updated_at, created_at, user_id, meta, inputs, tags')
       .is('deleted_at', null)
       .order('updated_at', { ascending: false }),
   ]);
@@ -231,6 +232,7 @@ export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
     advisorEmail: emailByUserId[p.user_id] ?? '',
     meta: p.meta,
     inputs: p.inputs,
+    tags: Array.isArray((p as any).tags) ? (p as any).tags : [],
   }));
 }
 

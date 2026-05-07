@@ -3,12 +3,12 @@ import { FilterField, FilterOp, FilterChip } from '../../savedViewsTypes';
 /** Metadata about each filter field used to drive the AddFilterMenu + chip label. */
 export interface FilterFieldMeta {
   field: FilterField;
-  group: 'Demographics' | 'FIRE' | 'Insurance' | 'Activity' | 'Team';
+  group: 'Demographics' | 'FIRE' | 'Insurance' | 'Activity' | 'Tags' | 'Team';
   label: string;
   /** Allowed operators for this field. */
   ops: FilterOp[];
   /** Value editor for the operators. */
-  valueKind: 'numberRange' | 'numberSingle' | 'boolean' | 'days' | 'overdue' | 'string';
+  valueKind: 'numberRange' | 'numberSingle' | 'boolean' | 'days' | 'overdue' | 'string' | 'tag';
   /** Default operator + value when first added via the menu. */
   defaultChip: () => Omit<FilterChip, 'id'>;
   /** Render a short value summary inside the chip pill. */
@@ -140,6 +140,18 @@ export const FILTER_FIELDS: FilterFieldMeta[] = [
     ops: ['within', 'overdue'], valueKind: 'overdue',
     defaultChip: () => ({ field: 'nextPremiumDueDays', op: 'within', value: 30 }),
     renderValue: (c) => c.op === 'overdue' ? 'overdue' : `due in ≤ ${c.value}d`,
+  },
+
+  // Tags
+  {
+    field: 'tag', group: 'Tags', label: 'Tag',
+    ops: ['in', 'notIn'], valueKind: 'tag',
+    defaultChip: () => ({ field: 'tag', op: 'in', value: '' }),
+    renderValue: (c) => {
+      const t = typeof c.value === 'string' ? c.value : '';
+      if (!t) return c.op === 'in' ? '(pick a tag)' : '(pick a tag)';
+      return c.op === 'in' ? t : `not ${t}`;
+    },
   },
 ];
 

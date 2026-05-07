@@ -59,6 +59,7 @@ function teamProfileToClientProfile(t: TeamProfile): ClientProfile {
     nextReviewDate: meta.nextReviewDate ?? null,
     notes: typeof meta.notes === 'string' ? meta.notes : '',
     noteEntries,
+    tags: t.tags ?? [],
     // Manager-only extras read by ClientTable via `(profile as any).…`
     ...({ advisorUserId: t.advisorUserId, advisorEmail: t.advisorEmail } as object),
   } as ClientProfile;

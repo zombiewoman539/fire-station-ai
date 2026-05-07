@@ -11,10 +11,12 @@ interface Props {
   onSearchChange: (q: string) => void;
   /** Right-side action area (Save, Save as, …). Provided by DashboardShell. */
   actions?: React.ReactNode;
+  /** Available tag values (union across loaded profiles). Drives tag-chip dropdowns. */
+  tagSuggestions?: string[];
 }
 
 export default function FilterBar({
-  dashboardKind, chips, onChipsChange, search, onSearchChange, actions,
+  dashboardKind, chips, onChipsChange, search, onSearchChange, actions, tagSuggestions,
 }: Props) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuAnchor, setMenuAnchor] = React.useState<DOMRect | null>(null);
@@ -36,6 +38,7 @@ export default function FilterBar({
           chip={chip}
           onChange={(next) => onChipsChange(chips.map(c => c.id === chip.id ? next : c))}
           onRemove={() => onChipsChange(chips.filter(c => c.id !== chip.id))}
+          tagSuggestions={tagSuggestions}
         />
       ))}
 

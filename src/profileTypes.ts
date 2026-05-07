@@ -21,4 +21,6 @@ export interface ClientProfile {
   /** @deprecated kept for legacy data; new writes use noteEntries */
   notes: string;
   noteEntries: NoteEntry[];        // newest-first
+  /** Free-text tags (e.g. "VIP", "warm", "do-not-contact"). Filterable via saved-views chips. */
+  tags: string[];
 }
