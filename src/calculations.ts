@@ -162,6 +162,10 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       }
       total += p.premiumAmount * (FREQ_MULT[p.premiumFrequency] ?? 12);
     }
+    // Hospital plan rider/ISP cash premium — paid 100% in cash, real drag on surplus.
+    // The MediSave portion (annualPremiumMedisave) is ignored: CPF isn't modelled in this app
+    // (see project_cpf_stripped.md). Once CPF is reintroduced, deduct that from MA balances instead.
+    total += inputs.hospitalPlan?.annualPremiumCash ?? 0;
     return total;
   };
 
