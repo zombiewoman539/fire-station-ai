@@ -211,9 +211,11 @@ export interface AdvisorTarget {
 export async function getAllTeamProfiles(): Promise<TeamProfile[]> {
   const [membersResult, profilesResult] = await Promise.all([
     supabase.from('team_memberships').select('user_id, email').eq('status', 'active'),
+    // Select * so we tolerate the tags column not existing yet
+    // (supabase_client_tags_migration.sql may not have been applied).
     supabase
       .from('client_profiles')
-      .select('id, name, updated_at, created_at, user_id, meta, inputs, tags')
+      .select('*')
       .is('deleted_at', null)
       .order('updated_at', { ascending: false }),
   ]);

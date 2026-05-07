@@ -161,44 +161,71 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
   };
 }
 
+/** Heuristic: a Postgres "column does not exist" error from PostgREST.
+ *  Used to fall back when supabase_client_tags_migration.sql hasn't been applied yet. */
+function isMissingTagsColumnError(err: any): boolean {
+  if (!err) return false;
+  const msg = `${err.message ?? ''} ${err.details ?? ''} ${err.hint ?? ''}`.toLowerCase();
+  return msg.includes('tags') && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes('column'));
+}
+
 export async function saveProfile(profile: ClientProfile): Promise<void> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('Not authenticated');
 
+  const baseRow = {
+    id: profile.id,
+    user_id: user.id,
+    name: profile.name,
+    inputs: profile.inputs,
+    meta: {
+      lastMeetingDate: profile.lastMeetingDate ?? null,
+      nextReviewDate: profile.nextReviewDate ?? null,
+      noteEntries: profile.noteEntries ?? [],
+    },
+    updated_at: new Date().toISOString(),
+  };
+
   const { error } = await supabase
     .from('client_profiles')
-    .upsert({
-      id: profile.id,
-      user_id: user.id,
-      name: profile.name,
-      inputs: profile.inputs,
-      tags: profile.tags ?? [],
-      meta: {
-        lastMeetingDate: profile.lastMeetingDate ?? null,
-        nextReviewDate: profile.nextReviewDate ?? null,
-        noteEntries: profile.noteEntries ?? [],
-      },
-      updated_at: new Date().toISOString(),
-    });
+    .upsert({ ...baseRow, tags: profile.tags ?? [] });
 
-  if (error) throw error;
+  if (!error) return;
+
+  // Fallback: if the tags column doesn't exist yet (migration not run), retry without it.
+  if (isMissingTagsColumnError(error)) {
+    console.warn('[profileStorage] tags column missing — retrying save without tags. Run supabase_client_tags_migration.sql to enable.');
+    const { error: retryError } = await supabase.from('client_profiles').upsert(baseRow);
+    if (retryError) throw retryError;
+    return;
+  }
+
+  throw error;
 }
 
 export async function createProfile(name: string, inputs?: FireInputs): Promise<ClientProfile> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase
+  const baseRow = {
+    user_id: user.id,
+    name,
+    inputs: inputs || defaultInputs,
+    meta: {},
+  };
+
+  let { data, error } = await supabase
     .from('client_profiles')
-    .insert({
-      user_id: user.id,
-      name,
-      inputs: inputs || defaultInputs,
-      meta: {},
-      tags: [],
-    })
+    .insert({ ...baseRow, tags: [] })
     .select()
     .single();
+
+  if (error && isMissingTagsColumnError(error)) {
+    console.warn('[profileStorage] tags column missing — retrying insert without tags.');
+    const retry = await supabase.from('client_profiles').insert(baseRow).select().single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) throw error;
 
