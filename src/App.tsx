@@ -77,7 +77,7 @@ function UpgradeBanner({ message, onUpgrade }: { message: string; onUpgrade: () 
 
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
@@ -90,6 +90,7 @@ function Dashboard() {
   );
   const [profileSummaries, setProfileSummaries] = useState<Record<string, ProfileSummary>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const pendingSaveRef = useRef<ClientProfile | null>(null);
   const [theme, toggleTheme] = useTheme();
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -114,6 +115,7 @@ function Dashboard() {
             nextReviewDate: null,
             notes: '',
             noteEntries: [],
+            tags: [],
           };
           setActiveProfile(localProfile);
           clearTimeout(timeout);
@@ -211,19 +213,43 @@ function Dashboard() {
 
     const updated = { ...activeProfile, inputs: newInputs, updatedAt: new Date().toISOString() };
     setActiveProfile(updated);
+    pendingSaveRef.current = updated;
     setSaveStatus('saving');
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       try {
         await saveProfile(updated);
+        pendingSaveRef.current = null;
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (e) {
         console.error('Save failed:', e);
-        setSaveStatus('idle');
+        setSaveStatus('error');
       }
     }, 800);
+  }, [activeProfile]);
+
+  // Force-flush any pending debounced save immediately. Returns true on success.
+  const flushSave = useCallback(async (): Promise<boolean> => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = undefined;
+    }
+    const pending = pendingSaveRef.current ?? activeProfile;
+    if (!pending) return true;
+    setSaveStatus('saving');
+    try {
+      await saveProfile(pending);
+      pendingSaveRef.current = null;
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 2000);
+      return true;
+    } catch (e) {
+      console.error('Save failed:', e);
+      setSaveStatus('error');
+      return false;
+    }
   }, [activeProfile]);
 
   const handleSelectProfile = useCallback((profile: ClientProfile) => {
@@ -233,21 +259,23 @@ function Dashboard() {
     setSaveStatus('idle');
   }, []);
 
-  // Updates CRM meta fields (lastMeetingDate, nextReviewDate, notes, noteEntries) and saves
-  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => {
+  // Updates CRM meta fields (lastMeetingDate, nextReviewDate, notes, noteEntries, tags) and saves
+  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries' | 'tags'>>) => {
     if (!activeProfile) return;
     const updated = { ...activeProfile, ...updates, updatedAt: new Date().toISOString() };
     setActiveProfile(updated);
+    pendingSaveRef.current = updated;
     setSaveStatus('saving');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       try {
         await saveProfile(updated);
+        pendingSaveRef.current = null;
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (e) {
         console.error('Save failed:', e);
-        setSaveStatus('idle');
+        setSaveStatus('error');
       }
     }, 800);
   }, [activeProfile]);
@@ -490,6 +518,8 @@ function Dashboard() {
         currentProfileId={activeProfile?.id}
         profile={activeProfile}
         onProfileMetaChange={handleProfileMetaChange}
+        onSaveNow={flushSave}
+        saveStatus={saveStatus}
       />
 
       {/* Right side: chart + toggleable bottom panel */}

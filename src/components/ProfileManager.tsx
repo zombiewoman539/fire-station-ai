@@ -28,7 +28,7 @@ interface Props {
   onSelectProfile: (profile: ClientProfile) => void;
   onNewProfile: (profile: ClientProfile) => void;
   onEditDetails: () => void;
-  saveStatus: 'saved' | 'saving' | 'idle';
+  saveStatus: 'saved' | 'saving' | 'idle' | 'error';
   profileSummaries: Record<string, ProfileSummary>;
 }
 
@@ -229,7 +229,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const saveColor = saveStatus === 'saving' ? '#fbbf24' : saveStatus === 'saved' ? '#34d399' : 'transparent';
+  const saveColor = saveStatus === 'saving' ? '#fbbf24' : saveStatus === 'saved' ? '#34d399' : saveStatus === 'error' ? '#f87171' : 'transparent';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--surface)', borderRight: '1px solid var(--border)' }}>
@@ -246,7 +246,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
               width: 7, height: 7, borderRadius: '50%',
               background: saveColor, transition: 'background 0.3s',
               display: saveStatus !== 'idle' ? 'block' : 'none',
-            }} title={saveStatus === 'saving' ? 'Saving…' : 'Saved'} />
+            }} title={saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : 'Saved'} />
             {/* Import */}
             <button onClick={handleImport} title="Import JSON"
               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 7px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 11 }}>

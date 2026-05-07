@@ -4,6 +4,7 @@ import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile, NoteEntry } from '../profileTypes';
 import NotesLog from './NotesLog';
 import NewTaskModal from './NewTaskModal';
+import TagInput from './TagInput';
 import { Task, listTasks, completeTask, reopenTask, deleteTask } from '../services/taskService';
 
 interface Props {
@@ -14,7 +15,9 @@ interface Props {
   clientName?: string;
   currentProfileId?: string;
   profile?: ClientProfile | null;
-  onProfileMetaChange?: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => void;
+  onProfileMetaChange?: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries' | 'tags'>>) => void;
+  onSaveNow?: () => Promise<boolean>;
+  saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
 }
 
 type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases' | 'estate' | 'activity';
@@ -1282,7 +1285,7 @@ function EstatePlanningSection({ inputs, onChange }: { inputs: FireInputs; onCha
 
 function ActivitySection({ profile, onMetaChange }: {
   profile: ClientProfile | null | undefined;
-  onMetaChange: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries'>>) => void;
+  onMetaChange: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries' | 'tags'>>) => void;
 }) {
   const nextReview = profile?.nextReviewDate ?? '';
   const noteEntries: NoteEntry[] = profile?.noteEntries ?? [];
@@ -1321,6 +1324,20 @@ function ActivitySection({ profile, onMetaChange }: {
       onMetaChange({ noteEntries: next });
     }
   };
+
+  // Tag suggestions sourced from all the user's other clients
+  const [tagSuggestions, setTagSuggestions] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    listProfiles()
+      .then(profiles => {
+        const set = new Set<string>();
+        for (const p of profiles) {
+          for (const t of p.tags ?? []) set.add(t);
+        }
+        setTagSuggestions(Array.from(set).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => setTagSuggestions([]));
+  }, [profile?.id]);
 
   // Tasks for this client
   const [tasks, setTasks] = React.useState<Task[]>([]);
@@ -1384,7 +1401,20 @@ function ActivitySection({ profile, onMetaChange }: {
   return (
     <div>
       <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 20, lineHeight: 1.6 }}>
-        Log meetings, keep notes, and schedule reviews. The "Last meeting" date and count come from any notes tagged as meetings.
+        Log meetings, keep notes, schedule reviews, and tag this client. The "Last meeting" date and count come from any notes tagged as meetings.
+      </div>
+
+      {/* Tags */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
+          Tags
+        </label>
+        <TagInput
+          value={profile?.tags ?? []}
+          onChange={(next) => onMetaChange({ tags: next })}
+          suggestions={tagSuggestions}
+          placeholder="Add tag (e.g. VIP, warm, do-not-contact) — Enter to add"
+        />
       </div>
 
       {/* Meeting stats — derived from the notes feed */}
@@ -1587,6 +1617,22 @@ function ActivitySection({ profile, onMetaChange }: {
   );
 }
 
+// ── Save status pill ──────────────────────────────────────────────────────────
+function SaveStatusPill({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (status === 'idle') return null;
+  const config = {
+    saving: { label: 'Saving…',     color: 'var(--text-4)', dot: '#fbbf24' },
+    saved:  { label: 'All changes saved', color: '#34d399',     dot: '#34d399' },
+    error:  { label: 'Save failed', color: '#f87171',     dot: '#f87171' },
+  }[status];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: config.color, fontWeight: 500 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: config.dot }} />
+      {config.label}
+    </span>
+  );
+}
+
 // ── Main EditModal ─────────────────────────────────────────────────────────────
 const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'personal',  icon: '👤', label: 'Personal' },
@@ -1598,7 +1644,7 @@ const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'activity',  icon: '📅', label: 'Activity & Notes' },
 ];
 
-export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId, profile, onProfileMetaChange }: Props) {
+export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId, profile, onProfileMetaChange, onSaveNow, saveStatus = 'idle' }: Props) {
   const [activeSection, setActiveSection] = React.useState<Section>('personal');
   const activeSectionRef = React.useRef(activeSection);
   activeSectionRef.current = activeSection;
@@ -1648,10 +1694,29 @@ export default function EditModal({ open, onClose, inputs, onChange, clientName,
             <div style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Editing</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{clientName || 'Client Details'}</div>
           </div>
-          <button onClick={onClose}
-            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 14 }}>
-            ✕ Close
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <SaveStatusPill status={saveStatus} />
+            {onSaveNow && (
+              <button
+                onClick={() => { onSaveNow(); }}
+                disabled={saveStatus === 'saving'}
+                style={{
+                  background: saveStatus === 'error' ? '#b91c1c' : '#10b981',
+                  border: 'none', borderRadius: 8,
+                  padding: '7px 14px', fontSize: 13, fontWeight: 700,
+                  color: '#fff',
+                  cursor: saveStatus === 'saving' ? 'wait' : 'pointer',
+                  opacity: saveStatus === 'saving' ? 0.7 : 1,
+                }}
+              >
+                {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Retry save' : 'Save'}
+              </button>
+            )}
+            <button onClick={onClose}
+              style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', color: 'var(--text-3)', fontSize: 14 }}>
+              ✕ Close
+            </button>
+          </div>
         </div>
 
         {/* Body: nav + content */}
