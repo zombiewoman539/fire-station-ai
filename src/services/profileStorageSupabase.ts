@@ -198,12 +198,25 @@ export async function saveProfile(profile: ClientProfile): Promise<void> {
       .from('client_profiles')
       .upsert({ ...baseRow, tags: profile.tags ?? [] });
     if (!error) return;
-    console.error('[profileStorage] save with tags failed — retrying without tags. Original error:', error);
+    console.error(
+      '[profileStorage] save with tags failed — retrying without tags. ' +
+      `code=${(error as any)?.code ?? 'n/a'} | message=${(error as any)?.message ?? 'n/a'} | ` +
+      `details=${(error as any)?.details ?? 'n/a'} | hint=${(error as any)?.hint ?? 'n/a'}`,
+      error,
+    );
     markTagsColumnMissing();
   }
 
   const { error: retryError } = await supabase.from('client_profiles').upsert(baseRow);
-  if (retryError) throw retryError;
+  if (retryError) {
+    console.error(
+      '[profileStorage] save without tags ALSO failed. ' +
+      `code=${(retryError as any)?.code ?? 'n/a'} | message=${(retryError as any)?.message ?? 'n/a'} | ` +
+      `details=${(retryError as any)?.details ?? 'n/a'} | hint=${(retryError as any)?.hint ?? 'n/a'}`,
+      retryError,
+    );
+    throw retryError;
+  }
 }
 
 export async function createProfile(name: string, inputs?: FireInputs): Promise<ClientProfile> {
