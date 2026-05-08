@@ -52,6 +52,7 @@ function teamProfileToClientProfile(t: TeamProfile): ClientProfile {
   return {
     id: t.id,
     name: t.name,
+    userId: t.advisorUserId,  // owner — used for read-only detection in EditModal
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     inputs: t.inputs,

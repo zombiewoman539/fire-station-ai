@@ -18,6 +18,9 @@ interface Props {
   onProfileMetaChange?: (updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries' | 'tags'>>) => void;
   onSaveNow?: () => Promise<boolean>;
   saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  /** True when the active profile is owned by another user (e.g. manager viewing teammate's
+   *  client). Suppresses the Save Now button and renders a banner explaining why edits won't persist. */
+  readOnly?: boolean;
 }
 
 type Section = 'personal' | 'income' | 'assets' | 'insurance' | 'purchases' | 'estate' | 'activity';
@@ -1644,7 +1647,7 @@ const NAV: { key: Section; icon: string; label: string }[] = [
   { key: 'activity',  icon: '📅', label: 'Activity & Notes' },
 ];
 
-export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId, profile, onProfileMetaChange, onSaveNow, saveStatus = 'idle' }: Props) {
+export default function EditModal({ open, onClose, inputs, onChange, clientName, currentProfileId, profile, onProfileMetaChange, onSaveNow, saveStatus = 'idle', readOnly = false }: Props) {
   const [activeSection, setActiveSection] = React.useState<Section>('personal');
   const activeSectionRef = React.useRef(activeSection);
   activeSectionRef.current = activeSection;
@@ -1691,12 +1694,14 @@ export default function EditModal({ open, onClose, inputs, onChange, clientName,
           padding: '16px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0,
         }}>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Editing</div>
+            <div style={{ fontSize: 11, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+              {readOnly ? 'Viewing' : 'Editing'}
+            </div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{clientName || 'Client Details'}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <SaveStatusPill status={saveStatus} />
-            {onSaveNow && (
+            {!readOnly && <SaveStatusPill status={saveStatus} />}
+            {!readOnly && onSaveNow && (
               <button
                 onClick={() => { onSaveNow(); }}
                 disabled={saveStatus === 'saving'}
@@ -1718,6 +1723,24 @@ export default function EditModal({ open, onClose, inputs, onChange, clientName,
             </button>
           </div>
         </div>
+
+        {/* Read-only banner — appears between header and body when viewing another user's client */}
+        {readOnly && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 24px',
+            background: 'rgba(251,191,36,0.08)',
+            borderBottom: '1px solid rgba(251,191,36,0.25)',
+            color: '#fbbf24',
+            fontSize: 13, fontWeight: 500,
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 16 }}>🔒</span>
+            <span>
+              <strong>Read-only.</strong> This client belongs to another advisor in your team. You can view all details, but changes won't save. Ask the owning advisor to edit, or transfer the client to take ownership.
+            </span>
+          </div>
+        )}
 
         {/* Body: nav + content */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0, flexDirection: isMobile ? 'column' : 'row' }}>

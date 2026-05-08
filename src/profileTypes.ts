@@ -12,6 +12,9 @@ export interface NoteEntry {
 export interface ClientProfile {
   id: string;
   name: string;
+  /** Auth user id of the owner. Compared against the current session to detect read-only views
+   *  (e.g. a manager viewing a teammate's client). Optional only for legacy local-dev profiles. */
+  userId?: string;
   createdAt: string;
   updatedAt: string;
   inputs: FireInputs;

@@ -61,6 +61,8 @@ interface Props {
   visibleColumns?: string[];
   /** Optional callback for the per-row "+ Task" button (manager dashboard). */
   onTaskClick?: (row: EnrichedProfile) => void;
+  /** Auth user id of the current viewer. Used to render a "you" indicator on rows the user owns. */
+  currentUserId?: string | null;
 }
 
 function formatSGDK(n: number) {
@@ -98,7 +100,7 @@ function SignalBadge({ score }: { score: number }) {
   );
 }
 
-export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortChange, visibleColumns, onTaskClick }: Props) {
+export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortChange, visibleColumns, onTaskClick, currentUserId }: Props) {
   const navigate = useNavigate();
 
   /** True if this column id should render. When visibleColumns is undefined (no view setting),
@@ -205,6 +207,7 @@ export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortCh
                 onView={() => handleViewClient(row.profile.id)}
                 onTaskClick={onTaskClick}
                 visible={visible}
+                isOwn={!!currentUserId && (row.profile.userId === currentUserId)}
               />
             ))}
           </tbody>
@@ -221,9 +224,11 @@ interface RowProps {
   onView: () => void;
   onTaskClick?: (row: EnrichedProfile) => void;
   visible: (columnId: string) => boolean;
+  /** True when the current viewer is the owner (advisor) of this row's profile. */
+  isOwn: boolean;
 }
 
-function ClientRow({ row, columnSet, first, onView, onTaskClick, visible }: RowProps) {
+function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn }: RowProps) {
   const td: React.CSSProperties = { padding: '11px 14px', fontSize: 13, color: 'var(--text-2)', verticalAlign: 'middle' };
   const profile = row.profile;
   const advisorEmail = (profile as any).advisorEmail as string | undefined;
@@ -338,7 +343,18 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible }: RowP
       {visible('advisor') && (
         <td style={td}>
           {advisorEmail ? (
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{advisorEmail.split('@')[0]}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: isOwn ? 'var(--text-1)' : 'var(--text-3)', fontWeight: isOwn ? 600 : 500 }}>
+                {advisorEmail.split('@')[0]}
+              </span>
+              {isOwn && (
+                <span style={{
+                  fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 4,
+                  background: 'rgba(52,211,153,0.15)', color: '#34d399',
+                  border: '1px solid rgba(52,211,153,0.3)', letterSpacing: '0.04em',
+                }}>YOU</span>
+              )}
+            </span>
           ) : (
             <span style={{ fontSize: 12, color: 'var(--text-5)', fontStyle: 'italic' }}>Advisor removed</span>
           )}

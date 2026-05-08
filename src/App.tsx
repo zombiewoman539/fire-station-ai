@@ -77,6 +77,7 @@ function UpgradeBanner({ message, onUpgrade }: { message: string; onUpgrade: () 
 
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
@@ -101,6 +102,11 @@ function Dashboard() {
     const timeout = setTimeout(() => setLoading(false), 6000);
 
     const loadProfiles = async () => {
+      // Capture current user id once — used by EditModal to detect read-only views
+      // (e.g. a manager viewing a teammate's client where RLS blocks writes).
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+
       // In local dev without auth session, use a local-only profile
       if (isLocalDev) {
         const { data: { session } } = await supabase.auth.getSession();
@@ -108,6 +114,7 @@ function Dashboard() {
           const localProfile: ClientProfile = {
             id: 'local-dev',
             name: 'Dev Client',
+            userId: 'local-dev',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             inputs: defaultInputs,
@@ -117,6 +124,7 @@ function Dashboard() {
             noteEntries: [],
             tags: [],
           };
+          setCurrentUserId('local-dev');
           setActiveProfile(localProfile);
           clearTimeout(timeout);
           setLoading(false);
@@ -207,12 +215,19 @@ function Dashboard() {
     if (isMobile) setSidebarCollapsed(true);
   }, [isMobile]);
 
+  // True when the active profile belongs to another user (e.g. a manager viewing a teammate's
+  // client). RLS will reject any write, so we suppress save attempts and surface a banner.
+  const isReadOnlyProfile = !!activeProfile?.userId
+    && !!currentUserId
+    && activeProfile.userId !== currentUserId;
+
   // Auto-save with debounce
   const handleInputChange = useCallback((newInputs: FireInputs) => {
     if (!activeProfile) return;
 
     const updated = { ...activeProfile, inputs: newInputs, updatedAt: new Date().toISOString() };
     setActiveProfile(updated);
+    if (isReadOnlyProfile) return; // edits are local-only; no save attempt against RLS
     pendingSaveRef.current = updated;
     setSaveStatus('saving');
 
@@ -228,7 +243,7 @@ function Dashboard() {
         setSaveStatus('error');
       }
     }, 800);
-  }, [activeProfile]);
+  }, [activeProfile, isReadOnlyProfile]);
 
   // Force-flush any pending debounced save immediately. Returns true on success.
   const flushSave = useCallback(async (): Promise<boolean> => {
@@ -264,6 +279,7 @@ function Dashboard() {
     if (!activeProfile) return;
     const updated = { ...activeProfile, ...updates, updatedAt: new Date().toISOString() };
     setActiveProfile(updated);
+    if (isReadOnlyProfile) return; // RLS would reject; banner in EditModal explains why
     pendingSaveRef.current = updated;
     setSaveStatus('saving');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -278,7 +294,7 @@ function Dashboard() {
         setSaveStatus('error');
       }
     }, 800);
-  }, [activeProfile]);
+  }, [activeProfile, isReadOnlyProfile]);
 
   const handleNewProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
@@ -520,6 +536,7 @@ function Dashboard() {
         onProfileMetaChange={handleProfileMetaChange}
         onSaveNow={flushSave}
         saveStatus={saveStatus}
+        readOnly={isReadOnlyProfile}
       />
 
       {/* Right side: chart + toggleable bottom panel */}

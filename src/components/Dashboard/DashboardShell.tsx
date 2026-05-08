@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTeam } from '../../contexts/TeamContext';
+import { supabase } from '../../services/supabaseClient';
 import { ClientProfile } from '../../profileTypes';
 import { Task } from '../../services/taskService';
 import { EnrichedProfile, enrichProfiles } from '../../enrichProfile';
@@ -51,6 +52,14 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
   const { teamStatus } = useTeam();
   const isManager = teamStatus?.role === 'manager';
   const orgId = teamStatus?.orgId ?? null;
+
+  // Current user id — used by ClientTable to mark rows the manager owns.
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.id) setCurrentUserId(user.id);
+    });
+  }, []);
 
   // ─── View state ─────────────────────────────────────────────────────────────
   const [savedViews, setSavedViews] = React.useState<SavedView[]>([]);
@@ -321,6 +330,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
           onSortChange={handleSortChange}
           visibleColumns={effectiveConfig.visibleColumns}
           onTaskClick={handleRowTaskClick}
+          currentUserId={currentUserId}
         />
       </main>
 

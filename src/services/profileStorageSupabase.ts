@@ -132,6 +132,7 @@ export async function listProfiles(): Promise<ClientProfile[]> {
   return (data || []).map(row => ({
     id: row.id,
     name: row.name,
+    userId: row.user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
@@ -153,6 +154,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
   return {
     id: data.id,
     name: data.name,
+    userId: data.user_id,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
@@ -258,6 +260,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
   return {
     id: data.id,
     name: data.name,
+    userId: data.user_id,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     inputs: migrateInputs(data.inputs as FireInputs),
@@ -306,6 +309,7 @@ export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedA
   return (data || []).map(row => ({
     id: row.id,
     name: row.name,
+    userId: row.user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
