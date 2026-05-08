@@ -161,12 +161,16 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
   };
 }
 
-/** Heuristic: a Postgres "column does not exist" error from PostgREST.
- *  Used to fall back when supabase_client_tags_migration.sql hasn't been applied yet. */
-function isMissingTagsColumnError(err: any): boolean {
-  if (!err) return false;
-  const msg = `${err.message ?? ''} ${err.details ?? ''} ${err.hint ?? ''}`.toLowerCase();
-  return msg.includes('tags') && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes('column'));
+/** Sticky flag: once we know the tags column doesn't exist, stop trying to write it.
+ *  Reset by clearing localStorage 'profileStorage.tagsColumnExists' once the migration runs. */
+const TAGS_COLUMN_FLAG = 'profileStorage.tagsColumnExists';
+function tagsColumnLikelyExists(): boolean {
+  // Default true (assume migration is applied). Once we hit a column error, we flip to false.
+  const v = localStorage.getItem(TAGS_COLUMN_FLAG);
+  return v !== 'false';
+}
+function markTagsColumnMissing() {
+  try { localStorage.setItem(TAGS_COLUMN_FLAG, 'false'); } catch {}
 }
 
 export async function saveProfile(profile: ClientProfile): Promise<void> {
@@ -186,21 +190,20 @@ export async function saveProfile(profile: ClientProfile): Promise<void> {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from('client_profiles')
-    .upsert({ ...baseRow, tags: profile.tags ?? [] });
-
-  if (!error) return;
-
-  // Fallback: if the tags column doesn't exist yet (migration not run), retry without it.
-  if (isMissingTagsColumnError(error)) {
-    console.warn('[profileStorage] tags column missing — retrying save without tags. Run supabase_client_tags_migration.sql to enable.');
-    const { error: retryError } = await supabase.from('client_profiles').upsert(baseRow);
-    if (retryError) throw retryError;
-    return;
+  // Two-attempt pattern: write with tags first; if anything goes wrong, retry without tags.
+  // This is bulletproof — we don't try to interpret the error format. The cost is one extra
+  // round trip on the (rare) error path.
+  if (tagsColumnLikelyExists()) {
+    const { error } = await supabase
+      .from('client_profiles')
+      .upsert({ ...baseRow, tags: profile.tags ?? [] });
+    if (!error) return;
+    console.error('[profileStorage] save with tags failed — retrying without tags. Original error:', error);
+    markTagsColumnMissing();
   }
 
-  throw error;
+  const { error: retryError } = await supabase.from('client_profiles').upsert(baseRow);
+  if (retryError) throw retryError;
 }
 
 export async function createProfile(name: string, inputs?: FireInputs): Promise<ClientProfile> {
@@ -214,14 +217,24 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
     meta: {},
   };
 
-  let { data, error } = await supabase
-    .from('client_profiles')
-    .insert({ ...baseRow, tags: [] })
-    .select()
-    .single();
+  let data: any = null;
+  let error: any = null;
 
-  if (error && isMissingTagsColumnError(error)) {
-    console.warn('[profileStorage] tags column missing — retrying insert without tags.');
+  if (tagsColumnLikelyExists()) {
+    const result = await supabase
+      .from('client_profiles')
+      .insert({ ...baseRow, tags: [] })
+      .select()
+      .single();
+    data = result.data;
+    error = result.error;
+    if (error) {
+      console.error('[profileStorage] create with tags failed — retrying without tags. Original error:', error);
+      markTagsColumnMissing();
+    }
+  }
+
+  if (!data || error) {
     const retry = await supabase.from('client_profiles').insert(baseRow).select().single();
     data = retry.data;
     error = retry.error;
