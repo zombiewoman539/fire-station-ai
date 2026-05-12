@@ -162,7 +162,7 @@ function Dashboard() {
     };
     loadProfiles();
     return () => clearTimeout(timeout);
-  }, []);
+  }, [showError]);
 
   const inputs = activeProfile?.inputs || defaultInputs;
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
@@ -247,7 +247,7 @@ function Dashboard() {
         showError('Save failed — check your connection and try again.');
       }
     }, 800);
-  }, [activeProfile, isReadOnlyProfile]);
+  }, [activeProfile, isReadOnlyProfile, showError]);
 
   // Force-flush any pending debounced save immediately. Returns true on success.
   const flushSave = useCallback(async (): Promise<boolean> => {
@@ -299,7 +299,7 @@ function Dashboard() {
         showError('Save failed — check your connection and try again.');
       }
     }, 800);
-  }, [activeProfile, isReadOnlyProfile]);
+  }, [activeProfile, isReadOnlyProfile, showError]);
 
   const handleNewProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);

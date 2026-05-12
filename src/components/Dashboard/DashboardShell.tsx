@@ -108,7 +108,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
       console.error('Load saved views failed:', e);
       showError('Could not load saved views — your filters may be reset.');
     }
-  }, [dashboardKind]);
+  }, [dashboardKind, showError]);
   React.useEffect(() => { refreshViews(); }, [refreshViews]);
 
   // ─── Resolve active view ────────────────────────────────────────────────────
