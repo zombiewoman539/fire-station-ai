@@ -3,7 +3,7 @@ import { useTeam } from '../../contexts/TeamContext';
 import { supabase } from '../../services/supabaseClient';
 import { ClientProfile } from '../../profileTypes';
 import { Task } from '../../services/taskService';
-import { EnrichedProfile, enrichProfiles } from '../../enrichProfile';
+import { EnrichedProfile, enrichProfile } from '../../enrichProfile';
 import { applyFilters, applySearch, compareRows } from '../../filterEngine';
 import {
   DashboardKind, ResolvedView, FilterChip, ViewConfig, SavedView,
@@ -141,10 +141,23 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
   const isModified = draftFilters !== null || draftVisibleColumns !== null;
 
   // ─── Compute rows ──────────────────────────────────────────────────────────
-  const enriched = React.useMemo(
-    () => enrichProfiles(profiles, { tasks }),
-    [profiles, tasks],
-  );
+  // Cache keyed by profile.id + updatedAt + that profile's task snapshot.
+  // Avoids re-running FIRE math on profiles whose data hasn't changed.
+  const enrichCache = React.useRef<Record<string, EnrichedProfile>>({});
+
+  const enriched = React.useMemo(() => {
+    return profiles.map(profile => {
+      const ownTasksSig = tasks
+        .filter(t => t.clientProfileId === profile.id)
+        .map(t => `${t.id}:${t.status}`)
+        .join(',');
+      const cacheKey = `${profile.id}:${profile.updatedAt}:${ownTasksSig}`;
+      if (!enrichCache.current[cacheKey]) {
+        enrichCache.current[cacheKey] = enrichProfile(profile, { tasks });
+      }
+      return enrichCache.current[cacheKey];
+    });
+  }, [profiles, tasks]);
 
   // Tag suggestions = union of tags across all loaded profiles
   const tagSuggestions = React.useMemo(() => {

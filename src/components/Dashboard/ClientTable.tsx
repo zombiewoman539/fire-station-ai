@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { EnrichedProfile } from '../../enrichProfile';
 import { ColumnSet } from '../../savedViewsTypes';
 import { formatSGD } from '../../calculations';
@@ -102,15 +103,19 @@ function SignalBadge({ score }: { score: number }) {
 
 export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortChange, visibleColumns, onTaskClick, currentUserId }: Props) {
   const navigate = useNavigate();
+  const parentRef = React.useRef<HTMLDivElement>(null);
 
-  /** True if this column id should render. When visibleColumns is undefined (no view setting),
-   *  all columns show; required columns always show even if explicitly hidden. */
-  const visible = (id: string): boolean => {
-    const def = COLUMNS_BY_SET[columnSet].find(c => c.id === id);
-    if (def?.required) return true;
-    if (!visibleColumns) return true;
-    return visibleColumns.includes(id);
-  };
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 54,
+    overscan: 5,
+  });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom = virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
 
   const handleSort = (key: string) => {
     if (sortBy === key) onSortChange(key, sortDir === 'asc' ? 'desc' : 'asc');
@@ -122,18 +127,26 @@ export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortCh
     navigate('/');
   };
 
+  // Memoised so ClientRow's custom comparator can rely on reference equality
+  const stableVisibleColumns = React.useMemo(() => visibleColumns, [visibleColumns]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stickyTh: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 1 };
+
   const colHd = (key: string, align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
     fontSize: 10, fontWeight: 700, color: sortBy === key ? 'var(--text-2)' : 'var(--text-5)',
     textTransform: 'uppercase', letterSpacing: '0.06em',
     padding: '8px 14px', textAlign: align, whiteSpace: 'nowrap',
     borderBottom: '1px solid var(--border)', cursor: 'pointer', userSelect: 'none',
-    background: sortBy === key ? 'rgba(96,165,250,0.04)' : 'transparent',
+    background: sortBy === key ? 'var(--surface)' : 'var(--card)',
+    ...stickyTh,
   });
   const colHdPlain = (align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
     fontSize: 10, fontWeight: 700, color: 'var(--text-5)',
     textTransform: 'uppercase', letterSpacing: '0.06em',
     padding: '8px 14px', textAlign: align, whiteSpace: 'nowrap',
     borderBottom: '1px solid var(--border)',
+    background: 'var(--card)',
+    ...stickyTh,
   });
 
   const SortArrow = ({ k }: { k: string }) =>
@@ -153,63 +166,72 @@ export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortCh
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto' }}>
+      <div ref={parentRef} style={{ overflow: 'auto', maxHeight: '68vh' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: columnSet === 'advisor' ? 760 : 820 }}>
           <thead>
             {columnSet === 'advisor' && (
               <tr>
-                {visible('name')          && <th style={colHd('name')}             onClick={() => handleSort('name')}>Name <SortArrow k="name" /></th>}
-                {visible('age')           && <th style={colHd('age', 'center')}    onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
-                {visible('retirementAge') && <th style={colHd('retirementAge', 'center')} onClick={() => handleSort('retirementAge')}>Retire <SortArrow k="retirementAge" /></th>}
-                {visible('status')        && <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>Status <SortArrow k="fireOnTrack" /></th>}
-                {visible('wealth')        && <th style={colHd('wealth', 'right')}  onClick={() => handleSort('wealth')}>Wealth at Retirement <SortArrow k="wealth" /></th>}
-                {visible('coverage')      && <th style={colHd('coverage', 'right')} onClick={() => handleSort('coverage')}>Death Coverage <SortArrow k="coverage" /></th>}
-                {visible('lpa')           && <th style={colHdPlain('center')}>LPA</th>}
-                {visible('will')          && <th style={colHdPlain('center')}>Will</th>}
-                {visible('lastSeen')      && <th style={colHd('lastSeen', 'center')} onClick={() => handleSort('lastSeen')}>Last Met <SortArrow k="lastSeen" /></th>}
+                {visible('name', columnSet, stableVisibleColumns)          && <th style={colHd('name')}             onClick={() => handleSort('name')}>Name <SortArrow k="name" /></th>}
+                {visible('age', columnSet, stableVisibleColumns)           && <th style={colHd('age', 'center')}    onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
+                {visible('retirementAge', columnSet, stableVisibleColumns) && <th style={colHd('retirementAge', 'center')} onClick={() => handleSort('retirementAge')}>Retire <SortArrow k="retirementAge" /></th>}
+                {visible('status', columnSet, stableVisibleColumns)        && <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>Status <SortArrow k="fireOnTrack" /></th>}
+                {visible('wealth', columnSet, stableVisibleColumns)        && <th style={colHd('wealth', 'right')}  onClick={() => handleSort('wealth')}>Wealth at Retirement <SortArrow k="wealth" /></th>}
+                {visible('coverage', columnSet, stableVisibleColumns)      && <th style={colHd('coverage', 'right')} onClick={() => handleSort('coverage')}>Death Coverage <SortArrow k="coverage" /></th>}
+                {visible('lpa', columnSet, stableVisibleColumns)           && <th style={colHdPlain('center')}>LPA</th>}
+                {visible('will', columnSet, stableVisibleColumns)          && <th style={colHdPlain('center')}>Will</th>}
+                {visible('lastSeen', columnSet, stableVisibleColumns)      && <th style={colHd('lastSeen', 'center')} onClick={() => handleSort('lastSeen')}>Last Met <SortArrow k="lastSeen" /></th>}
                 <th style={colHdPlain('right')}></th>
               </tr>
             )}
             {columnSet === 'fire' && (
               <tr>
-                {visible('name')        && <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>}
-                {visible('advisor')     && <th style={colHdPlain()}>Advisor</th>}
-                {visible('age')         && <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
-                {visible('income')      && <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>}
-                {visible('fireStatus')  && <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>FIRE Status <SortArrow k="fireOnTrack" /></th>}
-                {visible('fireGap')     && <th style={colHd('fireGap', 'right')} onClick={() => handleSort('fireGap')}>Gap / Surplus <SortArrow k="fireGap" /></th>}
-                {visible('lastUpdated') && <th style={colHd('lastUpdated', 'center')} onClick={() => handleSort('lastUpdated')}>Last seen <SortArrow k="lastUpdated" /></th>}
+                {visible('name', columnSet, stableVisibleColumns)        && <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>}
+                {visible('advisor', columnSet, stableVisibleColumns)     && <th style={colHdPlain()}>Advisor</th>}
+                {visible('age', columnSet, stableVisibleColumns)         && <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
+                {visible('income', columnSet, stableVisibleColumns)      && <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>}
+                {visible('fireStatus', columnSet, stableVisibleColumns)  && <th style={colHd('fireOnTrack', 'center')} onClick={() => handleSort('fireOnTrack')}>FIRE Status <SortArrow k="fireOnTrack" /></th>}
+                {visible('fireGap', columnSet, stableVisibleColumns)     && <th style={colHd('fireGap', 'right')} onClick={() => handleSort('fireGap')}>Gap / Surplus <SortArrow k="fireGap" /></th>}
+                {visible('lastUpdated', columnSet, stableVisibleColumns) && <th style={colHd('lastUpdated', 'center')} onClick={() => handleSort('lastUpdated')}>Last seen <SortArrow k="lastUpdated" /></th>}
                 {onTaskClick && <th style={colHdPlain('right')}></th>}
               </tr>
             )}
             {columnSet === 'insurance' && (
               <tr>
-                {visible('name')         && <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>}
-                {visible('advisor')      && <th style={colHdPlain()}>Advisor</th>}
-                {visible('age')          && <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
-                {visible('income')       && <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>}
-                {visible('deathGap')     && <th style={colHd('deathGap', 'center')} onClick={() => handleSort('deathGap')}>Death Gap <SortArrow k="deathGap" /></th>}
-                {visible('ciGap')        && <th style={colHd('ciGap', 'center')}   onClick={() => handleSort('ciGap')}>CI Gap <SortArrow k="ciGap" /></th>}
-                {visible('eciGap')       && <th style={colHd('eciGap', 'center')}  onClick={() => handleSort('eciGap')}>ECI Gap <SortArrow k="eciGap" /></th>}
-                {visible('hospitalPlan') && <th style={colHdPlain('center')}>Hospital Plan</th>}
-                {visible('signalScore')  && <th style={colHd('signalScore', 'center')} onClick={() => handleSort('signalScore')}>Signal <SortArrow k="signalScore" /></th>}
+                {visible('name', columnSet, stableVisibleColumns)         && <th style={colHd('name')}            onClick={() => handleSort('name')}>Client <SortArrow k="name" /></th>}
+                {visible('advisor', columnSet, stableVisibleColumns)      && <th style={colHdPlain()}>Advisor</th>}
+                {visible('age', columnSet, stableVisibleColumns)          && <th style={colHd('age', 'center')}   onClick={() => handleSort('age')}>Age <SortArrow k="age" /></th>}
+                {visible('income', columnSet, stableVisibleColumns)       && <th style={colHd('income', 'right')} onClick={() => handleSort('income')}>Income <SortArrow k="income" /></th>}
+                {visible('deathGap', columnSet, stableVisibleColumns)     && <th style={colHd('deathGap', 'center')} onClick={() => handleSort('deathGap')}>Death Gap <SortArrow k="deathGap" /></th>}
+                {visible('ciGap', columnSet, stableVisibleColumns)        && <th style={colHd('ciGap', 'center')}   onClick={() => handleSort('ciGap')}>CI Gap <SortArrow k="ciGap" /></th>}
+                {visible('eciGap', columnSet, stableVisibleColumns)       && <th style={colHd('eciGap', 'center')}  onClick={() => handleSort('eciGap')}>ECI Gap <SortArrow k="eciGap" /></th>}
+                {visible('hospitalPlan', columnSet, stableVisibleColumns) && <th style={colHdPlain('center')}>Hospital Plan</th>}
+                {visible('signalScore', columnSet, stableVisibleColumns)  && <th style={colHd('signalScore', 'center')} onClick={() => handleSort('signalScore')}>Signal <SortArrow k="signalScore" /></th>}
                 {onTaskClick && <th style={colHdPlain('right')}></th>}
               </tr>
             )}
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <ClientRow
-                key={row.profile.id}
-                row={row}
-                columnSet={columnSet}
-                first={i === 0}
-                onView={() => handleViewClient(row.profile.id)}
-                onTaskClick={onTaskClick}
-                visible={visible}
-                isOwn={!!currentUserId && (row.profile.userId === currentUserId)}
-              />
-            ))}
+            {paddingTop > 0 && (
+              <tr><td colSpan={20} style={{ height: paddingTop, padding: 0 }} /></tr>
+            )}
+            {virtualItems.map(virtualRow => {
+              const row = rows[virtualRow.index];
+              return (
+                <ClientRow
+                  key={row.profile.id}
+                  row={row}
+                  columnSet={columnSet}
+                  visibleColumns={stableVisibleColumns}
+                  first={virtualRow.index === 0}
+                  onView={() => handleViewClient(row.profile.id)}
+                  onTaskClick={onTaskClick}
+                  isOwn={!!currentUserId && (row.profile.userId === currentUserId)}
+                />
+              );
+            })}
+            {paddingBottom > 0 && (
+              <tr><td colSpan={20} style={{ height: paddingBottom, padding: 0 }} /></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -217,22 +239,44 @@ export default function ClientTable({ rows, columnSet, sortBy, sortDir, onSortCh
   );
 }
 
+/** Pure visibility check — extracted so ClientRow can use it without a function prop. */
+function visible(id: string, columnSet: ColumnSet, visibleColumns?: string[]): boolean {
+  const def = COLUMNS_BY_SET[columnSet].find(c => c.id === id);
+  if (def?.required) return true;
+  if (!visibleColumns) return true;
+  return visibleColumns.includes(id);
+}
+
 interface RowProps {
   row: EnrichedProfile;
   columnSet: ColumnSet;
+  visibleColumns?: string[];
   first: boolean;
   onView: () => void;
   onTaskClick?: (row: EnrichedProfile) => void;
-  visible: (columnId: string) => boolean;
   /** True when the current viewer is the owner (advisor) of this row's profile. */
   isOwn: boolean;
 }
 
-function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn }: RowProps) {
+function rowPropsEqual(prev: RowProps, next: RowProps): boolean {
+  return (
+    prev.row.profile.id === next.row.profile.id &&
+    prev.row.profile.updatedAt === next.row.profile.updatedAt &&
+    prev.columnSet === next.columnSet &&
+    prev.visibleColumns === next.visibleColumns &&
+    prev.first === next.first &&
+    prev.isOwn === next.isOwn
+    // onView and onTaskClick excluded — functionally equivalent even when reference changes
+  );
+}
+
+const ClientRow = React.memo(function ClientRow({ row, columnSet, visibleColumns, first, onView, onTaskClick, isOwn }: RowProps) {
   const td: React.CSSProperties = { padding: '11px 14px', fontSize: 13, color: 'var(--text-2)', verticalAlign: 'middle' };
   const profile = row.profile;
   const advisorEmail = (profile as any).advisorEmail as string | undefined;
   const phoneNumber = profile.inputs.personal?.phoneNumber;
+
+  const vis = (id: string) => visible(id, columnSet, visibleColumns);
 
   if (columnSet === 'advisor') {
     const ep = profile.inputs.estatePlanning;
@@ -246,7 +290,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
         onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface)'}
         onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
       >
-        {visible('name') && (
+        {vis('name') && (
           <td style={{ ...td }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
@@ -259,7 +303,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
             </div>
           </td>
         )}
-        {visible('age') && (
+        {vis('age') && (
           <td style={{ ...td, textAlign: 'center' }}>
             {row.liveAge}
             {profile.inputs.personal?.dateOfBirth && (
@@ -267,10 +311,10 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
             )}
           </td>
         )}
-        {visible('retirementAge') && (
+        {vis('retirementAge') && (
           <td style={{ ...td, textAlign: 'center' }}>{retAge ?? '—'}</td>
         )}
-        {visible('status') && (
+        {vis('status') && (
           <td style={{ ...td, textAlign: 'center' }}>
             <span style={{
               fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
@@ -282,25 +326,25 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
             </span>
           </td>
         )}
-        {visible('wealth') && (
+        {vis('wealth') && (
           <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatSGDK(row.wealthAtRetirement)}</td>
         )}
-        {visible('coverage') && (
+        {vis('coverage') && (
           <td style={{ ...td, textAlign: 'right', color: row.hasMissingInsurance ? '#fbbf24' : 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
             {row.hasMissingInsurance ? '— No coverage' : formatSGDK(row.totalDeathSA)}
           </td>
         )}
-        {visible('lpa') && (
+        {vis('lpa') && (
           <td style={{ ...td, textAlign: 'center' }}>
             <span style={badgeStyle(lpa, '#818cf8')}>{lpa ? '✓' : '—'}</span>
           </td>
         )}
-        {visible('will') && (
+        {vis('will') && (
           <td style={{ ...td, textAlign: 'center' }}>
             <span style={badgeStyle(will, '#818cf8')}>{will ? '✓' : '—'}</span>
           </td>
         )}
-        {visible('lastSeen') && (
+        {vis('lastSeen') && (
           <td style={{ ...td, textAlign: 'center' }}>
             {row.daysSinceMeeting === null ? (
               <span style={{ fontSize: 11, color: 'var(--text-5)' }}>Never</span>
@@ -334,13 +378,13 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
   const gender = row.profile.inputs.personal?.gender ?? '';
   return (
     <tr style={{ borderTop: first ? 'none' : '1px solid var(--border)' }}>
-      {visible('name') && (
+      {vis('name') && (
         <td style={td}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{profile.name}</div>
           {phoneNumber && <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>{phoneNumber}</div>}
         </td>
       )}
-      {visible('advisor') && (
+      {vis('advisor') && (
         <td style={td}>
           {advisorEmail ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -360,7 +404,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
           )}
         </td>
       )}
-      {visible('age') && (
+      {vis('age') && (
         <td style={{ ...td, textAlign: 'center' }}>
           {ageCell !== null ? (
             <div>
@@ -372,7 +416,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
           ) : <span style={{ color: 'var(--text-5)', fontSize: 12 }}>—</span>}
         </td>
       )}
-      {visible('income') && (
+      {vis('income') && (
         <td style={{ ...td, textAlign: 'right' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
             {row.annualIncome ? formatSGD(row.annualIncome) : '—'}
@@ -382,7 +426,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
 
       {columnSet === 'fire' && (
         <>
-          {visible('fireStatus') && (
+          {vis('fireStatus') && (
             <td style={{ ...td, textAlign: 'center' }}>
               {row.fireOnTrack ? (
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399',
@@ -395,7 +439,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
               )}
             </td>
           )}
-          {visible('fireGap') && (
+          {vis('fireGap') && (
             <td style={{ ...td, textAlign: 'right' }}>
               {row.fireGap !== null ? (
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#f87171' }}>-{formatSGD(row.fireGap)}</span>
@@ -404,7 +448,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
               ) : <span style={{ fontSize: 12, color: 'var(--text-5)' }}>—</span>}
             </td>
           )}
-          {visible('lastUpdated') && (
+          {vis('lastUpdated') && (
             <td style={{ ...td, textAlign: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: lastUpdatedColor(row.daysSinceUpdate) }}>
                 {row.daysSinceUpdate === 0 ? 'Today' : row.daysSinceUpdate === 1 ? 'Yesterday' : `${row.daysSinceUpdate}d ago`}
@@ -416,22 +460,22 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
 
       {columnSet === 'insurance' && (
         <>
-          {visible('deathGap') && (
+          {vis('deathGap') && (
             <td style={{ ...td, textAlign: 'center' }}>
               <GapCell gap={row.insurance.deathGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.death} />
             </td>
           )}
-          {visible('ciGap') && (
+          {vis('ciGap') && (
             <td style={{ ...td, textAlign: 'center' }}>
               <GapCell gap={row.insurance.ciGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.ci} />
             </td>
           )}
-          {visible('eciGap') && (
+          {vis('eciGap') && (
             <td style={{ ...td, textAlign: 'center' }}>
               <GapCell gap={row.insurance.eciGap} rec={(row.annualIncome ?? 0) * INSURANCE_BENCHMARK.eci} />
             </td>
           )}
-          {visible('hospitalPlan') && (
+          {vis('hospitalPlan') && (
             <td style={{ ...td, textAlign: 'center' }}>
               {row.insurance.hasISP === null ? (
                 <span style={{ fontSize: 11, color: 'var(--text-5)' }}>—</span>
@@ -450,7 +494,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
               )}
             </td>
           )}
-          {visible('signalScore') && (
+          {vis('signalScore') && (
             <td style={{ ...td, textAlign: 'center' }}>
               <SignalBadge score={row.insurance.signalScore} />
             </td>
@@ -474,7 +518,7 @@ function ClientRow({ row, columnSet, first, onView, onTaskClick, visible, isOwn 
       )}
     </tr>
   );
-}
+}, rowPropsEqual);
 
 function badgeStyle(active: boolean, accent: string): React.CSSProperties {
   return {
