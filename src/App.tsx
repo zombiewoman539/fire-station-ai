@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
@@ -9,8 +9,8 @@ import { supabase } from './services/supabaseClient';
 import {
   listProfiles,
   createProfile,
-  saveProfile,
 } from './services/profileStorageSupabase';
+import { useAutoSave } from './hooks/useAutoSave';
 import ChartPanel from './components/ChartPanel';
 import ProfileManager from './components/ProfileManager';
 import EditModal from './components/EditModal';
@@ -79,7 +79,6 @@ function UpgradeBanner({ message, onUpgrade }: { message: string; onUpgrade: () 
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
@@ -92,11 +91,15 @@ function Dashboard() {
     () => localStorage.getItem('fa-sidebar-open') !== 'true'
   );
   const [profileSummaries, setProfileSummaries] = useState<Record<string, ProfileSummary>>({});
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const pendingSaveRef = useRef<ClientProfile | null>(null);
   const [theme, toggleTheme] = useTheme();
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
+
+  const isReadOnlyProfile = !!activeProfile?.userId
+    && !!currentUserId
+    && activeProfile.userId !== currentUserId;
+
+  const { saveStatus, scheduleSave, flushSave, resetStatus: resetSaveStatus } = useAutoSave(isReadOnlyProfile, showError);
 
   // Load initial profile on mount
   useEffect(() => {
@@ -218,94 +221,32 @@ function Dashboard() {
     if (isMobile) setSidebarCollapsed(true);
   }, [isMobile]);
 
-  // True when the active profile belongs to another user (e.g. a manager viewing a teammate's
-  // client). RLS will reject any write, so we suppress save attempts and surface a banner.
-  const isReadOnlyProfile = !!activeProfile?.userId
-    && !!currentUserId
-    && activeProfile.userId !== currentUserId;
-
-  // Auto-save with debounce
   const handleInputChange = useCallback((newInputs: FireInputs) => {
     if (!activeProfile) return;
-
     const updated = { ...activeProfile, inputs: newInputs, updatedAt: new Date().toISOString() };
     setActiveProfile(updated);
-    if (isReadOnlyProfile) return; // edits are local-only; no save attempt against RLS
-    pendingSaveRef.current = updated;
-    setSaveStatus('saving');
+    scheduleSave(updated);
+  }, [activeProfile, scheduleSave]);
 
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        await saveProfile(updated);
-        pendingSaveRef.current = null;
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 2000);
-      } catch (e) {
-        console.error('Save failed:', e);
-        setSaveStatus('error');
-        showError('Save failed — check your connection and try again.');
-      }
-    }, 800);
-  }, [activeProfile, isReadOnlyProfile, showError]);
-
-  // Force-flush any pending debounced save immediately. Returns true on success.
-  const flushSave = useCallback(async (): Promise<boolean> => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = undefined;
-    }
-    const pending = pendingSaveRef.current ?? activeProfile;
-    if (!pending) return true;
-    setSaveStatus('saving');
-    try {
-      await saveProfile(pending);
-      pendingSaveRef.current = null;
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(s => (s === 'saved' ? 'idle' : s)), 2000);
-      return true;
-    } catch (e) {
-      console.error('Save failed:', e);
-      setSaveStatus('error');
-      return false;
-    }
-  }, [activeProfile]);
+  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries' | 'tags'>>) => {
+    if (!activeProfile) return;
+    const updated = { ...activeProfile, ...updates, updatedAt: new Date().toISOString() };
+    setActiveProfile(updated);
+    scheduleSave(updated);
+  }, [activeProfile, scheduleSave]);
 
   const handleSelectProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
     setExcludedIds(new Set());
     localStorage.setItem('fire-active-profile', profile.id);
-    setSaveStatus('idle');
-  }, []);
-
-  // Updates CRM meta fields (lastMeetingDate, nextReviewDate, notes, noteEntries, tags) and saves
-  const handleProfileMetaChange = useCallback((updates: Partial<Pick<ClientProfile, 'lastMeetingDate' | 'nextReviewDate' | 'notes' | 'noteEntries' | 'tags'>>) => {
-    if (!activeProfile) return;
-    const updated = { ...activeProfile, ...updates, updatedAt: new Date().toISOString() };
-    setActiveProfile(updated);
-    if (isReadOnlyProfile) return; // RLS would reject; banner in EditModal explains why
-    pendingSaveRef.current = updated;
-    setSaveStatus('saving');
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        await saveProfile(updated);
-        pendingSaveRef.current = null;
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 2000);
-      } catch (e) {
-        console.error('Save failed:', e);
-        setSaveStatus('error');
-        showError('Save failed — check your connection and try again.');
-      }
-    }, 800);
-  }, [activeProfile, isReadOnlyProfile, showError]);
+    resetSaveStatus();
+  }, [resetSaveStatus]);
 
   const handleNewProfile = useCallback((profile: ClientProfile) => {
     setActiveProfile(profile);
     localStorage.setItem('fire-active-profile', profile.id);
-    setSaveStatus('idle');
-  }, []);
+    resetSaveStatus();
+  }, [resetSaveStatus]);
 
   if (loading) {
     return (
@@ -539,7 +480,7 @@ function Dashboard() {
         currentProfileId={activeProfile?.id}
         profile={activeProfile}
         onProfileMetaChange={handleProfileMetaChange}
-        onSaveNow={flushSave}
+        onSaveNow={() => flushSave(activeProfile)}
         saveStatus={saveStatus}
         readOnly={isReadOnlyProfile}
       />
