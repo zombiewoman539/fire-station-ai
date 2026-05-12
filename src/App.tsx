@@ -34,6 +34,7 @@ import TasksPage from './components/TasksPage';
 import AdminPage from './components/AdminPage';
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
+import { useToast } from './contexts/ToastContext';
 import { createCheckoutSession, PRICES } from './services/subscriptionService';
 import type { Session } from '@supabase/supabase-js';
 
@@ -86,6 +87,7 @@ function Dashboard() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [upgradeBanner, setUpgradeBanner] = useState('');
   const { isPro } = useSubscription();
+  const { showError } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('fa-sidebar-open') !== 'true'
   );
@@ -153,6 +155,7 @@ function Dashboard() {
         setProfileSummaries(summaries);
       } catch (e) {
         console.error('Failed to load profiles:', e);
+        showError('Failed to load your clients. Please refresh the page.');
       }
       clearTimeout(timeout);
       setLoading(false);
@@ -241,6 +244,7 @@ function Dashboard() {
       } catch (e) {
         console.error('Save failed:', e);
         setSaveStatus('error');
+        showError('Save failed — check your connection and try again.');
       }
     }, 800);
   }, [activeProfile, isReadOnlyProfile]);
@@ -292,6 +296,7 @@ function Dashboard() {
       } catch (e) {
         console.error('Save failed:', e);
         setSaveStatus('error');
+        showError('Save failed — check your connection and try again.');
       }
     }, 800);
   }, [activeProfile, isReadOnlyProfile]);

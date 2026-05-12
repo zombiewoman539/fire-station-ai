@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { ToastProvider } from './contexts/ToastContext';
+import Toast from './components/Toast';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -30,7 +32,10 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <ToastProvider>
+        <App />
+        <Toast />
+      </ToastProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );

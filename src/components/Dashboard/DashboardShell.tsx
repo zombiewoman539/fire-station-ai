@@ -9,6 +9,7 @@ import {
   DashboardKind, ResolvedView, FilterChip, ViewConfig, SavedView,
 } from '../../savedViewsTypes';
 import { builtInsForKind } from '../../builtInViews';
+import { useToast } from '../../contexts/ToastContext';
 import {
   listSavedViews, createSavedView, updateSavedView, deleteSavedView,
 } from '../../services/savedViewsService';
@@ -50,6 +51,7 @@ const DEFAULT_CONFIG_FOR_KIND: Record<DashboardKind, ViewConfig> = {
 
 export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTaskClick }: Props) {
   const { teamStatus } = useTeam();
+  const { showError } = useToast();
   const isManager = teamStatus?.role === 'manager';
   const orgId = teamStatus?.orgId ?? null;
 
@@ -104,6 +106,7 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
       setSavedViews(views.filter(v => v.dashboardKind === dashboardKind));
     } catch (e) {
       console.error('Load saved views failed:', e);
+      showError('Could not load saved views — your filters may be reset.');
     }
   }, [dashboardKind]);
   React.useEffect(() => { refreshViews(); }, [refreshViews]);
