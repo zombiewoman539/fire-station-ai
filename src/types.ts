@@ -53,6 +53,14 @@ export interface InvestmentBucket {
   payoutDurationYears?: number | null; // null = lifetime; finite = depletes capital (annuity)
 }
 
+export interface AssetTransition {
+  id: string;
+  atAge: number;          // age when the transfer fires (must be > currentAge to take effect)
+  fromBucketId: string;
+  toBucketId: string;
+  portion: number;        // 0–1 fraction of fromBucket.currentValue to transfer
+}
+
 export interface Assets {
   cashSavings: number;
   investments: number;              // fallback when investmentBuckets is empty
@@ -62,6 +70,7 @@ export interface Assets {
   /** Percentage reduction applied to investment returns once retired (0–100).
    *  Reflects the typical de-risking when you stop earning. Default 30 (i.e. retirement rate = accumulation × 0.70). */
   retirementReturnReduction?: number;
+  transitions?: AssetTransition[];
 }
 
 export interface FundAllocation {

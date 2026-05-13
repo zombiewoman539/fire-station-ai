@@ -1,5 +1,5 @@
 import React from 'react';
-import { FireInputs, InvestmentBucket } from '../../types';
+import { FireInputs, InvestmentBucket, AssetTransition } from '../../types';
 import { NumberField, SliderField, SectionLabel, DetailToggleButton } from '../FormFields';
 import { uid } from '../../utils/uid';
 
@@ -182,6 +182,17 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
   })();
   const bucketTotalMonthly = growthBuckets.reduce((s, b) => s + b.monthlyContribution, 0);
 
+  const transitions = inputs.assets.transitions ?? [];
+  const updTransitions = (ts: AssetTransition[]) =>
+    onChange({ ...inputs, assets: { ...inputs.assets, transitions: ts } });
+  const addTransition = () => updTransitions([...transitions, {
+    id: uid(), atAge: inputs.personal.retirementAge,
+    fromBucketId: buckets[0]?.id ?? '', toBucketId: buckets[1]?.id ?? '', portion: 0.5,
+  }]);
+  const removeTransition = (id: string) => updTransitions(transitions.filter(t => t.id !== id));
+  const updateTransition = (id: string, patch: Partial<AssetTransition>) =>
+    updTransitions(transitions.map(t => t.id === id ? { ...t, ...patch } : t));
+
   return (
     <div>
       <NumberField label="Cash Savings" value={inputs.assets.cashSavings} prefix="S$"
@@ -268,6 +279,72 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
             <span style={{ fontWeight: 700, color: '#34d399' }}>{bucketBlended.toFixed(1)}%</span> blended &nbsp;·&nbsp;
             +S${bucketTotalMonthly.toLocaleString()}/mo
           </div>
+
+          {/* Transitions */}
+          {buckets.length >= 2 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <SectionLabel>Transfers at age</SectionLabel>
+                <button onClick={addTransition} style={{
+                  fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}>+ Add transfer</button>
+              </div>
+              {transitions.length === 0 && (
+                <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0 }}>
+                  No transfers yet. Use these to model rebalancing or funding an annuity at retirement.
+                </p>
+              )}
+              {transitions.map(t => {
+                const fromBucket = buckets.find(b => b.id === t.fromBucketId);
+                const toBucket = buckets.find(b => b.id === t.toBucketId);
+                const isPast = t.atAge <= inputs.personal.currentAge;
+                return (
+                  <div key={t.id} style={{
+                    background: 'var(--inset)', borderRadius: 8, padding: '8px 10px', marginBottom: 6,
+                    border: `1px solid ${isPast ? 'rgba(239,68,68,0.3)' : 'var(--border-soft)'}`,
+                    opacity: isPast ? 0.6 : 1,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-4)' }}>Age</span>
+                      <input type="number" value={t.atAge}
+                        onChange={e => updateTransition(t.id, { atAge: Number(e.target.value) || 0 })}
+                        onFocus={e => e.target.select()}
+                        style={{ width: 44, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '3px 6px', fontSize: 12, color: 'var(--text-1)', outline: 'none' }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-4)' }}>move</span>
+                      <input type="number" min={1} max={100} value={Math.round(t.portion * 100)}
+                        onChange={e => updateTransition(t.id, { portion: Math.min(1, Math.max(0, (Number(e.target.value) || 0) / 100)) })}
+                        onFocus={e => e.target.select()}
+                        style={{ width: 44, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '3px 6px', fontSize: 12, color: 'var(--text-1)', outline: 'none' }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-4)' }}>% of</span>
+                      <select value={t.fromBucketId} onChange={e => updateTransition(t.id, { fromBucketId: e.target.value })}
+                        style={{ flex: 1, minWidth: 80, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '3px 6px', fontSize: 12, color: 'var(--text-1)', outline: 'none' }}>
+                        {buckets.filter(b => b.id !== t.toBucketId).map(b => (
+                          <option key={b.id} value={b.id}>{b.label}</option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: 11, color: 'var(--text-4)' }}>→</span>
+                      <select value={t.toBucketId} onChange={e => updateTransition(t.id, { toBucketId: e.target.value })}
+                        style={{ flex: 1, minWidth: 80, background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 6, padding: '3px 6px', fontSize: 12, color: 'var(--text-1)', outline: 'none' }}>
+                        {buckets.filter(b => b.id !== t.fromBucketId).map(b => (
+                          <option key={b.id} value={b.id}>{b.label}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => removeTransition(t.id)}
+                        style={{ color: 'var(--text-5)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                    </div>
+                    {isPast && (
+                      <p style={{ fontSize: 10, color: '#ef4444', margin: '4px 0 0' }}>Age already passed — transition will be ignored</p>
+                    )}
+                    {!isPast && fromBucket && toBucket && (
+                      <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '4px 0 0' }}>
+                        At age {t.atAge}: move {Math.round(t.portion * 100)}% of <strong style={{ color: 'var(--text-3)' }}>{fromBucket.label}</strong> → <strong style={{ color: 'var(--text-3)' }}>{toBucket.label}</strong>
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

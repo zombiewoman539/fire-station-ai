@@ -269,9 +269,31 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     }
   };
 
+  // Build a bucket-id → liveBucket index map for O(1) transition lookups
+  const bucketIdxById = new Map<string, number>();
+  if (hasBuckets) {
+    assets.investmentBuckets.forEach((b, i) => bucketIdxById.set(b.id, i));
+  }
+
   for (let i = 0; i <= years; i++) {
     const age = currentAge + i;
     const isRetired = age >= retirementAge;
+
+    // Apply asset transitions that fire at this age (only future ages — option B)
+    if (hasBuckets && assets.transitions) {
+      for (const t of assets.transitions) {
+        if (t.atAge !== age || t.atAge <= currentAge) continue;
+        const fromIdx = bucketIdxById.get(t.fromBucketId);
+        const toIdx = bucketIdxById.get(t.toBucketId);
+        if (fromIdx == null || toIdx == null) continue;
+        const from = liveBuckets[fromIdx];
+        const to = liveBuckets[toIdx];
+        if (from.value <= 0) continue;
+        const amount = from.value * Math.min(1, Math.max(0, t.portion));
+        from.value -= amount;
+        to.value += amount;
+      }
+    }
 
     let recurringPurchaseCosts = getRecurringCostAtAge(age);
     const annualPremiums = getAnnualPremiums(i);
