@@ -59,8 +59,9 @@ export function SliderField({ label, value, min, max, step, unit, tip, onChange 
 }
 
 // ── NumberField ───────────────────────────────────────────────────────────────
-export function NumberField({ label, value, prefix, tip, small, onChange }: {
+export function NumberField({ label, value, prefix, tip, small, rightSlot, onChange }: {
   label: string; value: number; prefix?: string; tip?: string; small?: boolean;
+  rightSlot?: React.ReactNode;
   onChange: (v: number) => void;
 }) {
   const [displayValue, setDisplayValue] = React.useState(String(value));
@@ -72,9 +73,12 @@ export function NumberField({ label, value, prefix, tip, small, onChange }: {
 
   return (
     <div style={{ marginBottom: small ? 8 : 14 }}>
-      <label style={{ fontSize: small ? 11 : 12, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>
-        {label}{tip && <InfoTip text={tip} />}
-      </label>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 8 }}>
+        <label style={{ fontSize: small ? 11 : 12, color: 'var(--text-4)' }}>
+          {label}{tip && <InfoTip text={tip} />}
+        </label>
+        {rightSlot}
+      </div>
       <div style={{
         display: 'flex', alignItems: 'center',
         background: 'var(--input-bg)', borderRadius: 8,
@@ -94,6 +98,38 @@ export function NumberField({ label, value, prefix, tip, small, onChange }: {
           style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, width: '100%' }} />
       </div>
     </div>
+  );
+}
+
+// ── DetailToggleButton ────────────────────────────────────────────────────────
+// Visible pill for switching a field between simple / detailed input modes.
+// Use as rightSlot of NumberField or in section headers.
+export function DetailToggleButton({ label, icon, onClick }: {
+  label: string; icon?: string; onClick: () => void;
+}) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <button type="button" onClick={onClick}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        fontSize: 11,
+        fontWeight: 500,
+        padding: '3px 10px',
+        borderRadius: 999,
+        border: `1px solid ${hover ? 'var(--border-mid)' : 'var(--border)'}`,
+        background: hover ? 'var(--inset)' : 'transparent',
+        color: hover ? 'var(--text-2)' : 'var(--text-3)',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        lineHeight: 1.4,
+        whiteSpace: 'nowrap',
+        transition: 'background 0.12s, border-color 0.12s, color 0.12s',
+      }}>
+      {icon && <span style={{ fontSize: 11 }}>{icon}</span>}
+      {label}
+    </button>
   );
 }
 

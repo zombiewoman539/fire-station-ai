@@ -1,6 +1,6 @@
 import React from 'react';
 import { FireInputs, InvestmentBucket } from '../../types';
-import { NumberField, SliderField, SectionLabel } from '../FormFields';
+import { NumberField, SliderField, SectionLabel, DetailToggleButton } from '../FormFields';
 import { uid } from '../../utils/uid';
 
 export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
@@ -59,6 +59,7 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
         <div>
           <NumberField label="Investments / Equities" value={inputs.assets.investments} prefix="S$"
             tip="Current value of your investment portfolio — stocks, ETFs, unit trusts, REITs, etc."
+            rightSlot={<DetailToggleButton icon="⊞" label="Track per-bucket" onClick={expandBuckets} />}
             onChange={v => updAssets('investments', v)} />
           <NumberField label="Annual Investment Contribution" value={inputs.income.annualInvestmentContribution} prefix="S$"
             tip="How much you actively invest each year. Remaining surplus goes to cash savings."
@@ -66,18 +67,12 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
           <SliderField label="Investment Return Rate" value={inputs.assets.investmentReturnRate} min={0} max={20} step={0.5} unit="%"
             tip="Expected annual return on equities. Global diversified ETFs average ~7% historically."
             onChange={v => updAssets('investmentReturnRate', v)} />
-          <button onClick={expandBuckets} style={{
-            fontSize: 12, color: 'var(--text-4)', marginTop: -8, marginBottom: 16,
-            background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block',
-          }}>↓ Break into investment buckets</button>
         </div>
       ) : (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <SectionLabel>Investment Portfolio</SectionLabel>
-            <button onClick={collapseBuckets} style={{ fontSize: 11, color: 'var(--text-4)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-              ↑ Use single total
-            </button>
+            <DetailToggleButton icon="↑" label="Use single total" onClick={collapseBuckets} />
           </div>
           {buckets.map(bucket => (
             <div key={bucket.id} style={{ background: 'var(--inset)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid var(--border-soft)' }}>

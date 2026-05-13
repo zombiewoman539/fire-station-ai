@@ -1,6 +1,6 @@
 import React from 'react';
 import { FireInputs, ExpenseLineItem } from '../../types';
-import { NumberField, SliderField, SectionLabel } from '../FormFields';
+import { NumberField, SliderField, SectionLabel, DetailToggleButton } from '../FormFields';
 import { uid } from '../../utils/uid';
 
 export function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
@@ -42,22 +42,15 @@ export function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChan
         onChange={v => upd('annualIncome', v)} />
 
       {items.length === 0 ? (
-        <div>
-          <NumberField label="Annual Living Expenses" value={inputs.income.annualExpenses} prefix="S$"
-            tip="Total yearly spend — housing, food, transport, lifestyle."
-            onChange={v => upd('annualExpenses', v)} />
-          <button onClick={expandExpenses} style={{
-            fontSize: 12, color: 'var(--text-4)', marginTop: -8, marginBottom: 16,
-            background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block',
-          }}>↓ Break down into monthly line items</button>
-        </div>
+        <NumberField label="Annual Living Expenses" value={inputs.income.annualExpenses} prefix="S$"
+          tip="Total yearly spend — housing, food, transport, lifestyle."
+          rightSlot={<DetailToggleButton icon="☰" label="Break into line items" onClick={expandExpenses} />}
+          onChange={v => upd('annualExpenses', v)} />
       ) : (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <SectionLabel>Monthly Expenses</SectionLabel>
-            <button onClick={collapseExpenses} style={{ fontSize: 11, color: 'var(--text-4)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-              ↑ Use single total
-            </button>
+            <DetailToggleButton icon="↑" label="Use single total" onClick={collapseExpenses} />
           </div>
           {items.map(item => {
             const annualEquiv = item.frequency === 'monthly' ? item.amount * 12 : item.amount;
