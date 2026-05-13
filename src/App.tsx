@@ -184,10 +184,8 @@ function Dashboard() {
   const results = useMemo(() => calculate(effectiveInputs), [effectiveInputs]);
 
   // Detect an unconfigured client (still showing default values)
-  const isDefaultClient =
-    inputs.income.annualIncome === defaultInputs.income.annualIncome &&
-    inputs.personal.currentAge === defaultInputs.personal.currentAge &&
-    inputs.assets.investments === defaultInputs.assets.investments;
+  const isDefaultClient = !activeProfile ||
+    Math.abs(new Date(activeProfile.updatedAt).getTime() - new Date(activeProfile.createdAt).getTime()) < 5000;
 
   // Keep active client's on-track badge in sync as inputs change
   useEffect(() => {
