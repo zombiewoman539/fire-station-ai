@@ -43,6 +43,14 @@ export interface InvestmentBucket {
   currentValue: number;
   monthlyContribution: number;
   annualReturnRate: number;
+  // W2: structured product types (absent / 'growth' = standard compounding bucket)
+  productType?: 'growth' | 'dividend' | 'annuity';
+  premiumType?: 'single' | 'limited';
+  annualPremium?: number;           // limited pay: annual premium (SGD)
+  premiumYears?: number;            // limited pay: how many years premiums are paid from today
+  payoutStartAge?: number;          // age when payouts begin
+  payoutAnnualAmount?: number;      // annual payout (coupon for dividend; drawdown for annuity)
+  payoutDurationYears?: number | null; // null = lifetime; finite = depletes capital (annuity)
 }
 
 export interface Assets {

@@ -3,6 +3,126 @@ import { FireInputs, InvestmentBucket } from '../../types';
 import { NumberField, SliderField, SectionLabel, DetailToggleButton } from '../FormFields';
 import { uid } from '../../utils/uid';
 
+type ProductType = 'growth' | 'dividend' | 'annuity';
+
+const PRODUCT_LABELS: Record<ProductType, string> = {
+  growth: 'Growth',
+  dividend: 'Dividend',
+  annuity: 'Annuity',
+};
+
+function ProductTypePill({ value, onChange }: { value: ProductType; onChange: (v: ProductType) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+      {(['growth', 'dividend', 'annuity'] as ProductType[]).map(t => (
+        <button key={t} type="button" onClick={() => onChange(t)} style={{
+          fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer',
+          border: `1px solid ${value === t ? 'var(--accent)' : 'var(--border)'}`,
+          background: value === t ? 'var(--accent)' : 'transparent',
+          color: value === t ? '#fff' : 'var(--text-3)',
+          transition: 'all 0.12s',
+        }}>{PRODUCT_LABELS[t]}</button>
+      ))}
+    </div>
+  );
+}
+
+function BucketInput({ label, value, prefix, suffix, step = 1, onChange }: {
+  label: string; value: number; prefix?: string; suffix?: string; step?: number;
+  onChange: (v: number) => void;
+}) {
+  const [focused, setFocused] = React.useState(false);
+  const [display, setDisplay] = React.useState(String(value));
+  React.useEffect(() => { if (!focused) setDisplay(String(value)); }, [value, focused]);
+  return (
+    <div>
+      <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 8px' }}>
+        {prefix && <span style={{ color: 'var(--text-4)', fontSize: 11, marginRight: 3 }}>{prefix}</span>}
+        <input type="number" value={focused ? display : value} step={step}
+          onFocus={e => { setFocused(true); setDisplay(String(value)); e.target.select(); }}
+          onBlur={() => { setFocused(false); onChange(Number(display) || 0); }}
+          onChange={e => { setDisplay(e.target.value); const n = Number(e.target.value); if (!isNaN(n)) onChange(n); }}
+          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }} />
+        {suffix && <span style={{ color: 'var(--text-4)', fontSize: 11, marginLeft: 2 }}>{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ProductDetailsPanel({ bucket, onChange }: { bucket: InvestmentBucket; onChange: (patch: Partial<InvestmentBucket>) => void }) {
+  const isLimited = bucket.premiumType === 'limited';
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-soft)' }}>
+      {/* Premium type toggle */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 4 }}>Premium structure</label>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['single', 'limited'] as const).map(pt => (
+            <button key={pt} type="button" onClick={() => onChange({ premiumType: pt })} style={{
+              fontSize: 11, fontWeight: 500, padding: '3px 10px', borderRadius: 999, cursor: 'pointer',
+              border: `1px solid ${bucket.premiumType === pt ? 'var(--accent)' : 'var(--border)'}`,
+              background: bucket.premiumType === pt ? 'rgba(99,102,241,0.15)' : 'transparent',
+              color: bucket.premiumType === pt ? 'var(--accent)' : 'var(--text-3)',
+              transition: 'all 0.12s',
+            }}>{pt === 'single' ? 'Single premium' : 'Regular premiums'}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Limited pay fields */}
+      {isLimited && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          <BucketInput label="Annual premium" value={bucket.annualPremium ?? 0} prefix="S$"
+            onChange={v => onChange({ annualPremium: v })} />
+          <BucketInput label="Pay for (years)" value={bucket.premiumYears ?? 0}
+            onChange={v => onChange({ premiumYears: v })} />
+        </div>
+      )}
+
+      {/* Payout fields */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+        <BucketInput label="Payout start age" value={bucket.payoutStartAge ?? 65}
+          onChange={v => onChange({ payoutStartAge: v })} />
+        <BucketInput label="Annual payout" value={bucket.payoutAnnualAmount ?? 0} prefix="S$"
+          onChange={v => onChange({ payoutAnnualAmount: v })} />
+      </div>
+
+      {/* Duration — only for annuity */}
+      {bucket.productType === 'annuity' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <BucketInput
+              label={bucket.payoutDurationYears == null ? 'Duration (lifetime)' : 'Duration (years)'}
+              value={bucket.payoutDurationYears ?? 0}
+              onChange={v => onChange({ payoutDurationYears: v === 0 ? null : v })}
+            />
+          </div>
+          <div style={{ paddingTop: 18 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, color: 'var(--text-3)' }}>
+              <input type="checkbox" checked={bucket.payoutDurationYears == null}
+                onChange={e => onChange({ payoutDurationYears: e.target.checked ? null : 20 })}
+                style={{ cursor: 'pointer' }} />
+              Lifetime
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Summary line */}
+      {(bucket.payoutAnnualAmount ?? 0) > 0 && (bucket.payoutStartAge ?? 0) > 0 && (
+        <div style={{ marginTop: 8, fontSize: 11, color: '#34d399', fontWeight: 500 }}>
+          +S${(bucket.payoutAnnualAmount ?? 0).toLocaleString()}/yr from age {bucket.payoutStartAge}
+          {bucket.productType === 'annuity' && bucket.payoutDurationYears != null
+            ? ` for ${bucket.payoutDurationYears} yrs`
+            : ' (lifetime)'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChange: (i: FireInputs) => void }) {
   const updAssets = (field: string, v: number) => onChange({ ...inputs, assets: { ...inputs.assets, [field]: v } });
 
@@ -28,11 +148,12 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
     onChange({ ...inputs, assets: { ...inputs.assets, investmentBuckets: [seed] } });
   };
   const collapseBuckets = () => {
-    const totalVal = buckets.reduce((s, b) => s + b.currentValue, 0);
+    const growthBuckets = buckets.filter(b => !b.productType || b.productType === 'growth');
+    const totalVal = growthBuckets.reduce((s, b) => s + b.currentValue, 0);
     const blended = totalVal > 0
-      ? buckets.reduce((s, b) => s + (b.currentValue / totalVal) * b.annualReturnRate, 0)
+      ? growthBuckets.reduce((s, b) => s + (b.currentValue / totalVal) * b.annualReturnRate, 0)
       : inputs.assets.investmentReturnRate;
-    const totalMonthly = buckets.reduce((s, b) => s + b.monthlyContribution, 0);
+    const totalMonthly = growthBuckets.reduce((s, b) => s + b.monthlyContribution, 0);
     onChange({
       ...inputs,
       assets: { ...inputs.assets, investmentBuckets: [], investments: totalVal, investmentReturnRate: Math.round(blended * 10) / 10 },
@@ -40,11 +161,26 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
     });
   };
 
+  const setProductType = (id: string, pt: ProductType) => {
+    const patch: Partial<InvestmentBucket> = { productType: pt };
+    if (pt !== 'growth') {
+      // Seed sensible defaults when switching to a product type
+      const b = buckets.find(x => x.id === id);
+      if (!b?.premiumType) patch.premiumType = 'single';
+      if (!b?.payoutStartAge) patch.payoutStartAge = inputs.personal.retirementAge;
+      if (pt === 'annuity' && b?.payoutDurationYears === undefined) patch.payoutDurationYears = 20;
+      if (pt === 'dividend' && b?.payoutDurationYears === undefined) patch.payoutDurationYears = null;
+    }
+    updateBucket(id, patch);
+  };
+
   const bucketTotalVal = buckets.reduce((s, b) => s + b.currentValue, 0);
-  const bucketBlended = bucketTotalVal > 0
-    ? buckets.reduce((s, b) => s + (b.currentValue / bucketTotalVal) * b.annualReturnRate, 0)
-    : 0;
-  const bucketTotalMonthly = buckets.reduce((s, b) => s + b.monthlyContribution, 0);
+  const growthBuckets = buckets.filter(b => !b.productType || b.productType === 'growth');
+  const bucketBlended = (() => {
+    const tv = growthBuckets.reduce((s, b) => s + b.currentValue, 0);
+    return tv > 0 ? growthBuckets.reduce((s, b) => s + (b.currentValue / tv) * b.annualReturnRate, 0) : 0;
+  })();
+  const bucketTotalMonthly = growthBuckets.reduce((s, b) => s + b.monthlyContribution, 0);
 
   return (
     <div>
@@ -74,34 +210,55 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
             <SectionLabel>Investment Portfolio</SectionLabel>
             <DetailToggleButton icon="↑" label="Use single total" onClick={collapseBuckets} />
           </div>
-          {buckets.map(bucket => (
-            <div key={bucket.id} style={{ background: 'var(--inset)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid var(--border-soft)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <input value={bucket.label} onChange={e => updateBucket(bucket.id, { label: e.target.value })}
-                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, fontWeight: 600 }} />
-                <button onClick={() => removeBucket(bucket.id)}
-                  style={{ color: 'var(--text-5)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                {[
-                  { key: 'currentValue' as const, label: 'Current value', prefix: 'S$' },
-                  { key: 'monthlyContribution' as const, label: 'Monthly add', prefix: 'S$' },
-                  { key: 'annualReturnRate' as const, label: 'Return % p.a.', suffix: '%' },
-                ].map(({ key, label, prefix, suffix }) => (
-                  <div key={key}>
-                    <label style={{ fontSize: 11, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>{label}</label>
-                    <div style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 8px' }}>
-                      {prefix && <span style={{ color: 'var(--text-4)', fontSize: 11, marginRight: 3 }}>{prefix}</span>}
-                      <input type="number" value={bucket[key]} step={key === 'annualReturnRate' ? 0.5 : 1}
-                        onChange={e => updateBucket(bucket.id, { [key]: Number(e.target.value) || 0 })}
-                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }} />
-                      {suffix && <span style={{ color: 'var(--text-4)', fontSize: 11, marginLeft: 2 }}>{suffix}</span>}
-                    </div>
+          {buckets.map(bucket => {
+            const isProduct = bucket.productType === 'dividend' || bucket.productType === 'annuity';
+            const productType: ProductType = bucket.productType ?? 'growth';
+            return (
+              <div key={bucket.id} style={{ background: 'var(--inset)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid var(--border-soft)' }}>
+                {/* Bucket header: name + remove */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <input value={bucket.label} onChange={e => updateBucket(bucket.id, { label: e.target.value })}
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, fontWeight: 600 }} />
+                  <button onClick={() => removeBucket(bucket.id)}
+                    style={{ color: 'var(--text-5)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                </div>
+
+                {/* Product type pills */}
+                <ProductTypePill value={productType} onChange={pt => setProductType(bucket.id, pt)} />
+
+                {/* Growth fields */}
+                {!isProduct && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {[
+                      { key: 'currentValue' as const, label: 'Current value', prefix: 'S$' },
+                      { key: 'monthlyContribution' as const, label: 'Monthly add', prefix: 'S$' },
+                      { key: 'annualReturnRate' as const, label: 'Return % p.a.', suffix: '%' },
+                    ].map(({ key, label, prefix, suffix }) => (
+                      <BucketInput key={key} label={label} value={bucket[key] as number}
+                        prefix={prefix} suffix={suffix}
+                        step={key === 'annualReturnRate' ? 0.5 : 1}
+                        onChange={v => updateBucket(bucket.id, { [key]: v })} />
+                    ))}
                   </div>
-                ))}
+                )}
+
+                {/* Product bucket: just the capital value */}
+                {isProduct && (
+                  <div style={{ marginBottom: 2 }}>
+                    <BucketInput
+                      label={bucket.premiumType === 'single' ? 'Single premium (S$)' : 'Policy value today (S$)'}
+                      value={bucket.currentValue} prefix="S$"
+                      onChange={v => updateBucket(bucket.id, { currentValue: v })} />
+                  </div>
+                )}
+
+                {/* Product details panel */}
+                {isProduct && (
+                  <ProductDetailsPanel bucket={bucket} onChange={patch => updateBucket(bucket.id, patch)} />
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           <button onClick={addBucket} style={{
             width: '100%', padding: '8px 0', fontSize: 12, color: '#34d399',
             border: '1px dashed rgba(52,211,153,0.4)', borderRadius: 8, background: 'none', cursor: 'pointer', marginBottom: 8,

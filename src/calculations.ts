@@ -92,17 +92,39 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   // Per-bucket tracking: contributions go into specific buckets, each grows at its own rate.
   // If no buckets configured, we synthesize a single virtual bucket from the legacy fields.
   const hasBuckets = assets.investmentBuckets && assets.investmentBuckets.length > 0;
-  type LiveBucket = { value: number; monthlyContribution: number; rate: number };
+  type LiveBucket = {
+    value: number; monthlyContribution: number; rate: number;
+    isProduct: boolean;
+    productType?: 'growth' | 'dividend' | 'annuity';
+    premiumType?: 'single' | 'limited';
+    annualPremium?: number;
+    premiumPayUntilAge?: number;
+    payoutStartAge?: number;
+    payoutAnnualAmount?: number;
+    payoutDurationYears?: number | null;
+  };
   const liveBuckets: LiveBucket[] = hasBuckets
-    ? assets.investmentBuckets.map(b => ({
-        value: b.currentValue,
-        monthlyContribution: b.monthlyContribution,
-        rate: b.annualReturnRate / 100,
-      }))
+    ? assets.investmentBuckets.map(b => {
+        const isProduct = b.productType === 'dividend' || b.productType === 'annuity';
+        return {
+          value: b.currentValue,
+          monthlyContribution: isProduct ? 0 : b.monthlyContribution,
+          rate: b.annualReturnRate / 100,
+          isProduct,
+          productType: b.productType,
+          premiumType: b.premiumType,
+          annualPremium: b.annualPremium,
+          premiumPayUntilAge: b.premiumType === 'limited' ? currentAge + (b.premiumYears ?? 0) : undefined,
+          payoutStartAge: b.payoutStartAge,
+          payoutAnnualAmount: b.payoutAnnualAmount,
+          payoutDurationYears: b.payoutDurationYears,
+        };
+      })
     : [{
         value: assets.investments,
         monthlyContribution: income.annualInvestmentContribution / 12,
         rate: assets.investmentReturnRate / 100,
+        isProduct: false,
       }];
   const annualInvestmentContribution = liveBuckets.reduce((s, b) => s + b.monthlyContribution * 12, 0);
 
@@ -118,35 +140,59 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
 
   const totalInvestments = (): number => liveBuckets.reduce((s, b) => s + b.value, 0);
 
-  /** Distribute a deposit across buckets weighted by their monthlyContribution share. */
+  /** Distribute a deposit across growth buckets weighted by their monthlyContribution share. */
   const depositToBuckets = (amount: number) => {
     if (amount <= 0 || liveBuckets.length === 0) return;
-    const totalMonthly = liveBuckets.reduce((s, b) => s + b.monthlyContribution, 0);
+    const growthBuckets = liveBuckets.filter(b => !b.isProduct);
+    if (growthBuckets.length === 0) return;
+    const totalMonthly = growthBuckets.reduce((s, b) => s + b.monthlyContribution, 0);
     if (totalMonthly <= 0) {
-      // No declared contribution split — distribute evenly across buckets
-      const share = amount / liveBuckets.length;
-      for (const b of liveBuckets) b.value += share;
+      const share = amount / growthBuckets.length;
+      for (const b of growthBuckets) b.value += share;
       return;
     }
-    for (const b of liveBuckets) {
+    for (const b of growthBuckets) {
       b.value += amount * (b.monthlyContribution / totalMonthly);
     }
   };
 
-  /** Withdraw from buckets proportionally to their current value. Returns how much was actually withdrawn (≤ amount). */
+  /** Withdraw from growth buckets proportionally to their current value. Returns how much was actually withdrawn (≤ amount). */
   const withdrawFromBuckets = (amount: number): number => {
     if (amount <= 0) return 0;
-    const total = totalInvestments();
+    const growthBuckets = liveBuckets.filter(b => !b.isProduct);
+    const total = growthBuckets.reduce((s, b) => s + b.value, 0);
     if (total <= 0) return 0;
     const taken = Math.min(amount, total);
     if (taken === total) {
-      for (const b of liveBuckets) b.value = 0;
+      for (const b of growthBuckets) b.value = 0;
       return taken;
     }
-    for (const b of liveBuckets) {
+    for (const b of growthBuckets) {
       b.value = Math.max(0, b.value - taken * (b.value / total));
     }
     return taken;
+  };
+
+  /** Annual premiums owed to limited-pay product buckets this year. */
+  const getProductPremiums = (age: number): number => {
+    let total = 0;
+    for (const b of liveBuckets) {
+      if (!b.isProduct || b.premiumType !== 'limited' || !b.annualPremium) continue;
+      if (b.premiumPayUntilAge != null && age < b.premiumPayUntilAge) total += b.annualPremium;
+    }
+    return total;
+  };
+
+  /** Annual payout income from active product buckets (dividend coupons + annuity drawdowns). */
+  const getProductPayouts = (age: number): number => {
+    let total = 0;
+    for (const b of liveBuckets) {
+      if (!b.isProduct || !b.payoutStartAge || age < b.payoutStartAge) continue;
+      if (b.payoutDurationYears != null && age >= b.payoutStartAge + b.payoutDurationYears) continue;
+      if (b.value <= 0) continue;
+      total += b.payoutAnnualAmount ?? 0;
+    }
+    return total;
   };
 
   // Scenario state
@@ -270,11 +316,13 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     // with the retirement-phase inflation logic.
     // ============================================================
     const yearsFromNow = age - currentAge;
+    const productPremiums = getProductPremiums(age);
+    const productPayouts = getProductPayouts(age);
     if (!isRetired) {
       const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
       const inflatedAccumulationExpenses = baseAnnualExpenses * Math.pow(1 + inflationRate, yearsFromNow);
-      const totalExpenses = inflatedAccumulationExpenses + recurringPurchaseCosts + annualPremiums;
-      const surplus = takeHomePay - totalExpenses;
+      const totalExpenses = inflatedAccumulationExpenses + recurringPurchaseCosts + annualPremiums + productPremiums;
+      const surplus = takeHomePay - totalExpenses + productPayouts;
 
       if (surplus > 0) {
         const toInvest = Math.min(annualInvestmentContribution, surplus);
@@ -297,8 +345,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       // Retirement expenses in today's dollars — inflate to the actual year
       const inflatedExpenses = income.retirementExpenses * Math.pow(1 + inflationRate, yearsFromNow);
       const streamIncome = getActiveStreamIncome(age, yearsFromNow, income.retirementIncomeStreams, inflationRate);
-      const expensesNeeded = inflatedExpenses + recurringPurchaseCosts + annualPremiums;
-      const netDrawdown = expensesNeeded - streamIncome;
+      const expensesNeeded = inflatedExpenses + recurringPurchaseCosts + annualPremiums + productPremiums;
+      const netDrawdown = expensesNeeded - streamIncome - productPayouts;
 
       if (netDrawdown <= 0) {
         // Stream income covers everything — surplus to cash
@@ -338,6 +386,16 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     if (cash > 0) cash *= (1 + cashRate);
 
     for (const b of liveBuckets) {
+      if (b.isProduct) {
+        // Annuity: deplete capital by the payout amount each active payout year
+        if (b.productType === 'annuity' && b.payoutStartAge && age >= b.payoutStartAge) {
+          if (b.payoutDurationYears == null || age < b.payoutStartAge + b.payoutDurationYears) {
+            b.value = Math.max(0, b.value - (b.payoutAnnualAmount ?? 0));
+          }
+        }
+        // Dividend: capital preserved — no change to b.value
+        continue;
+      }
       if (b.value <= 0) continue;
       const effectiveRate = isRetired ? b.rate * retirementReturnFactor : b.rate;
       b.value *= (1 + effectiveRate);
