@@ -20,11 +20,14 @@ const SubscriptionContext = createContext<SubscriptionContextValue>({
   refresh: async () => {},
 });
 
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
+    if (isLocalDev) { setLoaded(true); return; }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoaded(true); return; }
     const sub = await getMySubscription();
@@ -36,7 +39,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   const trialActive = subscription?.trialEndsAt != null && new Date(subscription.trialEndsAt) > new Date();
   const isActive = subscription?.status === 'active' || (subscription?.status === 'trialing' && trialActive);
-  const tier: Tier = isActive ? subscription!.tier : 'starter';
+  const tier: Tier = isLocalDev ? 'pro' : isActive ? subscription!.tier : 'starter';
 
   const value = useMemo(() => ({
     tier,
