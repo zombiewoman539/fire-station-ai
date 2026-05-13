@@ -1,4 +1,23 @@
-import { FireInputs, YearData, FireResults, Scenario } from './types';
+import { FireInputs, YearData, FireResults, Scenario, RetirementIncomeStream } from './types';
+
+/** Sum of all retirement income streams active at a given age, with inflation applied
+ *  per stream's `inflate` flag (nominal streams like CPF LIFE stay flat). */
+export function getActiveStreamIncome(
+  age: number,
+  yearsFromNow: number,
+  streams: RetirementIncomeStream[] | undefined,
+  inflationRate: number,
+): number {
+  if (!streams || streams.length === 0) return 0;
+  let total = 0;
+  for (const s of streams) {
+    if (age < s.startAge) continue;
+    if (s.durationYears != null && age >= s.startAge + s.durationYears) continue;
+    const inflateFactor = s.inflate ? Math.pow(1 + inflationRate, yearsFromNow) : 1;
+    total += s.annualAmount * inflateFactor;
+  }
+  return total;
+}
 
 export function formatSGD(value: number): string {
   const abs = Math.abs(value);
@@ -277,22 +296,28 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     } else {
       // Retirement expenses in today's dollars — inflate to the actual year
       const inflatedExpenses = income.retirementExpenses * Math.pow(1 + inflationRate, yearsFromNow);
-      const grossDrawdown = inflatedExpenses + recurringPurchaseCosts + annualPremiums;
-      const totalDrawdown = Math.max(0, grossDrawdown);
+      const streamIncome = getActiveStreamIncome(age, yearsFromNow, income.retirementIncomeStreams, inflationRate);
+      const expensesNeeded = inflatedExpenses + recurringPurchaseCosts + annualPremiums;
+      const netDrawdown = expensesNeeded - streamIncome;
 
-      const investmentsTotal = totalInvestments();
-      const totalAvailable = Math.max(0, investmentsTotal) + Math.max(0, cash);
+      if (netDrawdown <= 0) {
+        // Stream income covers everything — surplus to cash
+        cash += -netDrawdown;
+      } else {
+        const investmentsTotal = totalInvestments();
+        const totalAvailable = Math.max(0, investmentsTotal) + Math.max(0, cash);
 
-      if (totalAvailable <= 0 && totalDrawdown > 0) {
-        if (!moneyRunsOutAge) moneyRunsOutAge = age;
-      } else if (totalDrawdown > 0) {
-        const fromInvestments = withdrawFromBuckets(Math.min(totalDrawdown, investmentsTotal));
-        const remainder = totalDrawdown - fromInvestments;
-        if (remainder > 0) {
-          cash -= remainder;
-          if (cash < 0) {
-            if (!moneyRunsOutAge) moneyRunsOutAge = age;
-            cash = 0;
+        if (totalAvailable <= 0) {
+          if (!moneyRunsOutAge) moneyRunsOutAge = age;
+        } else {
+          const fromInvestments = withdrawFromBuckets(Math.min(netDrawdown, investmentsTotal));
+          const remainder = netDrawdown - fromInvestments;
+          if (remainder > 0) {
+            cash -= remainder;
+            if (cash < 0) {
+              if (!moneyRunsOutAge) moneyRunsOutAge = age;
+              cash = 0;
+            }
           }
         }
       }
@@ -350,7 +375,13 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const grossRetirementExpenses = income.retirementExpenses;
   const inflatedRetirementExpenses = Math.round(grossRetirementExpenses * Math.pow(1 + inflationRate, yearsToRetirement));
   const withdrawalRate = income.withdrawalRate / 100;
-  const netDrawdownNeeded = inflatedRetirementExpenses;
+  // Stream income active AT retirement age — reduces the FIRE pot needed.
+  // Streams that kick in later (e.g. CPF LIFE @ 65 with retirement @ 55) don't reduce the
+  // headline number, but the year-by-year simulation will reflect them accurately.
+  const streamIncomeAtRetirement = Math.round(
+    getActiveStreamIncome(retirementAge, yearsToRetirement, income.retirementIncomeStreams, inflationRate)
+  );
+  const netDrawdownNeeded = Math.max(0, inflatedRetirementExpenses - streamIncomeAtRetirement);
   const inflationBuffer = 0.10;
   const fireNumber = Math.round((netDrawdownNeeded / withdrawalRate) * (1 + inflationBuffer));
 
@@ -370,6 +401,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
       inflatedRetirementExpenses,
       inflationRate: income.inflationRate ?? 2.5,
       yearsToRetirement,
+      streamIncomeAtRetirement,
       netDrawdownNeeded,
       withdrawalRate: income.withdrawalRate,
       inflationBuffer: inflationBuffer * 100,

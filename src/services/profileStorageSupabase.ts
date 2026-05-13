@@ -47,6 +47,7 @@ function migrateInputs(inputs: any): FireInputs {
       salaryGrowthRate:              inc.salaryGrowthRate ?? 3,
       retirementExpenses:            inc.retirementExpenses ?? 48000,
       retirementExpenseItems:        inc.retirementExpenseItems ?? undefined,
+      retirementIncomeStreams:       inc.retirementIncomeStreams ?? undefined,
       inflationRate:                 inc.inflationRate ?? 2.5,
       withdrawalRate:                inc.withdrawalRate ?? 3.5,
     },

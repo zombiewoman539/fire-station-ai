@@ -1,5 +1,5 @@
 import React from 'react';
-import { FireInputs, ExpenseLineItem } from '../../types';
+import { FireInputs, ExpenseLineItem, RetirementIncomeStream } from '../../types';
 import { NumberField, SliderField, SectionLabel, DetailToggleButton } from '../FormFields';
 import { uid } from '../../utils/uid';
 
@@ -62,6 +62,30 @@ export function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChan
 
   const expenseTotal = itemsTotal(items);
   const retTotal = itemsTotal(retItems);
+
+  // Retirement income streams (CPF LIFE, rental, pension, ...)
+  const streams = inputs.income.retirementIncomeStreams ?? [];
+  const updateStreams = (next: RetirementIncomeStream[]) => {
+    onChange({
+      ...inputs,
+      income: { ...inputs.income, retirementIncomeStreams: next.length > 0 ? next : undefined },
+    });
+  };
+  const addStream = (preset?: Partial<RetirementIncomeStream>) => {
+    const fresh: RetirementIncomeStream = {
+      id: uid(),
+      label: 'New income stream',
+      annualAmount: 0,
+      startAge: 65,
+      durationYears: null,
+      inflate: false,
+      ...preset,
+    };
+    updateStreams([...streams, fresh]);
+  };
+  const removeStream = (id: string) => updateStreams(streams.filter(s => s.id !== id));
+  const patchStream = (id: string, patch: Partial<RetirementIncomeStream>) =>
+    updateStreams(streams.map(s => s.id === id ? { ...s, ...patch } : s));
 
   return (
     <div>
@@ -199,6 +223,90 @@ export function IncomeSection({ inputs, onChange }: { inputs: FireInputs; onChan
             </div>
           </div>
         )}
+
+        {/* Retirement income streams — CPF LIFE, rental, pension, etc. */}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <SectionLabel>Retirement Income Streams</SectionLabel>
+            {streams.length === 0 && (
+              <DetailToggleButton
+                icon="+"
+                label="Add CPF LIFE"
+                onClick={() => addStream({ label: 'CPF LIFE', startAge: 65, annualAmount: 18000, inflate: false })}
+              />
+            )}
+          </div>
+          {streams.length === 0 ? (
+            <p style={{ fontSize: 11, color: 'var(--text-5)', margin: 0, lineHeight: 1.5 }}>
+              Optional. Add CPF LIFE, rental, pension or spouse income that reduces how much the FIRE pot needs to cover.
+            </p>
+          ) : (
+            <>
+              {streams.map(s => (
+                <div key={s.id} style={{ background: 'var(--inset)', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid var(--border-soft)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <input value={s.label} onChange={e => patchStream(s.id, { label: e.target.value })}
+                      placeholder="Label (e.g. CPF LIFE, Rental)"
+                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13, fontWeight: 600 }} />
+                    <button onClick={() => removeStream(s.id)}
+                      style={{ color: 'var(--text-5)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.8fr 0.9fr', gap: 8, marginBottom: 6 }}>
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>Annual amount</label>
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 8px' }}>
+                        <span style={{ color: 'var(--text-4)', fontSize: 11, marginRight: 3 }}>S$</span>
+                        <input type="number" value={s.annualAmount} onChange={e => patchStream(s.id, { annualAmount: Number(e.target.value) || 0 })}
+                          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>Start age</label>
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 8px' }}>
+                        <input type="number" value={s.startAge} onChange={e => patchStream(s.id, { startAge: Number(e.target.value) || 0 })}
+                          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 10, color: 'var(--text-4)', display: 'block', marginBottom: 3 }}>Duration (yrs)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: 8, padding: '6px 8px' }}>
+                        <input
+                          type="number"
+                          value={s.durationYears ?? ''}
+                          placeholder="Life"
+                          onChange={e => {
+                            const v = e.target.value;
+                            patchStream(s.id, { durationYears: v === '' ? null : Number(v) });
+                          }}
+                          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 12, width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      {([['nominal', false], ['inflate', true]] as const).map(([label, val]) => (
+                        <button key={label} onClick={() => patchStream(s.id, { inflate: val })} style={{
+                          fontSize: 10, padding: '5px 10px', border: 'none', cursor: 'pointer',
+                          background: s.inflate === val ? 'var(--border-mid)' : 'var(--input-bg)',
+                          color: s.inflate === val ? 'var(--text-1)' : 'var(--text-4)',
+                          fontWeight: s.inflate === val ? 700 : 400, textTransform: 'capitalize',
+                        }}>{label}</button>
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--text-5)', fontStyle: 'italic' }}>
+                      {s.inflate ? 'Grows with inflation' : 'Flat SGD (CPF LIFE style)'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => addStream()} style={{
+                width: '100%', padding: '8px 0', fontSize: 12, color: '#34d399',
+                border: '1px dashed rgba(52,211,153,0.4)', borderRadius: 8, background: 'none', cursor: 'pointer',
+              }}>+ Add income stream</button>
+            </>
+          )}
+        </div>
       </div>
 
       <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 16, marginTop: 8 }}>

@@ -23,8 +23,18 @@ export interface IncomeExpenses {
   salaryGrowthRate: number;
   retirementExpenses: number;           // canonical total; auto-derived when retirementExpenseItems is non-empty
   retirementExpenseItems?: ExpenseLineItem[]; // optional breakdown — same shape as accumulation expenses
+  retirementIncomeStreams?: RetirementIncomeStream[]; // CPF LIFE, rental, pension, spouse CPF LIFE, etc.
   inflationRate: number;     // Annual inflation rate (%), default 2.5 (Singapore avg)
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
+}
+
+export interface RetirementIncomeStream {
+  id: string;
+  label: string;                  // 'CPF LIFE', 'Rental income', 'Spouse CPF LIFE', ...
+  annualAmount: number;           // SGD in today's dollars
+  startAge: number;               // age the stream begins paying out
+  durationYears: number | null;   // null = lifetime; otherwise stops after this many years
+  inflate: boolean;               // false = nominal (CPF LIFE); true = grows with inflation (rental-like)
 }
 
 export interface InvestmentBucket {
@@ -151,6 +161,8 @@ export interface FireResults {
     inflatedRetirementExpenses: number;
     inflationRate: number;
     yearsToRetirement: number;
+    /** Sum of retirement income streams active at retirementAge (CPF LIFE etc.), inflated where applicable. */
+    streamIncomeAtRetirement: number;
     netDrawdownNeeded: number;
     withdrawalRate: number;
     inflationBuffer: number;

@@ -349,3 +349,104 @@ test('recurring purchase reduces wealth during its active years', () => {
   const withP = calculate(withRecurring).wealthAtRetirement;
   expect(withP).toBeLessThan(without);
 });
+
+// ─── Retirement income streams (CPF LIFE etc.) ────────────────────────────────
+
+describe('retirementIncomeStreams', () => {
+  test('CPF LIFE stream starting at retirement age reduces FIRE Number', () => {
+    const baseRes = calculate(base);
+    const withCpf = calculate(withRetirement({
+      retirementIncomeStreams: [{
+        id: 's1', label: 'CPF LIFE', annualAmount: 18000, startAge: 55, durationYears: null, inflate: false,
+      }],
+    }));
+    expect(withCpf.fireNumber).toBeLessThan(baseRes.fireNumber);
+    expect(withCpf.fireNumberBreakdown.streamIncomeAtRetirement).toBe(18000);
+    expect(withCpf.fireNumberBreakdown.netDrawdownNeeded).toBe(baseRes.fireNumberBreakdown.netDrawdownNeeded - 18000);
+  });
+
+  test('stream that starts AFTER retirement age does not reduce FIRE Number', () => {
+    // retire at 55, CPF LIFE at 65 — FIRE Number is unchanged because stream not active at retirement
+    const baseRes = calculate(base);
+    const withLateCpf = calculate(withRetirement({
+      retirementIncomeStreams: [{
+        id: 's1', label: 'CPF LIFE', annualAmount: 18000, startAge: 65, durationYears: null, inflate: false,
+      }],
+    }));
+    expect(withLateCpf.fireNumber).toBe(baseRes.fireNumber);
+    expect(withLateCpf.fireNumberBreakdown.streamIncomeAtRetirement).toBe(0);
+  });
+
+  test('late-starting stream still reduces drawdown in year-by-year simulation', () => {
+    // Lifetime CPF LIFE starting at 65 — by life expectancy 80, money should last longer than without
+    const withoutCpf = calculate(withRetirement({ retirementExpenses: 36000 }));
+    const withLateCpf = calculate(withRetirement({
+      retirementExpenses: 36000,
+      retirementIncomeStreams: [{
+        id: 's1', label: 'CPF LIFE', annualAmount: 18000, startAge: 65, durationYears: null, inflate: false,
+      }],
+    }));
+    // CPF LIFE income should give more leftover money at life expectancy
+    const without80 = withoutCpf.yearlyData[withoutCpf.yearlyData.length - 1];
+    const with80 = withLateCpf.yearlyData[withLateCpf.yearlyData.length - 1];
+    expect(with80.totalNetWorth).toBeGreaterThan(without80.totalNetWorth);
+  });
+
+  test('nominal stream (inflate=false) stays flat in real dollars', () => {
+    const inputs = withRetirement({
+      inflationRate: 3,
+      retirementIncomeStreams: [{
+        id: 's1', label: 'CPF LIFE', annualAmount: 12000, startAge: 55, durationYears: null, inflate: false,
+      }],
+    });
+    const r = calculate(inputs);
+    // streamIncomeAtRetirement should equal annualAmount (no inflation applied)
+    expect(r.fireNumberBreakdown.streamIncomeAtRetirement).toBe(12000);
+  });
+
+  test('inflated stream grows with inflation', () => {
+    const inputs = withRetirement({
+      inflationRate: 3,
+      retirementIncomeStreams: [{
+        id: 's1', label: 'Rental', annualAmount: 12000, startAge: 55, durationYears: null, inflate: true,
+      }],
+    });
+    const r = calculate(inputs);
+    // 25 years of 3% inflation → ~12000 × 1.03^25 ≈ 25,124
+    expect(r.fireNumberBreakdown.streamIncomeAtRetirement).toBeGreaterThan(20000);
+    expect(r.fireNumberBreakdown.streamIncomeAtRetirement).toBeLessThan(30000);
+  });
+
+  test('finite-duration stream stops paying after durationYears', () => {
+    // 5-year stream from 60 → active 60..64, inactive at 65+
+    const inputs = withRetirement({
+      retirementExpenses: 36000,
+      retirementIncomeStreams: [{
+        id: 's1', label: 'Pension', annualAmount: 24000, startAge: 60, durationYears: 5, inflate: false,
+      }],
+    });
+    const withoutStream = calculate(withRetirement({ retirementExpenses: 36000 }));
+    const withStream = calculate(inputs);
+    // Wealth at end of life should be higher with the temporary stream
+    const last = withStream.yearlyData.length - 1;
+    expect(withStream.yearlyData[last].totalNetWorth).toBeGreaterThanOrEqual(withoutStream.yearlyData[last].totalNetWorth);
+  });
+
+  test('stream covering all expenses produces surplus to cash', () => {
+    // Stream of 100k vs expenses 36k → 64k/yr surplus → cash grows during retirement
+    const inputs = withRetirement({
+      retirementExpenses: 36000,
+      retirementIncomeStreams: [{
+        id: 's1', label: 'Generous pension', annualAmount: 100000, startAge: 55, durationYears: null, inflate: false,
+      }],
+    });
+    const r = calculate(inputs);
+    // Money should not run out
+    expect(r.moneyRunsOutAge).toBeUndefined();
+    // Final-year cash should be substantially higher than start-of-retirement cash
+    const retIdx = 55 - 30;
+    const startCash = r.yearlyData[retIdx].cash;
+    const endCash = r.yearlyData[r.yearlyData.length - 1].cash;
+    expect(endCash).toBeGreaterThan(startCash);
+  });
+});

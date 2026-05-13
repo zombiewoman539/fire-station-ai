@@ -410,6 +410,13 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
                     color="#fbbf24"
                     bold
                   />
+                  {fireNumberBreakdown.streamIncomeAtRetirement > 0 && (
+                    <FireRow
+                      label="− Retirement income (CPF LIFE etc.)"
+                      value={`-${formatSGD(fireNumberBreakdown.streamIncomeAtRetirement)}`}
+                      color="#34d399"
+                    />
+                  )}
                   <FireRow label="= Net drawdown needed / yr" value={formatSGD(fireNumberBreakdown.netDrawdownNeeded)} bold />
                   <div style={{ borderTop: `1px solid ${clr.border}`, margin: '2px 0' }} />
                   <FireRow
