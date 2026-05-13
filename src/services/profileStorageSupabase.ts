@@ -105,7 +105,7 @@ function parseMeta(
 }
 
 // Purge records that were soft-deleted more than 7 days ago.
-// Called on every listProfiles() so cleanup happens automatically over time.
+// Called on listProfiles / listProfilesPaged(page 0) so cleanup happens automatically over time.
 async function purgeExpiredDeletions(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -117,8 +117,20 @@ async function purgeExpiredDeletions(): Promise<void> {
     .lt('deleted_at', cutoff);
 }
 
+function mapRow(row: any): ClientProfile {
+  return {
+    id: row.id,
+    name: row.name,
+    userId: row.user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    inputs: migrateInputs(row.inputs as FireInputs),
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    ...parseMeta(row.meta, row.updated_at),
+  };
+}
+
 export async function listProfiles(): Promise<ClientProfile[]> {
-  // Purge soft-deleted profiles older than 7 days in the background
   purgeExpiredDeletions().catch(() => {});
 
   const { data, error } = await supabase
@@ -128,17 +140,28 @@ export async function listProfiles(): Promise<ClientProfile[]> {
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
+  return (data || []).map(mapRow);
+}
 
-  return (data || []).map(row => ({
-    id: row.id,
-    name: row.name,
-    userId: row.user_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    inputs: migrateInputs(row.inputs as FireInputs),
-    tags: Array.isArray(row.tags) ? row.tags : [],
-    ...parseMeta(row.meta, row.updated_at),
-  }));
+export async function listProfilesPaged(
+  page: number = 0,
+  pageSize: number = 50,
+): Promise<{ data: ClientProfile[]; hasMore: boolean }> {
+  if (page === 0) purgeExpiredDeletions().catch(() => {});
+
+  const from = page * pageSize;
+  const { data, error, count } = await supabase
+    .from('client_profiles')
+    .select('*', { count: 'exact' })
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .range(from, from + pageSize - 1);
+
+  if (error) throw error;
+  return {
+    data: (data || []).map(mapRow),
+    hasMore: (count ?? 0) > from + pageSize,
+  };
 }
 
 export async function getProfile(id: string): Promise<ClientProfile | null> {
@@ -150,123 +173,48 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
     .single();
 
   if (error || !data) return null;
-
-  return {
-    id: data.id,
-    name: data.name,
-    userId: data.user_id,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    inputs: migrateInputs(data.inputs as FireInputs),
-    tags: Array.isArray(data.tags) ? data.tags : [],
-    ...parseMeta(data.meta, data.updated_at),
-  };
-}
-
-/** Sticky flag: once we know the tags column doesn't exist, stop trying to write it.
- *  Reset by clearing localStorage 'profileStorage.tagsColumnExists' once the migration runs. */
-const TAGS_COLUMN_FLAG = 'profileStorage.tagsColumnExists';
-function tagsColumnLikelyExists(): boolean {
-  // Default true (assume migration is applied). Once we hit a column error, we flip to false.
-  const v = localStorage.getItem(TAGS_COLUMN_FLAG);
-  return v !== 'false';
-}
-function markTagsColumnMissing() {
-  try { localStorage.setItem(TAGS_COLUMN_FLAG, 'false'); } catch {}
+  return mapRow(data);
 }
 
 export async function saveProfile(profile: ClientProfile): Promise<void> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('Not authenticated');
 
-  const baseRow = {
+  const { error } = await supabase.from('client_profiles').upsert({
     id: profile.id,
     user_id: user.id,
     name: profile.name,
     inputs: profile.inputs,
+    tags: profile.tags ?? [],
     meta: {
       lastMeetingDate: profile.lastMeetingDate ?? null,
       nextReviewDate: profile.nextReviewDate ?? null,
       noteEntries: profile.noteEntries ?? [],
     },
     updated_at: new Date().toISOString(),
-  };
+  });
 
-  // Two-attempt pattern: write with tags first; if anything goes wrong, retry without tags.
-  // This is bulletproof — we don't try to interpret the error format. The cost is one extra
-  // round trip on the (rare) error path.
-  if (tagsColumnLikelyExists()) {
-    const { error } = await supabase
-      .from('client_profiles')
-      .upsert({ ...baseRow, tags: profile.tags ?? [] });
-    if (!error) return;
-    console.error(
-      '[profileStorage] save with tags failed — retrying without tags. ' +
-      `code=${(error as any)?.code ?? 'n/a'} | message=${(error as any)?.message ?? 'n/a'} | ` +
-      `details=${(error as any)?.details ?? 'n/a'} | hint=${(error as any)?.hint ?? 'n/a'}`,
-      error,
-    );
-    markTagsColumnMissing();
-  }
-
-  const { error: retryError } = await supabase.from('client_profiles').upsert(baseRow);
-  if (retryError) {
-    console.error(
-      '[profileStorage] save without tags ALSO failed. ' +
-      `code=${(retryError as any)?.code ?? 'n/a'} | message=${(retryError as any)?.message ?? 'n/a'} | ` +
-      `details=${(retryError as any)?.details ?? 'n/a'} | hint=${(retryError as any)?.hint ?? 'n/a'}`,
-      retryError,
-    );
-    throw retryError;
-  }
+  if (error) throw error;
 }
 
 export async function createProfile(name: string, inputs?: FireInputs): Promise<ClientProfile> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('Not authenticated');
 
-  const baseRow = {
-    user_id: user.id,
-    name,
-    inputs: inputs || defaultInputs,
-    meta: {},
-  };
-
-  let data: any = null;
-  let error: any = null;
-
-  if (tagsColumnLikelyExists()) {
-    const result = await supabase
-      .from('client_profiles')
-      .insert({ ...baseRow, tags: [] })
-      .select()
-      .single();
-    data = result.data;
-    error = result.error;
-    if (error) {
-      console.error('[profileStorage] create with tags failed — retrying without tags. Original error:', error);
-      markTagsColumnMissing();
-    }
-  }
-
-  if (!data || error) {
-    const retry = await supabase.from('client_profiles').insert(baseRow).select().single();
-    data = retry.data;
-    error = retry.error;
-  }
+  const { data, error } = await supabase
+    .from('client_profiles')
+    .insert({
+      user_id: user.id,
+      name,
+      inputs: inputs || defaultInputs,
+      tags: [],
+      meta: {},
+    })
+    .select()
+    .single();
 
   if (error) throw error;
-
-  return {
-    id: data.id,
-    name: data.name,
-    userId: data.user_id,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    inputs: migrateInputs(data.inputs as FireInputs),
-    tags: Array.isArray(data.tags) ? data.tags : [],
-    ...parseMeta(data.meta, data.updated_at),
-  };
+  return mapRow(data);
 }
 
 // Soft delete: sets deleted_at timestamp instead of removing the row.
@@ -307,14 +255,7 @@ export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedA
 
   if (error) throw error;
   return (data || []).map(row => ({
-    id: row.id,
-    name: row.name,
-    userId: row.user_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    inputs: migrateInputs(row.inputs as FireInputs),
-    tags: Array.isArray(row.tags) ? row.tags : [],
-    ...parseMeta(row.meta, row.updated_at),
+    ...mapRow(row),
     deletedAt: row.deleted_at,
   }));
 }

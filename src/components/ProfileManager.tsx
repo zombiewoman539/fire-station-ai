@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ClientProfile } from '../profileTypes';
 import {
-  listProfiles,
+  listProfilesPaged,
   createProfile,
   deleteProfile,
   renameProfile,
@@ -30,10 +30,14 @@ interface Props {
   onEditDetails: () => void;
   saveStatus: 'saved' | 'saving' | 'idle' | 'error';
   profileSummaries: Record<string, ProfileSummary>;
+  onProfilesLoaded?: (profiles: ClientProfile[]) => void;
 }
 
-export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, onEditDetails, saveStatus, profileSummaries }: Props) {
+export default function ProfileManager({ activeProfile, onSelectProfile, onNewProfile, onEditDetails, saveStatus, profileSummaries, onProfilesLoaded }: Props) {
   const [profiles, setProfiles] = useState<ClientProfile[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pageRef = useRef(0);
   const [search, setSearch] = useState('');
   const [menuId, setMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
@@ -49,12 +53,32 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
 
   const refresh = useCallback(async () => {
     try {
-      const list = await listProfiles();
-      setProfiles(list);
+      const result = await listProfilesPaged(0);
+      setProfiles(result.data);
+      setHasMore(result.hasMore);
+      pageRef.current = 0;
+      onProfilesLoaded?.(result.data);
     } catch (e) {
       console.error('Failed to load profiles:', e);
     }
-  }, []);
+  }, [onProfilesLoaded]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = pageRef.current + 1;
+      const result = await listProfilesPaged(nextPage);
+      setProfiles(prev => [...prev, ...result.data]);
+      setHasMore(result.hasMore);
+      pageRef.current = nextPage;
+      onProfilesLoaded?.(result.data);
+    } catch (e) {
+      console.error('Failed to load more profiles:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, onProfilesLoaded]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -120,14 +144,17 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     if (!window.confirm(`Delete "${profile.name}"? This cannot be undone.`)) return;
     try {
       await deleteProfile(profile.id);
-      const remaining = await listProfiles();
-      setProfiles(remaining);
+      const result = await listProfilesPaged(0);
+      setProfiles(result.data);
+      setHasMore(result.hasMore);
+      pageRef.current = 0;
       if (activeProfile?.id === profile.id) {
-        if (remaining.length > 0) {
-          onSelectProfile(remaining[0]);
+        if (result.data.length > 0) {
+          onSelectProfile(result.data[0]);
         } else {
           const p = await createProfile('New Client');
           setProfiles([p]);
+          setHasMore(false);
           onNewProfile(p);
         }
       }
@@ -192,10 +219,12 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     setRestoringId(id);
     try {
       await restoreProfile(id);
-      const [updated, restoredList] = await Promise.all([listDeletedProfiles(), listProfiles()]);
+      const [updated, restoredResult] = await Promise.all([listDeletedProfiles(), listProfilesPaged(0)]);
       setDeletedProfiles(updated);
-      setProfiles(restoredList);
-      const restored = restoredList.find(p => p.id === id);
+      setProfiles(restoredResult.data);
+      setHasMore(restoredResult.hasMore);
+      pageRef.current = 0;
+      const restored = restoredResult.data.find(p => p.id === id);
       if (restored) onSelectProfile(restored);
     } catch (e: any) {
       alert('Failed to restore: ' + e.message);
@@ -439,6 +468,25 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
           );
         })}
       </div>
+
+      {/* Load more */}
+      {hasMore && (
+        <div style={{ padding: '4px 8px 2px', flexShrink: 0 }}>
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            style={{
+              width: '100%', padding: '7px 0', borderRadius: 8,
+              background: 'none', border: '1px solid var(--border)',
+              cursor: loadingMore ? 'not-allowed' : 'pointer',
+              color: 'var(--text-4)', fontSize: 12, fontWeight: 600,
+              opacity: loadingMore ? 0.7 : 1,
+            }}
+          >
+            {loadingMore ? 'Loading…' : 'Load more clients'}
+          </button>
+        </div>
+      )}
 
       {/* Recently Deleted link */}
       <div style={{ padding: '6px 12px 0', flexShrink: 0, textAlign: 'center' }}>

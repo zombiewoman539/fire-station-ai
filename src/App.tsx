@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
@@ -7,8 +7,9 @@ import { ProfileSummary } from './components/ProfileManager';
 import { ClientProfile } from './profileTypes';
 import { supabase } from './services/supabaseClient';
 import {
-  listProfiles,
+  listProfilesPaged,
   createProfile,
+  getProfile,
 } from './services/profileStorageSupabase';
 import { useAutoSave } from './hooks/useAutoSave';
 import ChartPanel from './components/ChartPanel';
@@ -138,7 +139,7 @@ function Dashboard() {
       }
 
       try {
-        const profiles = await listProfiles();
+        const { data: profiles } = await listProfilesPaged(0);
         const lastActiveId = localStorage.getItem('fire-active-profile');
 
         let profile: ClientProfile | null = null;
@@ -149,7 +150,7 @@ function Dashboard() {
         setActiveProfile(profile);
         localStorage.setItem('fire-active-profile', profile.id);
 
-        // Pre-compute on-track status for every loaded profile
+        // Pre-compute on-track status for the first page of profiles
         const summaries: Record<string, ProfileSummary> = {};
         for (const p of profiles) {
           const r = calculate(p.inputs);
@@ -247,6 +248,38 @@ function Dashboard() {
     localStorage.setItem('fire-active-profile', profile.id);
     resetSaveStatus();
   }, [resetSaveStatus]);
+
+  // Extend profileSummaries when ProfileManager loads additional pages
+  const handleProfilesLoaded = useCallback((newProfiles: ClientProfile[]) => {
+    setProfileSummaries(prev => {
+      const next = { ...prev };
+      for (const p of newProfiles) {
+        if (!next[p.id]) {
+          const r = calculate(p.inputs);
+          next[p.id] = { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement };
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  // D2: reload active profile when another tab saves it
+  const activeProfileRef = useRef(activeProfile);
+  useEffect(() => { activeProfileRef.current = activeProfile; }, [activeProfile]);
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key !== 'fire-last-saved') return;
+      try {
+        const payload = JSON.parse(e.newValue ?? '');
+        const current = activeProfileRef.current;
+        if (current && payload.id === current.id) {
+          getProfile(current.id).then(p => { if (p) setActiveProfile(p); }).catch(() => {});
+        }
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   if (loading) {
     return (
@@ -446,6 +479,7 @@ function Dashboard() {
             onEditDetails={() => setEditModalOpen(true)}
             saveStatus={saveStatus}
             profileSummaries={profileSummaries}
+            onProfilesLoaded={handleProfilesLoaded}
           />
         </div>
       </div>

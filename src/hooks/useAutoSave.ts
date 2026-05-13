@@ -20,6 +20,8 @@ export function useAutoSave(isReadOnly: boolean, onError: (msg: string) => void)
         pendingSaveRef.current = null;
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(s => s === 'saved' ? 'idle' : s), 2000);
+        // Notify other tabs that this profile was saved
+        try { localStorage.setItem('fire-last-saved', JSON.stringify({ id: profile.id, at: Date.now() })); } catch {}
       } catch (e) {
         console.error('Save failed:', e);
         setSaveStatus('error');
