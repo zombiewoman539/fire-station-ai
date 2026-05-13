@@ -123,28 +123,13 @@ function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
 
-      // In local dev without auth session, use a local-only profile
+      // In local dev without auth session, delegate fully to localStorage backend
       if (isLocalDev) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          const localProfile: ClientProfile = {
-            id: 'local-dev',
-            name: 'Dev Client',
-            userId: 'local-dev',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            inputs: defaultInputs,
-            lastMeetingDate: null,
-            nextReviewDate: null,
-            notes: '',
-            noteEntries: [],
-            tags: [],
-          };
           setCurrentUserId('local-dev');
-          setActiveProfile(localProfile);
-          clearTimeout(timeout);
-          setLoading(false);
-          return;
+          // Falls through to the normal profile-loading path below, which now
+          // reads from localStorage via the patched profileStorageSupabase functions.
         }
       }
 
