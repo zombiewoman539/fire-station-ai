@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   listMyTasks, createTask, completeTask, reopenTask, deleteTask, updateTask, Task,
 } from '../services/taskService';
+import {
+  listTemplates, createTemplate, updateTemplate, deleteTemplate,
+  generateDueTasks, TaskTemplate, INTERVAL_OPTIONS,
+} from '../services/taskTemplateService';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { ClientProfile } from '../profileTypes';
 import NewTaskModal from './NewTaskModal';
@@ -42,10 +46,11 @@ type ViewKey =
   | 'upcoming'
   | 'all'
   | 'completed'
+  | 'recurring'
   | `client:${string}`;
 
 interface ParsedView {
-  kind: 'today' | 'upcoming' | 'all' | 'completed' | 'client';
+  kind: 'today' | 'upcoming' | 'all' | 'completed' | 'recurring' | 'client';
   clientId?: string;
 }
 
@@ -53,7 +58,7 @@ function parseView(view: ViewKey): ParsedView {
   if (view.startsWith('client:')) {
     return { kind: 'client', clientId: view.slice('client:'.length) };
   }
-  return { kind: view as 'today' | 'upcoming' | 'all' | 'completed' };
+  return { kind: view as 'today' | 'upcoming' | 'all' | 'completed' | 'recurring' };
 }
 
 // Sort: urgent first, then by due date asc, undated last, then createdAt desc
@@ -496,9 +501,27 @@ export default function TasksPage() {
   useEffect(() => { localStorage.setItem(VIEW_STORAGE_KEY, activeView); }, [activeView]);
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+
   const load = useCallback(async () => {
-    const [taskData, profileData] = await Promise.all([listMyTasks(), listProfiles()]);
-    setTasks(taskData);
+    const [taskData, profileData, templateData] = await Promise.all([
+      listMyTasks(), listProfiles(), listTemplates().catch(() => [] as TaskTemplate[]),
+    ]);
+    setTemplates(templateData);
+    // Auto-generate tasks for due templates, then refresh task list
+    if (templateData.length > 0) {
+      const generated = await generateDueTasks(templateData).catch(() => 0);
+      if (generated > 0) {
+        const refreshed = await listMyTasks().catch(() => taskData);
+        setTasks(refreshed);
+        // Refresh templates so lastGeneratedAt is up to date
+        listTemplates().then(setTemplates).catch(() => {});
+      } else {
+        setTasks(taskData);
+      }
+    } else {
+      setTasks(taskData);
+    }
     setProfiles(profileData);
     setLoading(false);
   }, []);
@@ -652,12 +675,25 @@ export default function TasksPage() {
     return { today: todayCount, upcoming: upcomingCount, all: allCount, completed: completedCount, clients };
   }, [tasks, today]);
 
+  // Template handlers
+  const handleTemplateCreated = (t: TaskTemplate) => setTemplates(prev => [t, ...prev]);
+  const handleTemplateDeleted = async (id: string) => {
+    if (!window.confirm('Delete this recurring task?')) return;
+    await deleteTemplate(id);
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  };
+  const handleTemplateUpdated = async (id: string, patch: Partial<TaskTemplate>) => {
+    await updateTemplate(id, patch);
+    setTemplates(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
   const viewLabel = (() => {
     if (view.kind === 'today') return 'Today';
     if (view.kind === 'upcoming') return 'Upcoming';
     if (view.kind === 'all') return 'All open tasks';
     if (view.kind === 'completed') return 'Completed';
+    if (view.kind === 'recurring') return 'Recurring tasks';
     if (view.kind === 'client') {
       const client = counts.clients.find(c => c.id === view.clientId);
       return client?.name ?? 'Client';
@@ -729,6 +765,7 @@ export default function TasksPage() {
             )}
 
             <div style={{ height: 12 }} />
+            <RailItem label="Recurring" count={templates.length} active={activeView === 'recurring'} onClick={() => setActiveView('recurring')} />
             <RailItem label="Completed" count={counts.completed} active={activeView === 'completed'} onClick={() => setActiveView('completed')} />
           </nav>
         </aside>
@@ -770,14 +807,24 @@ export default function TasksPage() {
             </div>
           </div>
 
-          <QuickAdd
-            profiles={profiles}
-            defaultClientId={defaultClientForQuickAdd}
-            onCreated={handleCreated}
-            onOpenFullModal={(seed) => setModalSeed(seed)}
-          />
+          {view.kind !== 'recurring' && (
+            <QuickAdd
+              profiles={profiles}
+              defaultClientId={defaultClientForQuickAdd}
+              onCreated={handleCreated}
+              onOpenFullModal={(seed) => setModalSeed(seed)}
+            />
+          )}
 
-          {loading ? (
+          {view.kind === 'recurring' ? (
+            <RecurringPane
+              templates={templates}
+              profiles={profiles}
+              onCreated={handleTemplateCreated}
+              onDeleted={handleTemplateDeleted}
+              onUpdated={handleTemplateUpdated}
+            />
+          ) : loading ? (
             <div style={{ color: 'var(--text-3)', fontSize: 14 }}>Loading…</div>
           ) : viewTasks.length === 0 ? (
             <EmptyState view={view.kind} hasAnyTasks={tasks.length > 0} />
@@ -851,6 +898,180 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
   );
 }
 
+// ─── Recurring pane ──────────────────────────────────────────────────────────
+
+function RecurringPane({ templates, profiles, onCreated, onDeleted, onUpdated }: {
+  templates: TaskTemplate[];
+  profiles: ClientProfile[];
+  onCreated: (t: TaskTemplate) => void;
+  onDeleted: (id: string) => void;
+  onUpdated: (id: string, patch: Partial<TaskTemplate>) => void;
+}) {
+  const [showNew, setShowNew] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newInterval, setNewInterval] = useState(30);
+  const [newClientId, setNewClientId] = useState('');
+  const [newPriority, setNewPriority] = useState<'normal' | 'urgent'>('normal');
+  const [saving, setSaving] = useState(false);
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
+    setSaving(true);
+    try {
+      const profile = profiles.find(p => p.id === newClientId);
+      const t = await createTemplate({
+        title: newTitle.trim(),
+        intervalDays: newInterval,
+        clientProfileId: newClientId || undefined,
+        clientName: profile?.name,
+        priority: newPriority,
+      });
+      onCreated(t);
+      setShowNew(false);
+      setNewTitle('');
+      setNewInterval(30);
+      setNewClientId('');
+      setNewPriority('normal');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  function nextDueLabel(t: TaskTemplate): string {
+    if (!t.lastGeneratedAt) return 'Due now';
+    const d = new Date(t.lastGeneratedAt.slice(0, 10) + 'T00:00:00');
+    d.setDate(d.getDate() + t.intervalDays);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff <= 0) return 'Due now';
+    if (diff === 1) return 'Due tomorrow';
+    return `Due in ${diff} days`;
+  }
+
+  const intervalLabel = (days: number) =>
+    INTERVAL_OPTIONS.find(o => o.days === days)?.label ?? `Every ${days} days`;
+
+  return (
+    <div>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-3)' }}>
+        Recurring tasks are automatically added to your task list on schedule.
+      </p>
+
+      {templates.map(t => (
+        <div key={t.id} style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '12px 14px', marginBottom: 8,
+          display: 'flex', alignItems: 'flex-start', gap: 12,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 15,
+          }}>↻</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {t.priority === 'urgent' && (
+                <span style={{
+                  fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 5,
+                  background: 'rgba(248,113,113,0.15)', color: '#f87171',
+                  border: '1px solid rgba(248,113,113,0.3)',
+                }}>URGENT</span>
+              )}
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t.title}</span>
+              {t.clientName && (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 5,
+                  background: 'rgba(16,185,129,0.1)', color: '#34d399',
+                  border: '1px solid rgba(16,185,129,0.2)',
+                }}>{t.clientName}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
+                {intervalLabel(t.intervalDays)}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                {nextDueLabel(t)}
+              </span>
+            </div>
+          </div>
+          <button onClick={() => onDeleted(t.id)} style={{
+            background: 'none', border: 'none', color: 'var(--text-3)',
+            cursor: 'pointer', padding: '2px 4px', fontSize: 16, lineHeight: 1,
+          }}>×</button>
+        </div>
+      ))}
+
+      {showNew ? (
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '14px 16px', marginTop: 8,
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              autoFocus
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              placeholder="Task title…"
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              style={{
+                background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                borderRadius: 8, padding: '8px 12px', color: 'var(--text-1)',
+                fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <select value={newInterval} onChange={e => setNewInterval(Number(e.target.value))} style={selectStyle}>
+                {INTERVAL_OPTIONS.map(o => (
+                  <option key={o.days} value={o.days}>{o.label}</option>
+                ))}
+              </select>
+              <select value={newClientId} onChange={e => setNewClientId(e.target.value)} style={selectStyle}>
+                <option value="">No client</option>
+                {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={newPriority} onChange={e => setNewPriority(e.target.value as 'normal' | 'urgent')} style={selectStyle}>
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowNew(false)} style={ghostBtnStyle}>Cancel</button>
+              <button onClick={handleCreate} disabled={saving || !newTitle.trim()} style={primaryBtnStyle}>
+                {saving ? 'Saving…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setShowNew(true)} style={{
+          width: '100%', padding: '10px 0', fontSize: 13, color: 'var(--accent)',
+          border: '1px dashed rgba(99,102,241,0.4)', borderRadius: 10,
+          background: 'none', cursor: 'pointer', marginTop: 4, fontWeight: 600,
+        }}>
+          + New recurring task
+        </button>
+      )}
+    </div>
+  );
+}
+
+const selectStyle: React.CSSProperties = {
+  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+  borderRadius: 7, padding: '6px 10px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
+};
+
+const ghostBtnStyle: React.CSSProperties = {
+  padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
+  background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  padding: '7px 18px', borderRadius: 8, border: 'none',
+  background: '#10b981', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+};
+
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
 function EmptyState({ view, hasAnyTasks }: { view: ParsedView['kind']; hasAnyTasks: boolean }) {
@@ -859,6 +1080,7 @@ function EmptyState({ view, hasAnyTasks }: { view: ParsedView['kind']; hasAnyTas
     upcoming: 'No upcoming tasks.',
     all: hasAnyTasks ? 'No open tasks.' : 'No tasks yet. Add one above to get started.',
     completed: 'Nothing completed yet.',
+    recurring: '',
     client: 'No open tasks for this client.',
   };
   return (
