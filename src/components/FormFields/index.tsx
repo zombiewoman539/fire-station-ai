@@ -87,7 +87,7 @@ export function NumberField({ label, value, prefix, tip, small, rightSlot, onCha
       }}>
         {prefix && <span style={{ color: 'var(--text-4)', fontSize: 13, marginRight: 6, fontWeight: 500 }}>{prefix}</span>}
         <input type="number" value={focused ? displayValue : value}
-          onFocus={() => { setFocused(true); setDisplayValue(String(value)); }}
+          onFocus={e => { setFocused(true); setDisplayValue(String(value)); e.target.select(); }}
           onBlur={() => { setFocused(false); onChange(Number(displayValue) || 0); }}
           onChange={e => {
             setDisplayValue(e.target.value);
