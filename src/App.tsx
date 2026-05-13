@@ -24,6 +24,11 @@ import NavBar from './components/NavBar';
 import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
 import LandingPage from './components/LandingPage';
+import { TeamProvider, useTeam } from './contexts/TeamContext';
+import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
+import { useToast } from './contexts/ToastContext';
+import { createCheckoutSession, PRICES } from './services/subscriptionService';
+import type { Session } from '@supabase/supabase-js';
 
 // Route-level and conditionally-rendered components — code-split to reduce TTI
 const PresentationMode    = React.lazy(() => import('./components/PresentationMode'));
@@ -35,11 +40,6 @@ const PrivacyPolicy       = React.lazy(() => import('./components/PrivacyPolicy'
 const PlansPage           = React.lazy(() => import('./components/PlansPage'));
 const TasksPage           = React.lazy(() => import('./components/TasksPage'));
 const AdminPage           = React.lazy(() => import('./components/AdminPage'));
-import { TeamProvider, useTeam } from './contexts/TeamContext';
-import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
-import { useToast } from './contexts/ToastContext';
-import { createCheckoutSession, PRICES } from './services/subscriptionService';
-import type { Session } from '@supabase/supabase-js';
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
 
