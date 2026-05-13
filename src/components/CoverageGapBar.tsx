@@ -1,5 +1,6 @@
 import React from 'react';
-import { FireInputs } from '../types';
+import { FireInputs, CoverageType } from '../types';
+import { resolveRecommended } from '../insuranceCompute';
 import { formatSGD } from '../calculations';
 
 interface Props {
@@ -38,50 +39,49 @@ export default function CoverageGapBar({ inputs, compact = false }: Props) {
   const currentECI   = inForce.reduce((s, p) => s + (p.eciSumAssured   || 0), 0);
   const currentCI    = inForce.reduce((s, p) => s + (p.ciSumAssured    || 0), 0);
 
-  // Singapore industry benchmarks
-  const neededDeath = annualIncome * 10;
-  const neededTPD   = annualIncome * 10;
-  const neededECI   = annualIncome * 5;
-  const neededCI    = annualIncome * 5;
+  // Resolve recommended per type — advisor target wins, else income×benchmark
+  const death = resolveRecommended('death', annualIncome, inputs.coverageTargets);
+  const tpd   = resolveRecommended('tpd',   annualIncome, inputs.coverageTargets);
+  const eci   = resolveRecommended('eci',   annualIncome, inputs.coverageTargets);
+  const ci    = resolveRecommended('ci',    annualIncome, inputs.coverageTargets);
 
-  const items = [
+  const items: Array<{
+    key: CoverageType; icon: string; label: string;
+    current: number; needed: number; pct: number; gap: number;
+    source: 'target' | 'benchmark';
+  }> = [
     {
-      key: 'death',
-      icon: '☠️',
-      label: 'Death',
-      current: currentDeath,
-      needed: neededDeath,
-      pct: Math.min(100, Math.round((currentDeath / neededDeath) * 100)),
-      gap: Math.max(0, neededDeath - currentDeath),
+      key: 'death', icon: '☠️', label: 'Death',
+      current: currentDeath, needed: death.amount,
+      pct: death.amount > 0 ? Math.min(100, Math.round((currentDeath / death.amount) * 100)) : 0,
+      gap: Math.max(0, death.amount - currentDeath),
+      source: death.source,
     },
     {
-      key: 'tpd',
-      icon: '🦽',
-      label: 'TPD',
-      current: currentTPD,
-      needed: neededTPD,
-      pct: Math.min(100, Math.round((currentTPD / neededTPD) * 100)),
-      gap: Math.max(0, neededTPD - currentTPD),
+      key: 'tpd', icon: '🦽', label: 'TPD',
+      current: currentTPD, needed: tpd.amount,
+      pct: tpd.amount > 0 ? Math.min(100, Math.round((currentTPD / tpd.amount) * 100)) : 0,
+      gap: Math.max(0, tpd.amount - currentTPD),
+      source: tpd.source,
     },
     {
-      key: 'eci',
-      icon: '⚡',
-      label: 'ECI',
-      current: currentECI,
-      needed: neededECI,
-      pct: Math.min(100, Math.round((currentECI / neededECI) * 100)),
-      gap: Math.max(0, neededECI - currentECI),
+      key: 'eci', icon: '⚡', label: 'ECI',
+      current: currentECI, needed: eci.amount,
+      pct: eci.amount > 0 ? Math.min(100, Math.round((currentECI / eci.amount) * 100)) : 0,
+      gap: Math.max(0, eci.amount - currentECI),
+      source: eci.source,
     },
     {
-      key: 'ci',
-      icon: '🏥',
-      label: 'Major CI',
-      current: currentCI,
-      needed: neededCI,
-      pct: Math.min(100, Math.round((currentCI / neededCI) * 100)),
-      gap: Math.max(0, neededCI - currentCI),
+      key: 'ci', icon: '🏥', label: 'Major CI',
+      current: currentCI, needed: ci.amount,
+      pct: ci.amount > 0 ? Math.min(100, Math.round((currentCI / ci.amount) * 100)) : 0,
+      gap: Math.max(0, ci.amount - currentCI),
+      source: ci.source,
     },
   ];
+
+  const anyAdvisorTarget = items.some(i => i.source === 'target');
+  const allAdvisorTargets = items.every(i => i.source === 'target');
 
   const criticalCount = items.filter(i => i.pct < 40).length;
   const totalGap = items.reduce((s, i) => s + i.gap, 0);
@@ -195,7 +195,11 @@ export default function CoverageGapBar({ inputs, compact = false }: Props) {
           )}
         </div>
         <span style={{ fontSize: 10, color: 'var(--text-5)', fontStyle: 'italic' }}>
-          Recommended: 10× income for Death &amp; TPD · 5× income for CI
+          {allAdvisorTargets
+            ? 'Targets set by advisor'
+            : anyAdvisorTarget
+              ? 'Targets advisor-set where specified · 10×/5× income benchmark otherwise'
+              : 'Benchmark: 10× income for Death & TPD · 5× income for CI'}
         </span>
       </div>
 
@@ -260,8 +264,15 @@ export default function CoverageGapBar({ inputs, compact = false }: Props) {
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', lineHeight: 1.3 }}>
                     {item.current > 0 ? formatSGD(item.current) : 'None'}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-5)' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-5)', display: 'flex', alignItems: 'center', gap: 4 }}>
                     of {formatSGD(item.needed)}
+                    {item.source === 'target' && (
+                      <span style={{
+                        fontSize: 8, fontWeight: 700, color: '#60a5fa',
+                        background: 'rgba(96,165,250,0.12)', padding: '1px 4px',
+                        borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.04em',
+                      }}>Target</span>
+                    )}
                   </div>
                 </div>
 

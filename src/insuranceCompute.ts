@@ -1,7 +1,7 @@
-import { FireInputs } from './types';
+import { FireInputs, CoverageType } from './types';
 
 // Singapore benchmarks: Death/TPD = 10× income, CI = 5×, ECI = 2×
-export const INSURANCE_BENCHMARK = { death: 10, tpd: 10, ci: 5, eci: 2 };
+export const INSURANCE_BENCHMARK: Record<CoverageType, number> = { death: 10, tpd: 10, ci: 5, eci: 2 };
 
 export interface InsuranceSummary {
   totalDeath: number;
@@ -12,6 +12,10 @@ export interface InsuranceSummary {
   tpdGap: number;
   ciGap: number;
   eciGap: number;
+  /** Per-type target source: 'target' if advisor set it, 'benchmark' if falling back to income multiple. */
+  coverageTargetSource: Record<CoverageType, 'target' | 'benchmark'>;
+  /** Per-type recommended amount that gap was computed against. */
+  recommended: Record<CoverageType, number>;
   annualPremium: number;
   signalScore: number; // 0–100: composite buying-opportunity score
   // Hospital plan
@@ -19,6 +23,17 @@ export interface InsuranceSummary {
   hasISP: boolean | null;
   hasRider: boolean | null;
   ispWardClass: string;
+}
+
+/** Resolve the recommended coverage amount for a given type — advisor target wins, else income×benchmark. */
+export function resolveRecommended(
+  type: CoverageType,
+  annualIncome: number,
+  targets: FireInputs['coverageTargets'],
+): { amount: number; source: 'target' | 'benchmark' } {
+  const target = targets?.[type];
+  if (typeof target === 'number' && target > 0) return { amount: target, source: 'target' };
+  return { amount: annualIncome * INSURANCE_BENCHMARK[type], source: 'benchmark' };
 }
 
 export function computeInsurance(inputs: FireInputs, daysSinceUpdate: number): InsuranceSummary {
@@ -32,10 +47,15 @@ export function computeInsurance(inputs: FireInputs, daysSinceUpdate: number): I
   const totalECI   = active.reduce((s, p) => s + (p.eciSumAssured ?? 0), 0);
   const annualPremium = active.reduce((s, p) => s + p.premiumAmount * (freqMult[p.premiumFrequency] ?? 1), 0);
 
-  const recDeath = income * INSURANCE_BENCHMARK.death;
-  const recCI    = income * INSURANCE_BENCHMARK.ci;
-  const recECI   = income * INSURANCE_BENCHMARK.eci;
-  const recTPD   = income * INSURANCE_BENCHMARK.tpd;
+  const death = resolveRecommended('death', income, inputs.coverageTargets);
+  const tpd   = resolveRecommended('tpd',   income, inputs.coverageTargets);
+  const ci    = resolveRecommended('ci',    income, inputs.coverageTargets);
+  const eci   = resolveRecommended('eci',   income, inputs.coverageTargets);
+
+  const recDeath = death.amount;
+  const recTPD   = tpd.amount;
+  const recCI    = ci.amount;
+  const recECI   = eci.amount;
 
   const deathGap = Math.max(0, recDeath - totalDeath);
   const tpdGap   = Math.max(0, recTPD   - totalTPD);
@@ -58,6 +78,8 @@ export function computeInsurance(inputs: FireInputs, daysSinceUpdate: number): I
   return {
     totalDeath, totalTPD, totalCI, totalECI,
     deathGap, tpdGap, ciGap, eciGap,
+    coverageTargetSource: { death: death.source, tpd: tpd.source, ci: ci.source, eci: eci.source },
+    recommended: { death: recDeath, tpd: recTPD, ci: recCI, eci: recECI },
     annualPremium, signalScore,
     hasMSL, hasISP, hasRider, ispWardClass,
   };

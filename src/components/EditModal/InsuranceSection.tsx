@@ -1,10 +1,18 @@
 import React from 'react';
-import { FireInputs, InsurancePolicy, FundAllocation, Nominee } from '../../types';
+import { FireInputs, InsurancePolicy, FundAllocation, Nominee, CoverageType } from '../../types';
+import { INSURANCE_BENCHMARK } from '../../insuranceCompute';
 import { listProfiles } from '../../services/profileStorageSupabase';
 import { ClientProfile } from '../../profileTypes';
 import { NumberField, SelectField, SectionLabel } from '../FormFields';
 import { HospitalPlanSection } from './HospitalPlanSection';
 import { uid } from '../../utils/uid';
+
+const COVERAGE_TYPE_META: Record<CoverageType, { label: string; icon: string }> = {
+  death: { label: 'Death', icon: '☠️' },
+  tpd:   { label: 'TPD', icon: '🦽' },
+  ci:    { label: 'Major CI', icon: '🏥' },
+  eci:   { label: 'ECI', icon: '⚡' },
+};
 
 const POLICY_TYPES = [
   { value: 'whole-life', label: 'Whole Life' },
@@ -43,8 +51,42 @@ export function InsuranceSection({ inputs, onChange, currentProfileId }: { input
     commencementDate: null, maturityDate: null, fundAllocations: [],
   }]);
 
+  const annualIncome = inputs.income.annualIncome;
+  const targets = inputs.coverageTargets ?? {};
+  const updateTarget = (type: CoverageType, v: number) => {
+    const next = { ...targets };
+    if (v > 0) next[type] = v;
+    else delete next[type];
+    onChange({ ...inputs, coverageTargets: Object.keys(next).length > 0 ? next : undefined });
+  };
+
   return (
     <div>
+      <div style={{ marginBottom: 18 }}>
+        <SectionLabel>Coverage Targets</SectionLabel>
+        <p style={{ fontSize: 11, color: 'var(--text-4)', margin: '0 0 10px', lineHeight: 1.5 }}>
+          Set advisor-recommended sum assured per coverage type. Blank fields fall back to the
+          Singapore benchmark (Death/TPD = 10× income · CI = 5× · ECI = 2×).
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {(Object.keys(COVERAGE_TYPE_META) as CoverageType[]).map(type => {
+            const meta = COVERAGE_TYPE_META[type];
+            const benchmark = annualIncome * INSURANCE_BENCHMARK[type];
+            return (
+              <NumberField
+                key={type}
+                small
+                label={`${meta.icon} ${meta.label} target`}
+                value={targets[type] ?? 0}
+                prefix="S$"
+                tip={`Leave at 0 to use the benchmark of ${benchmark.toLocaleString('en-SG', { style: 'currency', currency: 'SGD', maximumFractionDigits: 0 })} (${INSURANCE_BENCHMARK[type]}× annual income).`}
+                onChange={v => updateTarget(type, v)}
+              />
+            );
+          })}
+        </div>
+      </div>
+
       <HospitalPlanSection inputs={inputs} onChange={onChange} />
       {inputs.policies.map(p => (
         <div key={p.id} style={{

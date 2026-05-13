@@ -118,6 +118,8 @@ export interface MajorPurchase {
   repeatEveryYears: number;
 }
 
+export type CoverageType = 'death' | 'tpd' | 'ci' | 'eci';
+
 export interface FireInputs {
   personal: PersonalDetails;
   income: IncomeExpenses;
@@ -126,6 +128,8 @@ export interface FireInputs {
   purchases: MajorPurchase[];
   estatePlanning: EstatePlanning;
   hospitalPlan?: HospitalPlan;
+  /** Advisor-set target coverage per type (SGD). When a type is absent, falls back to the income-multiple benchmark. */
+  coverageTargets?: Partial<Record<CoverageType, number>>;
 }
 
 export interface YearData {
