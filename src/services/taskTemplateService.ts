@@ -1,6 +1,17 @@
 import { supabase } from './supabaseClient';
 import { createTask } from './taskService';
 
+const isLocalDev = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const LOCAL_KEY = 'fire-local-task-templates';
+function localLoad(): TaskTemplate[] {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; }
+}
+function localSave(ts: TaskTemplate[]): void {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(ts));
+}
+
 export interface TaskTemplate {
   id: string;
   userId: string;
@@ -42,6 +53,7 @@ function todayISO(): string {
 }
 
 export async function listTemplates(): Promise<TaskTemplate[]> {
+  if (isLocalDev) return localLoad();
   const { data, error } = await supabase
     .from('task_templates')
     .select('*')
@@ -58,6 +70,22 @@ export async function createTemplate(params: {
   clientName?: string;
   priority?: 'normal' | 'urgent';
 }): Promise<TaskTemplate> {
+  if (isLocalDev) {
+    const t: TaskTemplate = {
+      id: crypto.randomUUID?.() ?? `tpl-${Date.now()}`,
+      userId: 'local-dev',
+      title: params.title,
+      notes: params.notes ?? '',
+      intervalDays: params.intervalDays,
+      clientProfileId: params.clientProfileId ?? null,
+      clientName: params.clientName ?? null,
+      priority: params.priority ?? 'normal',
+      lastGeneratedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    localSave([t, ...localLoad()]);
+    return t;
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
@@ -82,6 +110,12 @@ export async function updateTemplate(
   id: string,
   updates: Partial<Pick<TaskTemplate, 'title' | 'notes' | 'intervalDays' | 'clientProfileId' | 'clientName' | 'priority'>>,
 ): Promise<void> {
+  if (isLocalDev) {
+    const all = localLoad();
+    const t = all.find(x => x.id === id);
+    if (t) { Object.assign(t, updates); localSave(all); }
+    return;
+  }
   const dbUpdates: Record<string, any> = {};
   if (updates.title !== undefined)           dbUpdates.title = updates.title;
   if (updates.notes !== undefined)           dbUpdates.notes = updates.notes;
@@ -94,6 +128,7 @@ export async function updateTemplate(
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
+  if (isLocalDev) { localSave(localLoad().filter(t => t.id !== id)); return; }
   const { error } = await supabase.from('task_templates').delete().eq('id', id);
   if (error) throw error;
 }
@@ -121,10 +156,16 @@ export async function generateDueTasks(templates: TaskTemplate[]): Promise<numbe
       dueDate: today,
     });
 
-    await supabase
-      .from('task_templates')
-      .update({ last_generated_at: new Date().toISOString() })
-      .eq('id', t.id);
+    if (isLocalDev) {
+      const all = localLoad();
+      const found = all.find(x => x.id === t.id);
+      if (found) { found.lastGeneratedAt = new Date().toISOString(); localSave(all); }
+    } else {
+      await supabase
+        .from('task_templates')
+        .update({ last_generated_at: new Date().toISOString() })
+        .eq('id', t.id);
+    }
 
     count++;
   }

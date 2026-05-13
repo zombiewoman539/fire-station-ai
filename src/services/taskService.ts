@@ -1,5 +1,13 @@
 import { supabase } from './supabaseClient';
 
+const isLocalDev = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const LOCAL_KEY = 'fire-local-tasks';
+function localLoad(): Task[] {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; }
+}
+function localSave(ts: Task[]): void { localStorage.setItem(LOCAL_KEY, JSON.stringify(ts)); }
+
 export interface Task {
   id: string;
   createdBy: string;
@@ -33,6 +41,7 @@ function rowToTask(row: any): Task {
 }
 
 export async function listTasks(): Promise<Task[]> {
+  if (isLocalDev) return localLoad();
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
@@ -44,6 +53,7 @@ export async function listTasks(): Promise<Task[]> {
 
 /** Returns only tasks assigned to the current user (for the personal Tasks page). */
 export async function listMyTasks(): Promise<Task[]> {
+  if (isLocalDev) return localLoad();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
@@ -63,9 +73,23 @@ export async function createTask(params: {
   clientName?: string;
   dueDate?: string;
   notes?: string;
-  assignedTo?: string; // if omitted, defaults to current user
+  assignedTo?: string;
   priority?: 'normal' | 'urgent';
 }): Promise<Task> {
+  if (isLocalDev) {
+    const task: Task = {
+      id: crypto.randomUUID?.() ?? `task-${Date.now()}`,
+      createdBy: 'local-dev', assignedTo: 'local-dev',
+      clientProfileId: params.clientProfileId ?? null,
+      clientName: params.clientName ?? null,
+      title: params.title, notes: params.notes ?? '',
+      dueDate: params.dueDate ?? null,
+      status: 'todo', priority: params.priority ?? 'normal',
+      createdAt: new Date().toISOString(), completedAt: null,
+    };
+    localSave([task, ...localLoad()]);
+    return task;
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
@@ -93,6 +117,12 @@ export async function updateTask(
   id: string,
   updates: Partial<Pick<Task, 'title' | 'notes' | 'dueDate' | 'status' | 'completedAt' | 'assignedTo' | 'priority'>>,
 ): Promise<void> {
+  if (isLocalDev) {
+    const all = localLoad();
+    const t = all.find(x => x.id === id);
+    if (t) { Object.assign(t, updates); localSave(all); }
+    return;
+  }
   const dbUpdates: Record<string, any> = {};
 
   if (updates.title !== undefined)       dbUpdates.title = updates.title;
@@ -108,23 +138,32 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string): Promise<void> {
+  if (isLocalDev) { localSave(localLoad().filter(t => t.id !== id)); return; }
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function completeTask(id: string, notes: string): Promise<void> {
+  if (isLocalDev) {
+    const all = localLoad();
+    const t = all.find(x => x.id === id);
+    if (t) { t.status = 'done'; t.notes = notes; t.completedAt = new Date().toISOString(); localSave(all); }
+    return;
+  }
   const { error } = await supabase
     .from('tasks')
-    .update({
-      status: 'done',
-      notes,
-      completed_at: new Date().toISOString(),
-    })
+    .update({ status: 'done', notes, completed_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
 }
 
 export async function reopenTask(id: string): Promise<void> {
+  if (isLocalDev) {
+    const all = localLoad();
+    const t = all.find(x => x.id === id);
+    if (t) { t.status = 'todo'; t.completedAt = null; localSave(all); }
+    return;
+  }
   const { error } = await supabase
     .from('tasks')
     .update({ status: 'todo', completed_at: null })
