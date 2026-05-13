@@ -28,9 +28,39 @@ interface Props {
 }
 
 const STORAGE_KEY_PREFIX = 'dashboard';
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function storageKey(kind: DashboardKind, key: 'activeViewId' | 'draftFilters' | 'draftVisibleColumns' | 'search'): string {
   return `${STORAGE_KEY_PREFIX}.${kind}.${key}`;
+}
+
+function setDraftStorage(key: string, value: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify({ v: value, exp: Date.now() + DRAFT_TTL_MS })); } catch {}
+}
+
+function getDraftStorage<T>(key: string): T | null {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && 'exp' in parsed) {
+      if (Date.now() > parsed.exp) { localStorage.removeItem(key); return null; }
+      return parsed.v as T;
+    }
+    return parsed as T; // legacy format without TTL — valid until next write
+  } catch { localStorage.removeItem(key); return null; }
+}
+
+function sweepExpiredDrafts(): void {
+  const now = Date.now();
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(STORAGE_KEY_PREFIX + '.'))
+    .forEach(key => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) ?? '');
+        if (parsed?.exp && now > parsed.exp) localStorage.removeItem(key);
+      } catch {}
+    });
 }
 
 function savedViewToResolved(v: SavedView): ResolvedView {
@@ -55,6 +85,9 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
   const isManager = teamStatus?.role === 'manager';
   const orgId = teamStatus?.orgId ?? null;
 
+  // Sweep expired draft filters once on mount
+  React.useEffect(() => { sweepExpiredDrafts(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Current user id — used by ClientTable to mark rows the manager owns.
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
   React.useEffect(() => {
@@ -69,18 +102,15 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     return localStorage.getItem(storageKey(dashboardKind, 'activeViewId'))
       || (dashboardKind === 'advisor' ? 'builtin:advisor.all' : 'builtin:manager.allFire');
   });
-  const [draftFilters, setDraftFilters] = React.useState<FilterChip[] | null>(() => {
-    const raw = localStorage.getItem(storageKey(dashboardKind, 'draftFilters'));
-    if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
-  });
-  // null = no draft (use the active view's columns); 'unset' sentinel encoded as the string "__unset__"
-  // since visibleColumns can legitimately be undefined; we flatten to either an array or null-no-draft.
+  const [draftFilters, setDraftFilters] = React.useState<FilterChip[] | null>(() =>
+    getDraftStorage<FilterChip[]>(storageKey(dashboardKind, 'draftFilters'))
+  );
+  // null = no draft (use the active view's columns); undefined = user explicitly reset to all.
   const [draftVisibleColumns, setDraftVisibleColumns] = React.useState<string[] | undefined | null>(() => {
-    const raw = localStorage.getItem(storageKey(dashboardKind, 'draftVisibleColumns'));
-    if (!raw) return null;
-    if (raw === '__all__') return undefined; // user explicitly reset to all
-    try { return JSON.parse(raw); } catch { return null; }
+    const val = getDraftStorage<string[] | string>(storageKey(dashboardKind, 'draftVisibleColumns'));
+    if (val === null) return null;
+    if (val === '__all__') return undefined;
+    return Array.isArray(val) ? val : null;
   });
   const [search, setSearch] = React.useState<string>(() => localStorage.getItem(storageKey(dashboardKind, 'search')) ?? '');
   const [showSaveModal, setShowSaveModal] = React.useState<'as-new' | 'rename' | null>(null);
@@ -89,13 +119,14 @@ export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTa
     localStorage.setItem(storageKey(dashboardKind, 'activeViewId'), activeViewId);
   }, [activeViewId, dashboardKind]);
   React.useEffect(() => {
-    if (draftFilters === null) localStorage.removeItem(storageKey(dashboardKind, 'draftFilters'));
-    else localStorage.setItem(storageKey(dashboardKind, 'draftFilters'), JSON.stringify(draftFilters));
+    const key = storageKey(dashboardKind, 'draftFilters');
+    if (draftFilters === null) localStorage.removeItem(key);
+    else setDraftStorage(key, draftFilters);
   }, [draftFilters, dashboardKind]);
   React.useEffect(() => {
-    if (draftVisibleColumns === null) localStorage.removeItem(storageKey(dashboardKind, 'draftVisibleColumns'));
-    else if (draftVisibleColumns === undefined) localStorage.setItem(storageKey(dashboardKind, 'draftVisibleColumns'), '__all__');
-    else localStorage.setItem(storageKey(dashboardKind, 'draftVisibleColumns'), JSON.stringify(draftVisibleColumns));
+    const key = storageKey(dashboardKind, 'draftVisibleColumns');
+    if (draftVisibleColumns === null) localStorage.removeItem(key);
+    else setDraftStorage(key, draftVisibleColumns === undefined ? '__all__' : draftVisibleColumns);
   }, [draftVisibleColumns, dashboardKind]);
   React.useEffect(() => { localStorage.setItem(storageKey(dashboardKind, 'search'), search); }, [search, dashboardKind]);
 

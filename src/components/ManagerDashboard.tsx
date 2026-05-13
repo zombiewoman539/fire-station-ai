@@ -57,7 +57,7 @@ interface AssignTaskModalProps {
 
 function AssignTaskModal({ advisor, preselectedClientId, preselectedClientName, onClose, onCreated }: AssignTaskModalProps) {
   const [title, setTitle] = useState('');
-  const [clientProfiles, setClientProfiles] = useState<any[]>([]);
+  const [clientProfiles, setClientProfiles] = useState<Array<{ id: string; name: string }>>([]);
   const [clientId, setClientId] = useState(preselectedClientId ?? '');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -173,7 +173,7 @@ interface AdvisorClientsDrawerProps {
 }
 
 function AdvisorClientsDrawer({ advisor, onClose, onAssignTask }: AdvisorClientsDrawerProps) {
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<Array<{ id: string; name: string; updated_at: string; meta: Record<string, unknown> | null }>>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -230,7 +230,7 @@ function AdvisorClientsDrawer({ advisor, onClose, onAssignTask }: AdvisorClients
           <div style={{ color: 'var(--text-4)', fontSize: 13 }}>No clients yet.</div>
         ) : (
           profiles.map(p => {
-            const meta = (p.meta as any) ?? {};
+            const meta = (p.meta ?? {}) as { lastMeetingDate?: string; nextReviewDate?: string };
             return (
               <div key={p.id} style={{
                 background: 'var(--inset)', border: '1px solid var(--border)',

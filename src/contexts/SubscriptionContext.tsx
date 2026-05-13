@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { getMySubscription, Tier, Subscription } from '../services/subscriptionService';
 
@@ -38,15 +38,17 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const isActive = subscription?.status === 'active' || (subscription?.status === 'trialing' && trialActive);
   const tier: Tier = isActive ? subscription!.tier : 'starter';
 
+  const value = useMemo(() => ({
+    tier,
+    subscription,
+    loaded,
+    isPro: tier === 'pro' || tier === 'team',
+    isTeam: tier === 'team',
+    refresh: load,
+  }), [tier, subscription, loaded, load]);
+
   return (
-    <SubscriptionContext.Provider value={{
-      tier,
-      subscription,
-      loaded,
-      isPro: tier === 'pro' || tier === 'team',
-      isTeam: tier === 'team',
-      refresh: load,
-    }}>
+    <SubscriptionContext.Provider value={value}>
       {children}
     </SubscriptionContext.Provider>
   );

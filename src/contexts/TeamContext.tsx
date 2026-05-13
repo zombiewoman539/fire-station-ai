@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import {
   getMyTeamStatus, getPendingInvite,
@@ -47,14 +47,16 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const value = useMemo(() => ({
+    teamStatus,
+    pendingInvite,
+    loaded,
+    isManager: teamStatus?.role === 'manager',
+    refresh: load,
+  }), [teamStatus, pendingInvite, loaded, load]);
+
   return (
-    <TeamContext.Provider value={{
-      teamStatus,
-      pendingInvite,
-      loaded,
-      isManager: teamStatus?.role === 'manager',
-      refresh: load,
-    }}>
+    <TeamContext.Provider value={value}>
       {children}
     </TeamContext.Provider>
   );

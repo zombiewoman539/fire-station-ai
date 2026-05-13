@@ -539,12 +539,14 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
             borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
             minWidth: 170, padding: '4px 0',
           }}>
-            {[
+            {(
+            [
               { label: 'Rename', icon: '✏', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleRename(p); } },
               { label: 'Duplicate', icon: '⧉', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleDuplicate(p); } },
               { label: 'Export JSON', icon: '↓', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleExport(p); } },
               { label: 'Delete', icon: '🗑', action: () => { const p = profiles.find(x => x.id === menuId); if (p) handleDelete(p); }, danger: true },
-            ].map(item => (
+            ] as Array<{ label: string; icon: string; action: () => void; danger?: boolean }>
+          ).map(item => (
               <button
                 key={item.label}
                 onClick={item.action}
@@ -552,7 +554,7 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
                   width: '100%', background: 'none', border: 'none', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '8px 14px', fontSize: 13, cursor: 'pointer',
-                  color: (item as any).danger ? '#f87171' : 'var(--text-2)',
+                  color: item.danger ? '#f87171' : 'var(--text-2)',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--card)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}

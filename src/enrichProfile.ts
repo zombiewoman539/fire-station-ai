@@ -40,6 +40,10 @@ export interface EnrichedProfile {
 
   // Source metadata for sorting
   daysSinceUpdate: number;             // since profile.updatedAt
+
+  // Manager-view extras (only present when viewed from ManagerDashboardPage)
+  advisorUserId?: string;
+  advisorEmail?: string;
 }
 
 function getLiveAge(profile: ClientProfile): number {
@@ -122,6 +126,8 @@ export function enrichProfile(profile: ClientProfile, opts: EnrichOptions): Enri
     meetingCount,
     nearestDueDays,
     daysSinceUpdate,
+    advisorUserId: (profile as any).advisorUserId as string | undefined,
+    advisorEmail: (profile as any).advisorEmail as string | undefined,
   };
 }
 

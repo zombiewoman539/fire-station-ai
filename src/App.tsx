@@ -18,21 +18,23 @@ import EditModal from './components/EditModal';
 import ToggleBar from './components/ToggleBar';
 import InsightsPanel from './components/InsightsPanel';
 import MilestoneTracker from './components/MilestoneTracker';
-import PresentationMode from './components/PresentationMode';
 import ExportReport from './components/ExportReport';
 import ScenarioPanel from './components/ScenarioPanel';
 import NavBar from './components/NavBar';
-import AdvisorDashboard from './components/AdvisorDashboard';
-import ManagerDashboardPage from './components/ManagerDashboardPage';
 import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
-import SettingsPage from './components/SettingsPage';
-import ManagerDashboard from './components/ManagerDashboard';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import PlansPage from './components/PlansPage';
 import LandingPage from './components/LandingPage';
-import TasksPage from './components/TasksPage';
-import AdminPage from './components/AdminPage';
+
+// Route-level and conditionally-rendered components — code-split to reduce TTI
+const PresentationMode    = React.lazy(() => import('./components/PresentationMode'));
+const AdvisorDashboard    = React.lazy(() => import('./components/AdvisorDashboard'));
+const ManagerDashboardPage = React.lazy(() => import('./components/ManagerDashboardPage'));
+const ManagerDashboard    = React.lazy(() => import('./components/ManagerDashboard'));
+const SettingsPage        = React.lazy(() => import('./components/SettingsPage'));
+const PrivacyPolicy       = React.lazy(() => import('./components/PrivacyPolicy'));
+const PlansPage           = React.lazy(() => import('./components/PlansPage'));
+const TasksPage           = React.lazy(() => import('./components/TasksPage'));
+const AdminPage           = React.lazy(() => import('./components/AdminPage'));
 import { TeamProvider, useTeam } from './contexts/TeamContext';
 import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
 import { useToast } from './contexts/ToastContext';
@@ -51,6 +53,14 @@ function useWindowWidth() {
   return width;
 }
 
+
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ fontSize: 32 }}>🔥</div>
+    </div>
+  );
+}
 
 function UpgradeBanner({ message, onUpgrade }: { message: string; onUpgrade: () => void }) {
   return (
@@ -295,12 +305,14 @@ function Dashboard() {
   // Presentation mode overlay
   if (presenting) {
     return (
-      <PresentationMode
-        inputs={inputs}
-        results={results}
-        clientName={activeProfile?.name || 'Client'}
-        onExit={() => setPresenting(false)}
-      />
+      <React.Suspense fallback={<PageLoader />}>
+        <PresentationMode
+          inputs={inputs}
+          results={results}
+          clientName={activeProfile?.name || 'Client'}
+          onExit={() => setPresenting(false)}
+        />
+      </React.Suspense>
     );
   }
 
@@ -731,7 +743,11 @@ function AppShell() {
   }, []);
 
   if (location.pathname === '/privacy') {
-    return <PrivacyPolicy />;
+    return (
+      <React.Suspense fallback={null}>
+        <PrivacyPolicy />
+      </React.Suspense>
+    );
   }
 
   if (checking && !isLocalDev) {
@@ -750,16 +766,18 @@ function AppShell() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <NavBar />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<DashboardRoute />} />
-          <Route path="/team" element={<ManagerDashboard />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/plans" element={<PlansPage />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
-        </Routes>
+        <React.Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<DashboardRoute />} />
+            <Route path="/team" element={<ManagerDashboard />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/plans" element={<PlansPage />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+          </Routes>
+        </React.Suspense>
       </div>
     </div>
   );

@@ -20,7 +20,7 @@ function getFieldValue(row: EnrichedProfile, field: FilterField): number | boole
     case 'hasOpenTask':      return row.hasOpenTask;
     case 'hasNotes':         return row.hasNotes;
     case 'nextPremiumDueDays': return row.nearestDueDays;       // null = no in-force premium in next 90d
-    case 'advisor':          return (row.profile as any).advisorUserId ?? null;
+    case 'advisor':          return row.advisorUserId ?? null;
     default:                 return null;
   }
 }
@@ -103,7 +103,7 @@ export function applySearch(rows: EnrichedProfile[], q: string): EnrichedProfile
   if (!needle) return rows;
   return rows.filter(row => {
     const name = row.profile.name.toLowerCase();
-    const advisorEmail = ((row.profile as any).advisorEmail ?? '').toLowerCase();
+    const advisorEmail = (row.advisorEmail ?? '').toLowerCase();
     return name.includes(needle) || advisorEmail.includes(needle);
   });
 }

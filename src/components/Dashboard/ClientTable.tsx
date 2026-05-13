@@ -273,7 +273,7 @@ function rowPropsEqual(prev: RowProps, next: RowProps): boolean {
 const ClientRow = React.memo(function ClientRow({ row, columnSet, visibleColumns, first, onView, onTaskClick, isOwn }: RowProps) {
   const td: React.CSSProperties = { padding: '11px 14px', fontSize: 13, color: 'var(--text-2)', verticalAlign: 'middle' };
   const profile = row.profile;
-  const advisorEmail = (profile as any).advisorEmail as string | undefined;
+  const advisorEmail = row.advisorEmail;
   const phoneNumber = profile.inputs.personal?.phoneNumber;
 
   const vis = (id: string) => visible(id, columnSet, visibleColumns);
