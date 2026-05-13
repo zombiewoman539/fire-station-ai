@@ -577,6 +577,7 @@ function Dashboard() {
             toolbar={chartToolbar}
             scenarioResults={scenarioResults}
             isDark={theme === 'dark'}
+            retirementExpenseItems={inputs.income.retirementExpenseItems}
           />
         </div>
 

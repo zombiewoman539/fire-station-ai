@@ -14,7 +14,7 @@ import {
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { Chart } from 'react-chartjs-2';
-import { FireResults } from '../types';
+import { FireResults, ExpenseLineItem } from '../types';
 import { formatSGD } from '../calculations';
 
 ChartJS.register(
@@ -29,6 +29,8 @@ interface Props {
   toolbar?: React.ReactNode;
   scenarioResults?: FireResults | null;
   isDark?: boolean;
+  /** Optional breakdown of today's retirement expenses, shown in the FIRE-number popup. */
+  retirementExpenseItems?: ExpenseLineItem[];
 }
 
 function FireRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
@@ -49,7 +51,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults, isDark = true }: Props) {
+export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults, isDark = true, retirementExpenseItems }: Props) {
   // Theme-aware color tokens
   const clr = {
     bg:         isDark ? '#111827' : '#eef2f7',
@@ -389,6 +391,19 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <FireRow label="Retirement expenses today" value={formatSGD(fireNumberBreakdown.grossRetirementExpenses)} />
+                  {retirementExpenseItems && retirementExpenseItems.length > 0 && (
+                    <div style={{ paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 3, marginTop: -2 }}>
+                      {retirementExpenseItems.map(item => {
+                        const annual = item.frequency === 'monthly' ? item.amount * 12 : item.amount;
+                        return (
+                          <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: clr.text4, fontSize: 9 }}>· {item.label || 'Unnamed'}</span>
+                            <span style={{ color: clr.text4, fontSize: 9 }}>{formatSGD(annual)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <FireRow
                     label={`+ ${fireNumberBreakdown.inflationRate}% inflation × ${fireNumberBreakdown.yearsToRetirement} yrs`}
                     value={formatSGD(fireNumberBreakdown.inflatedRetirementExpenses)}

@@ -359,7 +359,7 @@ export default function PresentationMode({ inputs, results, clientName, onExit }
 
         {/* Right: Chart */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <ChartPanel results={results} retirementAge={personal.retirementAge} isDark={true} />
+          <ChartPanel results={results} retirementAge={personal.retirementAge} isDark={true} retirementExpenseItems={income.retirementExpenseItems} />
         </div>
       </div>
     </div>

@@ -21,7 +21,8 @@ export interface IncomeExpenses {
   expenseItems: ExpenseLineItem[];      // when non-empty, annualExpenses is derived from this
   annualInvestmentContribution: number; // fallback when investmentBuckets is empty
   salaryGrowthRate: number;
-  retirementExpenses: number;
+  retirementExpenses: number;           // canonical total; auto-derived when retirementExpenseItems is non-empty
+  retirementExpenseItems?: ExpenseLineItem[]; // optional breakdown — same shape as accumulation expenses
   inflationRate: number;     // Annual inflation rate (%), default 2.5 (Singapore avg)
   withdrawalRate: number;    // Safe Withdrawal Rate, default 3.5%
 }
