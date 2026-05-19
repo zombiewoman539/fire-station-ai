@@ -98,7 +98,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     productType?: 'growth' | 'dividend' | 'annuity';
     premiumType?: 'single' | 'limited';
     annualPremium?: number;
-    premiumPayUntilAge?: number;
+    premiumStartAge?: number;       // age premiums begin (commencement)
+    premiumPayUntilAge?: number;    // age premiums stop (commencement + term)
     payoutStartAge?: number;
     payoutAnnualAmount?: number;
     payoutDurationYears?: number | null;
@@ -106,6 +107,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
   const liveBuckets: LiveBucket[] = hasBuckets
     ? assets.investmentBuckets.map(b => {
         const isProduct = b.productType === 'dividend' || b.productType === 'annuity';
+        const startAge = b.premiumCommencementAge ?? currentAge;
         return {
           value: b.currentValue,
           monthlyContribution: isProduct ? 0 : b.monthlyContribution,
@@ -114,7 +116,8 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
           productType: b.productType,
           premiumType: b.premiumType,
           annualPremium: b.annualPremium,
-          premiumPayUntilAge: b.premiumType === 'limited' ? currentAge + (b.premiumYears ?? 0) : undefined,
+          premiumStartAge: b.premiumType === 'limited' ? startAge : undefined,
+          premiumPayUntilAge: b.premiumType === 'limited' ? startAge + (b.premiumYears ?? 0) : undefined,
           payoutStartAge: b.payoutStartAge,
           payoutAnnualAmount: b.payoutAnnualAmount,
           payoutDurationYears: b.payoutDurationYears,
@@ -173,12 +176,19 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     return taken;
   };
 
-  /** Annual premiums owed to limited-pay product buckets this year. */
+  /** Annual premiums owed to limited-pay product buckets this year.
+   *  Only charges between [premiumStartAge, premiumPayUntilAge). Handles three cases:
+   *  - existing policy (startAge < currentAge): charges remaining years
+   *  - future policy (startAge > currentAge): premiums delayed until startAge
+   *  - paid-up policy (payUntilAge <= currentAge): no premiums charged
+   */
   const getProductPremiums = (age: number): number => {
     let total = 0;
     for (const b of liveBuckets) {
       if (!b.isProduct || b.premiumType !== 'limited' || !b.annualPremium) continue;
-      if (b.premiumPayUntilAge != null && age < b.premiumPayUntilAge) total += b.annualPremium;
+      if (b.premiumStartAge != null && age < b.premiumStartAge) continue;
+      if (b.premiumPayUntilAge != null && age >= b.premiumPayUntilAge) continue;
+      total += b.annualPremium;
     }
     return total;
   };

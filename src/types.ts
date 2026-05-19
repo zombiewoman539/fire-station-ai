@@ -47,7 +47,8 @@ export interface InvestmentBucket {
   productType?: 'growth' | 'dividend' | 'annuity';
   premiumType?: 'single' | 'limited';
   annualPremium?: number;           // limited pay: annual premium (SGD)
-  premiumYears?: number;            // limited pay: how many years premiums are paid from today
+  premiumYears?: number;            // limited pay: total years of the premium term
+  premiumCommencementAge?: number;  // age when premium payments began (defaults to currentAge if absent)
   payoutStartAge?: number;          // age when payouts begin
   payoutAnnualAmount?: number;      // annual payout (coupon for dividend; drawdown for annuity)
   payoutDurationYears?: number | null; // null = lifetime; finite = depletes capital (annuity)

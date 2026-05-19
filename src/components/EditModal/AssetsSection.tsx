@@ -51,8 +51,16 @@ function BucketInput({ label, value, prefix, suffix, step = 1, onChange }: {
   );
 }
 
-function ProductDetailsPanel({ bucket, onChange }: { bucket: InvestmentBucket; onChange: (patch: Partial<InvestmentBucket>) => void }) {
+function ProductDetailsPanel({ bucket, currentAge, onChange }: {
+  bucket: InvestmentBucket; currentAge: number;
+  onChange: (patch: Partial<InvestmentBucket>) => void;
+}) {
   const isLimited = bucket.premiumType === 'limited';
+  const commencementAge = bucket.premiumCommencementAge ?? currentAge;
+  const payUntilAge = commencementAge + (bucket.premiumYears ?? 0);
+  const yearsRemaining = Math.max(0, payUntilAge - currentAge);
+  const isPaidUp = isLimited && (bucket.premiumYears ?? 0) > 0 && payUntilAge <= currentAge;
+  const isFuture = commencementAge > currentAge;
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-soft)' }}>
       {/* Premium type toggle */}
@@ -73,12 +81,25 @@ function ProductDetailsPanel({ bucket, onChange }: { bucket: InvestmentBucket; o
 
       {/* Limited pay fields */}
       {isLimited && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          <BucketInput label="Annual premium" value={bucket.annualPremium ?? 0} prefix="S$"
-            onChange={v => onChange({ annualPremium: v })} />
-          <BucketInput label="Pay for (years)" value={bucket.premiumYears ?? 0}
-            onChange={v => onChange({ premiumYears: v })} />
-        </div>
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
+            <BucketInput label="Annual premium" value={bucket.annualPremium ?? 0} prefix="S$"
+              onChange={v => onChange({ annualPremium: v })} />
+            <BucketInput label="Premium term (yrs)" value={bucket.premiumYears ?? 0}
+              onChange={v => onChange({ premiumYears: v })} />
+            <BucketInput label="Started at age" value={commencementAge}
+              onChange={v => onChange({ premiumCommencementAge: v })} />
+          </div>
+          {(bucket.premiumYears ?? 0) > 0 && (
+            <div style={{ marginBottom: 10, fontSize: 11, color: isPaidUp ? '#34d399' : isFuture ? '#fbbf24' : 'var(--text-3)' }}>
+              {isPaidUp
+                ? `Fully paid up at age ${payUntilAge}`
+                : isFuture
+                  ? `Premiums start at age ${commencementAge} and run until age ${payUntilAge}`
+                  : `Premiums until age ${payUntilAge} · ${yearsRemaining} ${yearsRemaining === 1 ? 'year' : 'years'} remaining`}
+            </div>
+          )}
+        </>
       )}
 
       {/* Payout fields */}
@@ -265,7 +286,11 @@ export function AssetsSection({ inputs, onChange }: { inputs: FireInputs; onChan
 
                 {/* Product details panel */}
                 {isProduct && (
-                  <ProductDetailsPanel bucket={bucket} onChange={patch => updateBucket(bucket.id, patch)} />
+                  <ProductDetailsPanel
+                    bucket={bucket}
+                    currentAge={inputs.personal.currentAge}
+                    onChange={patch => updateBucket(bucket.id, patch)}
+                  />
                 )}
               </div>
             );
