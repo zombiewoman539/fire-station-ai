@@ -193,16 +193,28 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     return total;
   };
 
-  /** Annual payout income from active product buckets (dividend coupons + annuity drawdowns). */
+  /** Annual payout income from active product buckets (dividend coupons + annuity drawdowns).
+   *  Dividend: pays contractually regardless of bucket value (insurer's obligation, not balance-driven).
+   *  Annuity: stops when capital is exhausted. */
   const getProductPayouts = (age: number): number => {
     let total = 0;
     for (const b of liveBuckets) {
       if (!b.isProduct || !b.payoutStartAge || age < b.payoutStartAge) continue;
       if (b.payoutDurationYears != null && age >= b.payoutStartAge + b.payoutDurationYears) continue;
-      if (b.value <= 0) continue;
+      if (b.productType === 'annuity' && b.value <= 0) continue;
       total += b.payoutAnnualAmount ?? 0;
     }
     return total;
+  };
+
+  /** Add this year's premiums to the bucket value so balance sheet is preserved. */
+  const accumulateProductPremiums = (age: number): void => {
+    for (const b of liveBuckets) {
+      if (!b.isProduct || b.premiumType !== 'limited' || !b.annualPremium) continue;
+      if (b.premiumStartAge != null && age < b.premiumStartAge) continue;
+      if (b.premiumPayUntilAge != null && age >= b.premiumPayUntilAge) continue;
+      b.value += b.annualPremium;
+    }
   };
 
   // Scenario state
@@ -350,6 +362,7 @@ export function calculate(inputs: FireInputs, scenario?: Scenario): FireResults 
     const yearsFromNow = age - currentAge;
     const productPremiums = getProductPremiums(age);
     const productPayouts = getProductPayouts(age);
+    accumulateProductPremiums(age);  // premiums leave cash flow but build up bucket value
     if (!isRetired) {
       const takeHomePay = income.annualIncome * Math.pow(1 + salaryGrowth, i) * incomeMultiplier;
       const inflatedAccumulationExpenses = baseAnnualExpenses * Math.pow(1 + inflationRate, yearsFromNow);
