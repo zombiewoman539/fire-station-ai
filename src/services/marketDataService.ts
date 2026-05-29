@@ -45,11 +45,26 @@ async function fetchBatch(tickers: string[]): Promise<Record<string, QuoteResult
   const out: Record<string, QuoteResult> = {};
   if (tickers.length === 0) return out;
 
+  // Raw fetch instead of supabase.functions.invoke — the JS client adds an
+  // x-client-info header that some browsers cache aggressively in the CORS
+  // preflight. Raw fetch only sends the headers we explicitly set.
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL!;
+  const supabaseKey = process.env.REACT_APP_SUPABASE_KEY!;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? supabaseKey;
+
   try {
-    const { data, error } = await supabase.functions.invoke('market-data', {
-      body: { tickers },
+    const res = await fetch(`${supabaseUrl}/functions/v1/market-data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseKey,
+      },
+      body: JSON.stringify({ tickers }),
     });
-    if (error) throw error;
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
     for (const ticker of tickers) {
       const r = (data as any)?.[ticker];
       out[ticker] = {
