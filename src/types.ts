@@ -149,6 +149,68 @@ export interface MajorPurchase {
 
 export type CoverageType = 'death' | 'tpd' | 'ci' | 'eci';
 
+// ─── Track feature (Phase 1: per-ticker investment tracking) ────────────────
+
+export type TransactionType = 'buy' | 'sell' | 'dividend';
+export type SupportedCurrency = 'USD' | 'SGD';
+
+export interface InvestmentTransaction {
+  id: string;
+  clientProfileId: string;
+  date: string;               // YYYY-MM-DD
+  type: TransactionType;
+  ticker: string;
+  accountId: string;
+  currency: SupportedCurrency;
+  quantity: number;
+  amountPerUnit: number;
+  tradingFees: number;
+  notes: string;
+  createdAt: string;
+}
+
+export interface TrackingAccount {
+  id: string;
+  name: string;               // 'Interactive Brokers', 'Tiger', etc.
+  defaultCurrency: SupportedCurrency;
+}
+
+export interface BudgetRule {
+  spending: number;            // % of take-home, 0–100
+  savings: number;
+  investments: number;
+  insurance: number;
+}
+
+export interface TrackingMeta {
+  accounts: TrackingAccount[];
+  tickerCategories: Record<string, string>;   // 'CSPX' → 'S&P', 'NOW' → 'Tech'
+  budgetRule: BudgetRule;
+  baseCurrency: SupportedCurrency;
+}
+
+// Derived (not stored): per-ticker rollup of all transactions
+export interface Holding {
+  ticker: string;
+  accountId: string;
+  currency: SupportedCurrency;
+  category: string;
+  quantity: number;
+  costBasis: number;           // weighted average × qty, in native currency
+  averageCost: number;         // costBasis / quantity
+  realizedGain: number;        // sum across all sells (native currency)
+  dividendsReceived: number;   // cumulative (native currency)
+}
+
+export interface HoldingWithMarketData extends Holding {
+  marketPricePerUnit: number | null;   // native currency, null if Yahoo failed
+  marketValue: number | null;          // qty × marketPrice, native currency
+  unrealizedGain: number | null;       // marketValue − costBasis
+  unrealizedGainPct: number | null;
+  marketValueBase: number | null;      // converted to baseCurrency
+  costBasisBase: number;               // converted to baseCurrency
+}
+
 export interface FireInputs {
   personal: PersonalDetails;
   income: IncomeExpenses;
@@ -159,6 +221,8 @@ export interface FireInputs {
   hospitalPlan?: HospitalPlan;
   /** Advisor-set target coverage per type (SGD). When a type is absent, falls back to the income-multiple benchmark. */
   coverageTargets?: Partial<Record<CoverageType, number>>;
+  /** Track-feature metadata: accounts, ticker categories, budget rule, base currency. */
+  trackingMeta?: TrackingMeta;
 }
 
 export interface YearData {

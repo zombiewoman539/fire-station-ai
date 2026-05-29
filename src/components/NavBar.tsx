@@ -31,6 +31,15 @@ const tabs = [
       </svg>
     ),
   },
+  {
+    to: '/track',
+    label: 'Track',
+    icon: (
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 14l4-4 4 4 5-5" />
+      </svg>
+    ),
+  },
 ];
 
 const settingsTab = {

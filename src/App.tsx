@@ -39,6 +39,7 @@ const SettingsPage        = React.lazy(() => import('./components/SettingsPage')
 const PrivacyPolicy       = React.lazy(() => import('./components/PrivacyPolicy'));
 const PlansPage           = React.lazy(() => import('./components/PlansPage'));
 const TasksPage           = React.lazy(() => import('./components/TasksPage'));
+const TrackPage           = React.lazy(() => import('./pages/TrackPage'));
 const AdminPage           = React.lazy(() => import('./components/AdminPage'));
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
@@ -758,6 +759,7 @@ function AppShell() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/plans" element={<PlansPage />} />
             <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/track" element={<TrackPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           </Routes>
