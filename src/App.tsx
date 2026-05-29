@@ -735,7 +735,7 @@ function AppShell() {
     );
   }
 
-  if (checking && !isLocalDev) {
+  if (checking) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#9ca3af' }}>
         <div style={{ fontSize: 40 }}>🔥</div>
@@ -743,7 +743,7 @@ function AppShell() {
     );
   }
 
-  if (!session && !isLocalDev) {
+  if (!session) {
     return <LandingPage />;
   }
 
