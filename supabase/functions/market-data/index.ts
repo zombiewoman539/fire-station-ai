@@ -18,14 +18,18 @@ interface QuoteResponse {
   price: number | null;
   priceCurrency: string | null;
   history: Array<{ date: string; close: number }>;
+  resolvedTicker?: string | null;   // which symbol Yahoo actually matched, if a fallback was used
 }
 
-async function fetchOne(ticker: string): Promise<QuoteResponse> {
+// Common exchange suffixes to try when a bare ticker has no trading data.
+// Order roughly matches likelihood for a Singapore advisor's clients.
+const FALLBACK_SUFFIXES = ['.L', '.SI', '.HK', '.DE', '.AS', '.PA', '.MI', '.SW'];
+
+async function fetchYahoo(ticker: string): Promise<QuoteResponse & { resolvedTicker: string | null }> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=3mo&interval=1d`;
   try {
     const res = await fetch(url, {
       headers: {
-        // Yahoo returns 429 for empty user agents
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Accept': 'application/json',
       },
@@ -43,15 +47,38 @@ async function fetchOne(ticker: string): Promise<QuoteResponse> {
         close: closes[i] as number,
       }))
       .filter((p) => typeof p.close === 'number' && !isNaN(p.close));
-    const price = typeof meta?.regularMarketPrice === 'number' ? meta.regularMarketPrice : null;
+
+    // Filter out "stub" responses (Yahoo returns metadata for non-trading symbols
+    // with regularMarketTime=0 and an empty timestamp array — treat as no data)
+    const isStub = !timestamps.length || (meta?.regularMarketTime ?? 0) === 0;
+    const rawPrice = meta?.regularMarketPrice;
+    const price = !isStub && typeof rawPrice === 'number' && rawPrice > 0 ? rawPrice : null;
+
     return {
       price,
       priceCurrency: meta?.currency ?? null,
       history,
+      resolvedTicker: price !== null ? ticker : null,
     };
   } catch {
-    return { price: null, priceCurrency: null, history: [] };
+    return { price: null, priceCurrency: null, history: [], resolvedTicker: null };
   }
+}
+
+async function fetchOne(ticker: string): Promise<QuoteResponse> {
+  // First try the ticker as-given
+  const direct = await fetchYahoo(ticker);
+  if (direct.price !== null) return direct;
+
+  // If user already specified an exchange (contains '.'), don't try fallbacks
+  if (ticker.includes('.')) return direct;
+
+  // Otherwise try common non-US exchange suffixes
+  for (const suffix of FALLBACK_SUFFIXES) {
+    const result = await fetchYahoo(`${ticker}${suffix}`);
+    if (result.price !== null) return result;
+  }
+  return direct;
 }
 
 Deno.serve(async (req) => {
