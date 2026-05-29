@@ -1,8 +1,6 @@
 import { supabase } from './supabaseClient';
+import { useLocalStorageMode } from './storageMode';
 import { createTask } from './taskService';
-
-const isLocalDev = typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const LOCAL_KEY = 'fire-local-task-templates';
 function localLoad(): TaskTemplate[] {
@@ -53,7 +51,7 @@ function todayISO(): string {
 }
 
 export async function listTemplates(): Promise<TaskTemplate[]> {
-  if (isLocalDev) return localLoad();
+  if (await useLocalStorageMode()) return localLoad();
   const { data, error } = await supabase
     .from('task_templates')
     .select('*')
@@ -70,7 +68,7 @@ export async function createTemplate(params: {
   clientName?: string;
   priority?: 'normal' | 'urgent';
 }): Promise<TaskTemplate> {
-  if (isLocalDev) {
+  if (await useLocalStorageMode()) {
     const t: TaskTemplate = {
       id: crypto.randomUUID?.() ?? `tpl-${Date.now()}`,
       userId: 'local-dev',
@@ -110,7 +108,7 @@ export async function updateTemplate(
   id: string,
   updates: Partial<Pick<TaskTemplate, 'title' | 'notes' | 'intervalDays' | 'clientProfileId' | 'clientName' | 'priority'>>,
 ): Promise<void> {
-  if (isLocalDev) {
+  if (await useLocalStorageMode()) {
     const all = localLoad();
     const t = all.find(x => x.id === id);
     if (t) { Object.assign(t, updates); localSave(all); }
@@ -128,7 +126,7 @@ export async function updateTemplate(
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  if (isLocalDev) { localSave(localLoad().filter(t => t.id !== id)); return; }
+  if (await useLocalStorageMode()) { localSave(localLoad().filter(t => t.id !== id)); return; }
   const { error } = await supabase.from('task_templates').delete().eq('id', id);
   if (error) throw error;
 }
@@ -156,7 +154,7 @@ export async function generateDueTasks(templates: TaskTemplate[]): Promise<numbe
       dueDate: today,
     });
 
-    if (isLocalDev) {
+    if (await useLocalStorageMode()) {
       const all = localLoad();
       const found = all.find(x => x.id === t.id);
       if (found) { found.lastGeneratedAt = new Date().toISOString(); localSave(all); }
