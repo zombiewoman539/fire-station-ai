@@ -1,13 +1,14 @@
+import { supabase } from './supabaseClient';
 import { SupportedCurrency } from '../types';
 
 /**
  * Yahoo Finance market data service.
  *
- * Endpoints used:
- *   https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=3mo&interval=1d
+ * Yahoo's chart API doesn't return CORS headers, so we proxy through a Supabase
+ * Edge Function (supabase/functions/market-data) which fetches server-side and
+ * returns the data with proper CORS headers.
  *
- * Caches results in sessionStorage with a 15-minute TTL to avoid hammering Yahoo on every page load.
- * Direct browser access works because Yahoo's chart API allows CORS for query1.finance.yahoo.com.
+ * Results are cached in sessionStorage with a 15-minute TTL.
  */
 
 const TTL_MS = 15 * 60 * 1000;
@@ -39,35 +40,33 @@ function cacheFresh(entry: QuoteResult | undefined): entry is QuoteResult {
   return !!entry && Date.now() - entry.fetchedAt < TTL_MS;
 }
 
-async function fetchOne(ticker: string): Promise<QuoteResult> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=3mo&interval=1d`;
+async function fetchBatch(tickers: string[]): Promise<Record<string, QuoteResult>> {
   const fetchedAt = Date.now();
+  const out: Record<string, QuoteResult> = {};
+  if (tickers.length === 0) return out;
+
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const result = json?.chart?.result?.[0];
-    if (!result) throw new Error('no result');
-    const meta = result.meta;
-    const timestamps: number[] = result.timestamp ?? [];
-    const closes: Array<number | null> = result.indicators?.quote?.[0]?.close ?? [];
-    const history = timestamps
-      .map((ts, i) => ({
-        date: new Date(ts * 1000).toISOString().slice(0, 10),
-        close: closes[i] as number,
-      }))
-      .filter(p => typeof p.close === 'number' && !isNaN(p.close));
-    const price = typeof meta?.regularMarketPrice === 'number' ? meta.regularMarketPrice : null;
-    return {
-      ticker,
-      price,
-      priceCurrency: meta?.currency ?? null,
-      history,
-      fetchedAt,
-    };
-  } catch {
-    return { ticker, price: null, priceCurrency: null, history: [], fetchedAt };
+    const { data, error } = await supabase.functions.invoke('market-data', {
+      body: { tickers },
+    });
+    if (error) throw error;
+    for (const ticker of tickers) {
+      const r = (data as any)?.[ticker];
+      out[ticker] = {
+        ticker,
+        price: r?.price ?? null,
+        priceCurrency: r?.priceCurrency ?? null,
+        history: Array.isArray(r?.history) ? r.history : [],
+        fetchedAt,
+      };
+    }
+  } catch (e) {
+    console.warn('market-data fetch failed', e);
+    for (const ticker of tickers) {
+      out[ticker] = { ticker, price: null, priceCurrency: null, history: [], fetchedAt };
+    }
   }
+  return out;
 }
 
 /** Fetch quotes for many tickers in parallel, using cache. */
@@ -87,10 +86,10 @@ export async function fetchQuotes(tickers: string[]): Promise<Record<string, Quo
 
   if (toFetch.length === 0) return out;
 
-  const results = await Promise.all(toFetch.map(fetchOne));
-  for (const r of results) {
-    out[r.ticker] = r;
-    cache[r.ticker] = r;
+  const fetched = await fetchBatch(toFetch);
+  for (const ticker of Object.keys(fetched)) {
+    out[ticker] = fetched[ticker];
+    cache[ticker] = fetched[ticker];
   }
   saveCache(cache);
   return out;
