@@ -3,6 +3,7 @@ import { listProfiles, saveProfile } from '../services/profileStorageSupabase';
 import {
   listTransactions, createTransaction, updateTransaction, deleteTransaction,
 } from '../services/investmentTrackerService';
+import { listCashFlowMonths, upsertCashFlowMonth, deleteCashFlowMonth } from '../services/cashFlowService';
 import { fetchQuotes, refreshQuotes, getFxRate, QuoteResult } from '../services/marketDataService';
 import { deriveHoldings } from '../lib/holdings';
 import {
@@ -10,6 +11,7 @@ import {
 } from '../profileTypes';
 import {
   InvestmentTransaction, SupportedCurrency, TrackingMeta, HoldingWithMarketData,
+  CashFlowMonth, BudgetRule,
 } from '../types';
 import PortfolioSummary from '../components/Track/PortfolioSummary';
 import HoldingsTable from '../components/Track/HoldingsTable';
@@ -18,6 +20,9 @@ import TransactionsLog from '../components/Track/TransactionsLog';
 import AddTransactionModal from '../components/Track/AddTransactionModal';
 import DividendsPanel from '../components/Track/DividendsPanel';
 import SyncToFirePlanButton from '../components/Track/SyncToFirePlanButton';
+import CashFlowGrid from '../components/Track/CashFlowGrid';
+
+type TrackTab = 'portfolio' | 'cashflow';
 
 const DEFAULT_TRACKING_META: TrackingMeta = {
   accounts: [
@@ -37,9 +42,11 @@ export default function TrackPage() {
   const [fxRate, setFxRate] = useState<number>(1);  // multiply USD value by this to get base currency
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TrackTab>('portfolio');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<InvestmentTransaction | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
+  const [cashFlowMonths, setCashFlowMonths] = useState<CashFlowMonth[]>([]);
 
   const activeProfile = useMemo(
     () => profiles.find(p => p.id === activeProfileId) ?? null,
@@ -65,6 +72,14 @@ export default function TrackPage() {
     listTransactions(activeProfileId)
       .then(setTransactions)
       .catch(err => console.error('Failed to load transactions', err));
+  }, [activeProfileId]);
+
+  // ─── Load cash flow months for active profile ─────────────────────────────
+  useEffect(() => {
+    if (!activeProfileId) { setCashFlowMonths([]); return; }
+    listCashFlowMonths(activeProfileId)
+      .then(setCashFlowMonths)
+      .catch(err => console.error('Failed to load cash flow', err));
   }, [activeProfileId]);
 
   // ─── Holdings (derived from transactions) ─────────────────────────────────
@@ -169,6 +184,27 @@ export default function TrackPage() {
     try { await saveProfile(updated); } catch (e) { console.error('Failed to save currency', e); }
   };
 
+  const handleUpsertCashFlow = async (params: Omit<CashFlowMonth, 'id'>) => {
+    const saved = await upsertCashFlowMonth(params);
+    setCashFlowMonths(prev => {
+      const idx = prev.findIndex(m => m.month === saved.month);
+      return idx >= 0 ? prev.map((m, i) => i === idx ? saved : m) : [saved, ...prev];
+    });
+  };
+
+  const handleDeleteCashFlow = async (id: string) => {
+    await deleteCashFlowMonth(id);
+    setCashFlowMonths(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleBudgetRuleChange = async (rule: BudgetRule) => {
+    if (!activeProfile) return;
+    const newMeta: TrackingMeta = { ...trackingMeta, budgetRule: rule };
+    const updated: ClientProfile = { ...activeProfile, inputs: { ...activeProfile.inputs, trackingMeta: newMeta } };
+    setProfiles(prev => prev.map(p => p.id === updated.id ? updated : p));
+    await saveProfile(updated);
+  };
+
   const handleSyncToFire = async (newInvestments: number, newBuckets: any[]) => {
     if (!activeProfile) return;
     const updated: ClientProfile = {
@@ -241,6 +277,31 @@ export default function TrackPage() {
           />
         </div>
 
+        {/* Subtabs */}
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
+          {([
+            { key: 'portfolio', label: 'Portfolio' },
+            { key: 'cashflow', label: 'Cash Flow' },
+          ] as { key: TrackTab; label: string }[]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '8px 18px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: activeTab === tab.key ? 700 : 500,
+                color: activeTab === tab.key ? 'var(--accent, #4f46e5)' : 'var(--text-3)',
+                borderBottom: activeTab === tab.key ? '2px solid var(--accent, #4f46e5)' : '2px solid transparent',
+                marginBottom: -1,
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Portfolio tab */}
+        {activeTab === 'portfolio' && <>
+
         {/* Portfolio summary */}
         <PortfolioSummary
           holdings={enrichedHoldings}
@@ -308,6 +369,22 @@ export default function TrackPage() {
             }}
           />
         )}
+
+        </>}
+
+        {/* Cash Flow tab */}
+        {activeTab === 'cashflow' && (
+          <CashFlowGrid
+            clientProfileId={activeProfile.id}
+            annualIncome={activeProfile.inputs.income.annualIncome}
+            budgetRule={trackingMeta.budgetRule}
+            months={cashFlowMonths}
+            onUpsert={handleUpsertCashFlow}
+            onDelete={handleDeleteCashFlow}
+            onBudgetRuleChange={handleBudgetRuleChange}
+          />
+        )}
+
       </div>
     </div>
   );

@@ -202,6 +202,20 @@ export interface Holding {
   dividendsReceived: number;   // cumulative (native currency)
 }
 
+export interface CashFlowMonth {
+  id: string;
+  clientProfileId: string;
+  month: string;              // 'YYYY-MM'
+  salary: number;             // gross salary
+  takeHome: number;           // after CPF + tax
+  spending: number;
+  savings: number;
+  investments: number;
+  insurance: number;
+  cpf: number;
+  notes: string;
+}
+
 export interface HoldingWithMarketData extends Holding {
   marketPricePerUnit: number | null;   // native currency, null if Yahoo failed
   marketValue: number | null;          // qty × marketPrice, native currency
