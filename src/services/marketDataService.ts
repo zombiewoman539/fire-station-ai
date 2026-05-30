@@ -110,6 +110,48 @@ export async function fetchQuotes(tickers: string[]): Promise<Record<string, Quo
   return out;
 }
 
+/** Fetch with a custom range (e.g. '1y') — bypasses the 3mo cache. No caching for extended ranges. */
+export async function fetchQuotesForPerformance(tickers: string[]): Promise<Record<string, QuoteResult>> {
+  if (tickers.length === 0) return {};
+  const fetchedAt = Date.now();
+  const out: Record<string, QuoteResult> = {};
+
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL!;
+  const supabaseKey = process.env.REACT_APP_SUPABASE_KEY!;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? supabaseKey;
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/market-data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseKey,
+      },
+      body: JSON.stringify({ tickers, range: '1y' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    for (const ticker of tickers) {
+      const r = (data as any)?.[ticker];
+      out[ticker] = {
+        ticker,
+        price: r?.price ?? null,
+        priceCurrency: r?.priceCurrency ?? null,
+        history: Array.isArray(r?.history) ? r.history : [],
+        fetchedAt,
+      };
+    }
+  } catch (e) {
+    console.warn('performance data fetch failed', e);
+    for (const ticker of tickers) {
+      out[ticker] = { ticker, price: null, priceCurrency: null, history: [], fetchedAt };
+    }
+  }
+  return out;
+}
+
 /** Force a refresh, bypassing the cache. */
 export async function refreshQuotes(tickers: string[]): Promise<Record<string, QuoteResult>> {
   const cache = loadCache();

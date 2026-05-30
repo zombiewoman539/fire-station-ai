@@ -202,6 +202,28 @@ export interface Holding {
   dividendsReceived: number;   // cumulative (native currency)
 }
 
+export type LiabilityType = 'mortgage' | 'car' | 'student' | 'personal' | 'other';
+
+export interface Liability {
+  id: string;
+  clientProfileId: string;
+  name: string;
+  type: LiabilityType;
+  balance: number;          // current outstanding balance (SGD)
+  interestRate: number;     // annual % e.g. 2.5
+  monthlyPayment: number;
+  startDate: string | null; // YYYY-MM-DD
+  endDate: string | null;   // YYYY-MM-DD estimated payoff
+  notes: string;
+}
+
+export interface ClientVisibility {
+  portfolio: boolean;
+  cashflow: boolean;
+  loans: boolean;
+  performance: boolean;
+}
+
 export interface CashFlowMonth {
   id: string;
   clientProfileId: string;
@@ -237,6 +259,8 @@ export interface FireInputs {
   coverageTargets?: Partial<Record<CoverageType, number>>;
   /** Track-feature metadata: accounts, ticker categories, budget rule, base currency. */
   trackingMeta?: TrackingMeta;
+  clientToken?: string | null;
+  clientVisibility?: ClientVisibility;
 }
 
 export interface YearData {

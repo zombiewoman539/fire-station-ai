@@ -4,14 +4,16 @@ import {
   listTransactions, createTransaction, updateTransaction, deleteTransaction,
 } from '../services/investmentTrackerService';
 import { listCashFlowMonths, upsertCashFlowMonth, deleteCashFlowMonth } from '../services/cashFlowService';
-import { fetchQuotes, refreshQuotes, getFxRate, QuoteResult } from '../services/marketDataService';
+import { listLiabilities, createLiability, updateLiability, deleteLiability } from '../services/liabilitiesService';
+import { generateClientToken, revokeClientToken, saveClientVisibility, DEFAULT_VISIBILITY } from '../services/clientAccessService';
+import { fetchQuotes, refreshQuotes, getFxRate, fetchQuotesForPerformance, QuoteResult } from '../services/marketDataService';
 import { deriveHoldings } from '../lib/holdings';
 import {
   ClientProfile,
 } from '../profileTypes';
 import {
   InvestmentTransaction, SupportedCurrency, TrackingMeta, HoldingWithMarketData,
-  CashFlowMonth, BudgetRule,
+  CashFlowMonth, BudgetRule, Liability, ClientVisibility,
 } from '../types';
 import PortfolioSummary from '../components/Track/PortfolioSummary';
 import HoldingsTable from '../components/Track/HoldingsTable';
@@ -21,8 +23,11 @@ import AddTransactionModal from '../components/Track/AddTransactionModal';
 import DividendsPanel from '../components/Track/DividendsPanel';
 import SyncToFirePlanButton from '../components/Track/SyncToFirePlanButton';
 import CashFlowGrid from '../components/Track/CashFlowGrid';
+import LoansList from '../components/Track/LoansList';
+import PerformanceChart from '../components/Track/PerformanceChart';
+import InviteClientModal from '../components/Track/InviteClientModal';
 
-type TrackTab = 'portfolio' | 'cashflow';
+type TrackTab = 'portfolio' | 'cashflow' | 'loans' | 'performance';
 
 const DEFAULT_TRACKING_META: TrackingMeta = {
   accounts: [
@@ -47,6 +52,11 @@ export default function TrackPage() {
   const [editingTx, setEditingTx] = useState<InvestmentTransaction | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
   const [cashFlowMonths, setCashFlowMonths] = useState<CashFlowMonth[]>([]);
+  const [loans, setLoans] = useState<Liability[]>([]);
+  const [perfHistory, setPerfHistory] = useState<Record<string, QuoteResult>>({});
+  const [fxHistory, setFxHistory] = useState<QuoteResult | null>(null);
+  const [perfLoading, setPerfLoading] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   const activeProfile = useMemo(
     () => profiles.find(p => p.id === activeProfileId) ?? null,
@@ -82,6 +92,14 @@ export default function TrackPage() {
       .catch(err => console.error('Failed to load cash flow', err));
   }, [activeProfileId]);
 
+  // ─── Load loans for active profile ────────────────────────────────────────
+  useEffect(() => {
+    if (!activeProfileId) { setLoans([]); return; }
+    listLiabilities(activeProfileId)
+      .then(setLoans)
+      .catch(err => console.error('Failed to load loans', err));
+  }, [activeProfileId]);
+
   // ─── Holdings (derived from transactions) ─────────────────────────────────
   const holdings = useMemo(
     () => deriveHoldings(transactions, trackingMeta),
@@ -92,6 +110,21 @@ export default function TrackPage() {
     () => Array.from(new Set(holdings.filter(h => h.quantity > 0).map(h => h.ticker))),
     [holdings],
   );
+
+  // ─── Load 1-year performance history when Performance tab opens ───────────
+  useEffect(() => {
+    if (activeTab !== 'performance' || uniqueTickers.length === 0) return;
+    if (Object.keys(perfHistory).length > 0) return; // already loaded
+    setPerfLoading(true);
+    const allTickers = [...uniqueTickers, '^GSPC'];
+    fetchQuotesForPerformance(allTickers).then(data => {
+      setPerfHistory(data);
+      const fx = data['USDSGD=X'] ?? null;
+      setFxHistory(fx);
+      setPerfLoading(false);
+    }).catch(() => setPerfLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, uniqueTickers.join(',')]);
 
   // ─── Fetch market data when tickers change ────────────────────────────────
   const loadQuotes = useCallback(async (force = false) => {
@@ -184,6 +217,30 @@ export default function TrackPage() {
     try { await saveProfile(updated); } catch (e) { console.error('Failed to save currency', e); }
   };
 
+  // ─── Loan handlers ────────────────────────────────────────────────────────
+  const handleCreateLoan = async (params: Omit<Liability, 'id'>) => {
+    const l = await createLiability(params);
+    setLoans(prev => [...prev, l]);
+  };
+  const handleUpdateLoan = async (id: string, updates: Partial<Omit<Liability, 'id' | 'clientProfileId'>>) => {
+    await updateLiability(id, updates);
+    setLoans(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+  };
+  const handleDeleteLoan = async (id: string) => {
+    await deleteLiability(id);
+    setLoans(prev => prev.filter(l => l.id !== id));
+  };
+
+  // ─── Client access handlers ───────────────────────────────────────────────
+  const handleInviteUpdate = async (newToken: string | null, newVisibility: ClientVisibility) => {
+    if (!activeProfile) return;
+    const updated: ClientProfile = {
+      ...activeProfile,
+      inputs: { ...activeProfile.inputs, clientToken: newToken, clientVisibility: newVisibility },
+    };
+    setProfiles(prev => prev.map(p => p.id === updated.id ? updated : p));
+  };
+
   const handleUpsertCashFlow = async (params: Omit<CashFlowMonth, 'id'>) => {
     const saved = await upsertCashFlowMonth(params);
     setCashFlowMonths(prev => {
@@ -269,6 +326,12 @@ export default function TrackPage() {
               >{c}</button>
             ))}
           </div>
+          <button
+            onClick={() => setInviteModalOpen(true)}
+            style={{ padding: '6px 14px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}
+          >
+            👤 Client Link
+          </button>
           <SyncToFirePlanButton
             profile={activeProfile}
             holdings={enrichedHoldings}
@@ -280,8 +343,10 @@ export default function TrackPage() {
         {/* Subtabs */}
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
           {([
-            { key: 'portfolio', label: 'Portfolio' },
-            { key: 'cashflow', label: 'Cash Flow' },
+            { key: 'portfolio',    label: 'Portfolio' },
+            { key: 'cashflow',    label: 'Cash Flow' },
+            { key: 'loans',       label: 'Loans' },
+            { key: 'performance', label: 'Performance' },
           ] as { key: TrackTab; label: string }[]).map(tab => (
             <button
               key={tab.key}
@@ -382,6 +447,41 @@ export default function TrackPage() {
             onUpsert={handleUpsertCashFlow}
             onDelete={handleDeleteCashFlow}
             onBudgetRuleChange={handleBudgetRuleChange}
+          />
+        )}
+
+        {/* Loans tab */}
+        {activeTab === 'loans' && (
+          <LoansList
+            clientProfileId={activeProfile.id}
+            loans={loans}
+            onCreate={handleCreateLoan}
+            onUpdate={handleUpdateLoan}
+            onDelete={handleDeleteLoan}
+          />
+        )}
+
+        {/* Performance tab */}
+        {activeTab === 'performance' && (
+          <PerformanceChart
+            transactions={transactions}
+            priceHistory={perfHistory}
+            fxHistory={fxHistory}
+            baseCurrency={baseCurrency}
+            fxRate={fxRate}
+            loading={perfLoading}
+          />
+        )}
+
+        {/* Invite client modal */}
+        {inviteModalOpen && (
+          <InviteClientModal
+            profileId={activeProfile.id}
+            profileName={activeProfile.name}
+            existingToken={activeProfile.inputs.clientToken}
+            visibility={{ ...DEFAULT_VISIBILITY, ...(activeProfile.inputs.clientVisibility ?? {}) }}
+            onUpdate={handleInviteUpdate}
+            onClose={() => setInviteModalOpen(false)}
           />
         )}
 

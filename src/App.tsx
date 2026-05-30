@@ -41,6 +41,7 @@ const PlansPage           = React.lazy(() => import('./components/PlansPage'));
 const TasksPage           = React.lazy(() => import('./components/TasksPage'));
 const TrackPage           = React.lazy(() => import('./pages/TrackPage'));
 const AdminPage           = React.lazy(() => import('./components/AdminPage'));
+const ClientView          = React.lazy(() => import('./pages/ClientView'));
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
 
@@ -772,11 +773,20 @@ function AppShell() {
 function App() {
   return (
     <BrowserRouter>
-      <SubscriptionProvider>
-        <TeamProvider>
-          <AppShell />
-        </TeamProvider>
-      </SubscriptionProvider>
+      <React.Suspense fallback={<div style={{ minHeight: '100vh', background: '#0f172a' }} />}>
+        <Routes>
+          {/* Public client-view route — no auth required */}
+          <Route path="/client-view/:token" element={<ClientView />} />
+          {/* All advisor routes — auth handled inside AppShell */}
+          <Route path="/*" element={
+            <SubscriptionProvider>
+              <TeamProvider>
+                <AppShell />
+              </TeamProvider>
+            </SubscriptionProvider>
+          } />
+        </Routes>
+      </React.Suspense>
     </BrowserRouter>
   );
 }

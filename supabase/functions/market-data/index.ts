@@ -4,7 +4,8 @@
 // This edge function calls Yahoo server-side and returns the data with proper
 // CORS headers so the React app can use it from any origin.
 //
-// Body: { tickers: string[] }
+// Body: { tickers: string[], range?: string }
+// range defaults to '3mo'; use '1y' or '2y' for performance history
 // Returns: Record<ticker, { price, priceCurrency, history: [{date, close}] }>
 
 const CORS_HEADERS = {
@@ -25,8 +26,11 @@ interface QuoteResponse {
 // Order roughly matches likelihood for a Singapore advisor's clients.
 const FALLBACK_SUFFIXES = ['.L', '.SI', '.HK', '.DE', '.AS', '.PA', '.MI', '.SW'];
 
-async function fetchYahoo(ticker: string): Promise<QuoteResponse & { resolvedTicker: string | null }> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=3mo&interval=1d`;
+const ALLOWED_RANGES = new Set(['1d','5d','1mo','3mo','6mo','1y','2y','5y']);
+
+async function fetchYahoo(ticker: string, range = '3mo'): Promise<QuoteResponse & { resolvedTicker: string | null }> {
+  const safeRange = ALLOWED_RANGES.has(range) ? range : '3mo';
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${safeRange}&interval=1d`;
   try {
     const res = await fetch(url, {
       headers: {
@@ -65,9 +69,9 @@ async function fetchYahoo(ticker: string): Promise<QuoteResponse & { resolvedTic
   }
 }
 
-async function fetchOne(ticker: string): Promise<QuoteResponse> {
+async function fetchOne(ticker: string, range = '3mo'): Promise<QuoteResponse> {
   // First try the ticker as-given
-  const direct = await fetchYahoo(ticker);
+  const direct = await fetchYahoo(ticker, range);
   if (direct.price !== null) return direct;
 
   // If user already specified an exchange (contains '.'), don't try fallbacks
@@ -75,7 +79,7 @@ async function fetchOne(ticker: string): Promise<QuoteResponse> {
 
   // Otherwise try common non-US exchange suffixes
   for (const suffix of FALLBACK_SUFFIXES) {
-    const result = await fetchYahoo(`${ticker}${suffix}`);
+    const result = await fetchYahoo(`${ticker}${suffix}`, range);
     if (result.price !== null) return result;
   }
   return direct;
@@ -93,7 +97,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { tickers } = await req.json();
+    const body = await req.json();
+    const { tickers, range = '3mo' } = body;
     if (!Array.isArray(tickers)) {
       return new Response(JSON.stringify({ error: 'tickers must be an array' }), {
         status: 400,
@@ -108,7 +113,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const results = await Promise.all(unique.map(fetchOne));
+    const results = await Promise.all(unique.map(t => fetchOne(t, range)));
     const out: Record<string, QuoteResponse> = {};
     unique.forEach((t, i) => { out[t] = results[i]; });
 
