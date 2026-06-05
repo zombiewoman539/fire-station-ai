@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { useLocalStorageMode } from './storageMode';
+import { checkLocalStorageMode } from './storageMode';
 import { ClientProfile, NoteEntry } from '../profileTypes';
 import { FireInputs, InsurancePolicy, Nominee } from '../types';
 import { defaultInputs } from '../defaults';
@@ -152,7 +152,7 @@ function mapRow(row: any): ClientProfile {
 }
 
 export async function listProfiles(): Promise<ClientProfile[]> {
-  if (await useLocalStorageMode()) return localLoad();
+  if (await checkLocalStorageMode()) return localLoad();
   purgeExpiredDeletions().catch(() => {});
 
   const { data, error } = await supabase
@@ -169,7 +169,7 @@ export async function listProfilesPaged(
   page: number = 0,
   pageSize: number = 50,
 ): Promise<{ data: ClientProfile[]; hasMore: boolean }> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const slice = all.slice(page * pageSize, (page + 1) * pageSize);
     return { data: slice, hasMore: all.length > (page + 1) * pageSize };
@@ -192,7 +192,7 @@ export async function listProfilesPaged(
 }
 
 export async function getProfile(id: string): Promise<ClientProfile | null> {
-  if (await useLocalStorageMode()) return localLoad().find(p => p.id === id) ?? null;
+  if (await checkLocalStorageMode()) return localLoad().find(p => p.id === id) ?? null;
   const { data, error } = await supabase
     .from('client_profiles')
     .select('*')
@@ -205,7 +205,7 @@ export async function getProfile(id: string): Promise<ClientProfile | null> {
 }
 
 export async function saveProfile(profile: ClientProfile): Promise<void> {
-  if (await useLocalStorageMode()) { localUpsert({ ...profile, updatedAt: new Date().toISOString() }); return; }
+  if (await checkLocalStorageMode()) { localUpsert({ ...profile, updatedAt: new Date().toISOString() }); return; }
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('Not authenticated');
 
@@ -227,7 +227,7 @@ export async function saveProfile(profile: ClientProfile): Promise<void> {
 }
 
 export async function createProfile(name: string, inputs?: FireInputs): Promise<ClientProfile> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const now = new Date().toISOString();
     const profile: ClientProfile = {
       id: newId(), name, userId: 'local-dev', createdAt: now, updatedAt: now,
@@ -259,7 +259,7 @@ export async function createProfile(name: string, inputs?: FireInputs): Promise<
 // Soft delete: sets deleted_at timestamp instead of removing the row.
 // Records are permanently purged after 7 days via purgeExpiredDeletions().
 export async function deleteProfile(id: string): Promise<void> {
-  if (await useLocalStorageMode()) { localSave(localLoad().filter(p => p.id !== id)); return; }
+  if (await checkLocalStorageMode()) { localSave(localLoad().filter(p => p.id !== id)); return; }
   const { error } = await supabase
     .from('client_profiles')
     .update({ deleted_at: new Date().toISOString() })
@@ -269,7 +269,7 @@ export async function deleteProfile(id: string): Promise<void> {
 }
 
 export async function renameProfile(id: string, newName: string): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const p = all.find(x => x.id === id);
     if (p) { p.name = newName; p.updatedAt = new Date().toISOString(); localSave(all); }
@@ -291,7 +291,7 @@ export async function duplicateProfile(sourceId: string, newName: string): Promi
 
 /** List profiles soft-deleted within the last 7 days (recoverable). */
 export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedAt: string })[]> {
-  if (await useLocalStorageMode()) return [];
+  if (await checkLocalStorageMode()) return [];
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('client_profiles')
@@ -309,7 +309,7 @@ export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedA
 
 /** Restore a soft-deleted profile by clearing its deleted_at timestamp. */
 export async function restoreProfile(id: string): Promise<void> {
-  if (await useLocalStorageMode()) return;
+  if (await checkLocalStorageMode()) return;
   const { error } = await supabase
     .from('client_profiles')
     .update({ deleted_at: null })

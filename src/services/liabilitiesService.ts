@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { useLocalStorageMode } from './storageMode';
+import { checkLocalStorageMode } from './storageMode';
 import { Liability, LiabilityType } from '../types';
 
 const LOCAL_KEY = 'fire-local-liabilities';
@@ -26,7 +26,7 @@ function rowToLiability(row: any): Liability {
 }
 
 export async function listLiabilities(clientProfileId: string): Promise<Liability[]> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     return localLoad().filter(l => l.clientProfileId === clientProfileId);
   }
   const { data, error } = await supabase
@@ -39,7 +39,7 @@ export async function listLiabilities(clientProfileId: string): Promise<Liabilit
 }
 
 export async function createLiability(params: Omit<Liability, 'id'>): Promise<Liability> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const l: Liability = { id: `lib-${Date.now()}`, ...params };
     localSave([...localLoad(), l]);
     return l;
@@ -64,7 +64,7 @@ export async function createLiability(params: Omit<Liability, 'id'>): Promise<Li
 }
 
 export async function updateLiability(id: string, updates: Partial<Omit<Liability, 'id' | 'clientProfileId'>>): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const l = all.find(x => x.id === id);
     if (l) { Object.assign(l, updates); localSave(all); }
@@ -84,7 +84,7 @@ export async function updateLiability(id: string, updates: Partial<Omit<Liabilit
 }
 
 export async function deleteLiability(id: string): Promise<void> {
-  if (await useLocalStorageMode()) { localSave(localLoad().filter(l => l.id !== id)); return; }
+  if (await checkLocalStorageMode()) { localSave(localLoad().filter(l => l.id !== id)); return; }
   const { error } = await supabase.from('liabilities').delete().eq('id', id);
   if (error) throw error;
 }

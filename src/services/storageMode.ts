@@ -16,7 +16,7 @@ const isLocalhost = typeof window !== 'undefined' &&
 let _cached: boolean | null = null;
 let _inflight: Promise<boolean> | null = null;
 
-export async function useLocalStorageMode(): Promise<boolean> {
+export async function checkLocalStorageMode(): Promise<boolean> {
   if (!isLocalhost) return false;
   if (_cached !== null) return _cached;
   if (_inflight) return _inflight;
@@ -31,7 +31,7 @@ export async function useLocalStorageMode(): Promise<boolean> {
 
 // Synchronous variant — uses cached value; defaults to true on localhost
 // when the cache hasn't been hydrated yet. Used inside non-async helpers.
-export function useLocalStorageModeSync(): boolean {
+export function checkLocalStorageModeSync(): boolean {
   if (!isLocalhost) return false;
   return _cached ?? true;
 }

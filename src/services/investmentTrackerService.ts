@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { useLocalStorageMode } from './storageMode';
+import { checkLocalStorageMode } from './storageMode';
 import { InvestmentTransaction, TransactionType, SupportedCurrency } from '../types';
 
 const LOCAL_KEY = 'fire-local-investment-transactions';
@@ -35,7 +35,7 @@ function rowToTx(row: any): InvestmentTransaction {
 }
 
 export async function listTransactions(clientProfileId: string): Promise<InvestmentTransaction[]> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     return localLoad()
       .filter(t => t.clientProfileId === clientProfileId)
       .sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -52,7 +52,7 @@ export async function listTransactions(clientProfileId: string): Promise<Investm
 export async function createTransaction(
   params: Omit<InvestmentTransaction, 'id' | 'createdAt'>,
 ): Promise<InvestmentTransaction> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const tx: InvestmentTransaction = {
       ...params,
       id: newId(),
@@ -85,7 +85,7 @@ export async function updateTransaction(
   id: string,
   patch: Partial<Omit<InvestmentTransaction, 'id' | 'clientProfileId' | 'createdAt'>>,
 ): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const t = all.find(x => x.id === id);
     if (t) { Object.assign(t, patch); localSave(all); }
@@ -109,7 +109,7 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     localSave(localLoad().filter(t => t.id !== id));
     return;
   }
@@ -124,7 +124,7 @@ export async function deleteTransaction(id: string): Promise<void> {
 export async function createTransactionsBulk(
   rows: Array<Omit<InvestmentTransaction, 'id' | 'createdAt'>>,
 ): Promise<InvestmentTransaction[]> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const now = new Date().toISOString();
     const created: InvestmentTransaction[] = rows.map(r => ({
       ...r,

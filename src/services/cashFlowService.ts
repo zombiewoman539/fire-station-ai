@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { useLocalStorageMode } from './storageMode';
+import { checkLocalStorageMode } from './storageMode';
 import { CashFlowMonth } from '../types';
 
 const LOCAL_KEY = 'fire-local-cash-flow-months';
@@ -27,7 +27,7 @@ function rowToMonth(row: any): CashFlowMonth {
 }
 
 export async function listCashFlowMonths(clientProfileId: string): Promise<CashFlowMonth[]> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     return localLoad().filter(m => m.clientProfileId === clientProfileId);
   }
   const { data, error } = await supabase
@@ -40,7 +40,7 @@ export async function listCashFlowMonths(clientProfileId: string): Promise<CashF
 }
 
 export async function upsertCashFlowMonth(params: Omit<CashFlowMonth, 'id'>): Promise<CashFlowMonth> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const idx = all.findIndex(m => m.clientProfileId === params.clientProfileId && m.month === params.month);
     if (idx >= 0) {
@@ -73,7 +73,7 @@ export async function upsertCashFlowMonth(params: Omit<CashFlowMonth, 'id'>): Pr
 }
 
 export async function deleteCashFlowMonth(id: string): Promise<void> {
-  if (await useLocalStorageMode()) { localSave(localLoad().filter(m => m.id !== id)); return; }
+  if (await checkLocalStorageMode()) { localSave(localLoad().filter(m => m.id !== id)); return; }
   const { error } = await supabase.from('cash_flow_months').delete().eq('id', id);
   if (error) throw error;
 }

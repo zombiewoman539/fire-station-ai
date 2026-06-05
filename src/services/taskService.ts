@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { useLocalStorageMode } from './storageMode';
+import { checkLocalStorageMode } from './storageMode';
 
 const LOCAL_KEY = 'fire-local-tasks';
 function localLoad(): Task[] {
@@ -40,7 +40,7 @@ function rowToTask(row: any): Task {
 }
 
 export async function listTasks(): Promise<Task[]> {
-  if (await useLocalStorageMode()) return localLoad();
+  if (await checkLocalStorageMode()) return localLoad();
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
@@ -52,7 +52,7 @@ export async function listTasks(): Promise<Task[]> {
 
 /** Returns only tasks assigned to the current user (for the personal Tasks page). */
 export async function listMyTasks(): Promise<Task[]> {
-  if (await useLocalStorageMode()) return localLoad();
+  if (await checkLocalStorageMode()) return localLoad();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
@@ -75,7 +75,7 @@ export async function createTask(params: {
   assignedTo?: string;
   priority?: 'normal' | 'urgent';
 }): Promise<Task> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const task: Task = {
       id: crypto.randomUUID?.() ?? `task-${Date.now()}`,
       createdBy: 'local-dev', assignedTo: 'local-dev',
@@ -116,7 +116,7 @@ export async function updateTask(
   id: string,
   updates: Partial<Pick<Task, 'title' | 'notes' | 'dueDate' | 'status' | 'completedAt' | 'assignedTo' | 'priority'>>,
 ): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const t = all.find(x => x.id === id);
     if (t) { Object.assign(t, updates); localSave(all); }
@@ -137,13 +137,13 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  if (await useLocalStorageMode()) { localSave(localLoad().filter(t => t.id !== id)); return; }
+  if (await checkLocalStorageMode()) { localSave(localLoad().filter(t => t.id !== id)); return; }
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function completeTask(id: string, notes: string): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const t = all.find(x => x.id === id);
     if (t) { t.status = 'done'; t.notes = notes; t.completedAt = new Date().toISOString(); localSave(all); }
@@ -157,7 +157,7 @@ export async function completeTask(id: string, notes: string): Promise<void> {
 }
 
 export async function reopenTask(id: string): Promise<void> {
-  if (await useLocalStorageMode()) {
+  if (await checkLocalStorageMode()) {
     const all = localLoad();
     const t = all.find(x => x.id === id);
     if (t) { t.status = 'todo'; t.completedAt = null; localSave(all); }
