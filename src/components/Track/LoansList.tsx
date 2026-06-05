@@ -150,9 +150,6 @@ export default function LoansList({ clientProfileId, loans, onCreate, onUpdate, 
           const payoffDate = months !== null
             ? new Date(Date.now() + months * 30.44 * 24 * 3600 * 1000).toLocaleDateString('en-SG', { month: 'short', year: 'numeric' })
             : null;
-          const paidPct = loan.startDate && loan.balance > 0
-            ? null  // would need original amount to compute
-            : null;
 
           return (
             <div key={loan.id} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>

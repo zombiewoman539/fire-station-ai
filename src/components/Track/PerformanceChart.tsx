@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { InvestmentTransaction, SupportedCurrency } from '../../types';
 import { QuoteResult } from '../../services/marketDataService';

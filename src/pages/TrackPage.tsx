@@ -5,7 +5,7 @@ import {
 } from '../services/investmentTrackerService';
 import { listCashFlowMonths, upsertCashFlowMonth, deleteCashFlowMonth } from '../services/cashFlowService';
 import { listLiabilities, createLiability, updateLiability, deleteLiability } from '../services/liabilitiesService';
-import { generateClientToken, revokeClientToken, saveClientVisibility, DEFAULT_VISIBILITY } from '../services/clientAccessService';
+import { DEFAULT_VISIBILITY } from '../services/clientAccessService';
 import { fetchQuotes, refreshQuotes, getFxRate, fetchQuotesForPerformance, QuoteResult } from '../services/marketDataService';
 import { deriveHoldings } from '../lib/holdings';
 import {
