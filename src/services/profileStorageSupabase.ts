@@ -80,6 +80,9 @@ function migrateInputs(inputs: any): FireInputs {
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
       ...p,
+      // Re-generate short integer IDs (legacy sequential counter) to UUIDs so
+      // keys are globally unique and don't collide across sessions.
+      id: /^\d+$/.test(String(p.id ?? '')) ? crypto.randomUUID() : (p.id ?? crypto.randomUUID()),
       policyType: p.policyType ?? 'whole-life',
       deathSumAssured: p.deathSumAssured ?? 0,
       tpdSumAssured: p.tpdSumAssured ?? 0,

@@ -1,2 +1,4 @@
-let _nextId = 200;
-export const uid = () => String(++_nextId);
+export const uid = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
