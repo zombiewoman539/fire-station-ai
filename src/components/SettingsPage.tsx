@@ -56,9 +56,10 @@ export default function SettingsPage() {
   const [pwSuccess, setPwSuccess] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
 
-  // Backup state
+  // Backup / import state
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     fetch('/api/backup/status')
@@ -121,6 +122,31 @@ export default function SettingsPage() {
       // silently ignore — user will notice the download didn't happen
     } finally {
       setBackupLoading(false);
+    }
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setImportStatus('idle');
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      const res = await fetch('/api/backup/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backup),
+      });
+      if (res.ok) {
+        setImportStatus('success');
+        setLastUpdated(new Date().toISOString());
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setImportStatus('error');
+      }
+    } catch {
+      setImportStatus('error');
     }
   };
 
@@ -282,6 +308,26 @@ export default function SettingsPage() {
             >
               {backupLoading ? 'Exporting…' : 'Export backup'}
             </button>
+          </Row>
+          <Row
+            label="Import from cloud"
+            description={
+              importStatus === 'success' ? 'Import successful — reloading…' :
+              importStatus === 'error' ? 'Import failed — check the file and try again' :
+              'Import a data export from the FIRE Station cloud version'
+            }
+          >
+            <label style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+              padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+              display: 'inline-block',
+              ...(importStatus === 'success' ? { color: '#34d399', borderColor: 'rgba(16,185,129,0.4)' } : {}),
+              ...(importStatus === 'error' ? { color: '#f87171', borderColor: 'rgba(239,68,68,0.4)' } : {}),
+            }}>
+              {importStatus === 'success' ? 'Imported!' : importStatus === 'error' ? 'Try again' : 'Import data'}
+              <input type="file" accept=".json" onChange={handleImportBackup} style={{ display: 'none' }} />
+            </label>
           </Row>
         </Section>
 

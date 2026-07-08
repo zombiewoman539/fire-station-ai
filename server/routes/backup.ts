@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { DATA_DIR, readCollection } from '../db';
+import { DATA_DIR, readCollection, writeCollection } from '../db';
 
 const router = Router();
 
@@ -43,6 +43,26 @@ router.get('/export', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(JSON.stringify(backup, null, 2));
+});
+
+// POST /api/backup/import — restore from a backup file
+router.post('/import', (req, res) => {
+  const { version, data } = req.body ?? {};
+  if (!data || typeof data !== 'object') {
+    res.status(400).json({ error: 'Invalid backup file — missing data field' });
+    return;
+  }
+
+  const imported: string[] = [];
+  for (const name of COLLECTIONS) {
+    const collection = data[name];
+    if (Array.isArray(collection)) {
+      writeCollection(name, collection);
+      imported.push(name);
+    }
+  }
+
+  res.json({ success: true, imported });
 });
 
 export default router;
