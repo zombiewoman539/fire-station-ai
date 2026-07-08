@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../App';
 import { useLicense } from '../contexts/LicenseContext';
 
@@ -56,6 +56,17 @@ export default function SettingsPage() {
   const [pwSuccess, setPwSuccess] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
 
+  // Backup state
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/backup/status')
+      .then(r => r.json())
+      .then(d => setLastUpdated(d.lastUpdated ?? null))
+      .catch(() => {});
+  }, []);
+
   const handleSidebarOpen = (v: boolean) => {
     setSidebarOpenPref(v);
     localStorage.setItem('fa-sidebar-open', v ? 'true' : 'false');
@@ -90,6 +101,26 @@ export default function SettingsPage() {
       setPwError('Server error — please try again');
     } finally {
       setPwLoading(false);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const res = await fetch('/api/backup/export');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1]
+        ?? `firestation-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore — user will notice the download didn't happen
+    } finally {
+      setBackupLoading(false);
     }
   };
 
@@ -225,6 +256,31 @@ export default function SettingsPage() {
               }}
             >
               {theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode'}
+            </button>
+          </Row>
+        </Section>
+
+        {/* Data */}
+        <Section title="Data">
+          <Row
+            label="Export backup"
+            description={
+              lastUpdated
+                ? `Last data change: ${new Date(lastUpdated).toLocaleString('en-SG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                : 'Download all your client data as a JSON backup file'
+            }
+          >
+            <button
+              onClick={handleExportBackup}
+              disabled={backupLoading}
+              style={{
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+                padding: '7px 14px', cursor: backupLoading ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap', opacity: backupLoading ? 0.6 : 1,
+              }}
+            >
+              {backupLoading ? 'Exporting…' : 'Export backup'}
             </button>
           </Row>
         </Section>

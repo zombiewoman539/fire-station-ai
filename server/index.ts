@@ -13,6 +13,7 @@ import savedViewsRouter from './routes/savedViews';
 import tasksRouter from './routes/tasks';
 import taskTemplatesRouter from './routes/taskTemplates';
 import calculateRouter from './routes/calculate';
+import backupRouter from './routes/backup';
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -25,6 +26,7 @@ app.use('/api/auth', authRouter);
 
 // All other API routes require a valid session
 app.use('/api/profiles', requireAuth, profilesRouter);
+app.use('/api/backup', requireAuth, backupRouter);
 app.use('/api/saved-views', requireAuth, savedViewsRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/task-templates', requireAuth, taskTemplatesRouter);
