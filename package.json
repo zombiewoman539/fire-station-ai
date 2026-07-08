@@ -14,7 +14,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.11.1",
     "chart.js": "^4.5.1",
     "chartjs-plugin-annotation": "^3.1.0",
     "cookie-parser": "^1.4.7",
@@ -35,7 +34,10 @@
     "eject": "react-scripts eject",
     "start:server": "ts-node --project tsconfig.server.json server/index.ts",
     "start:local": "concurrently \"npm run start:server\" \"npm start\"",
-    "build:local": "npm run build"
+    "build:local": "npm run build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "package:mac": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-macos-x64 --output dist/firestation-mac --assets build/**",
+    "package:win": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-win-x64 --output dist/firestation-win.exe --assets build/**"
   },
   "eslintConfig": {
     "extends": [
@@ -58,13 +60,23 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^4.17.25",
     "@types/uuid": "^10.0.0",
+    "@yao-pkg/pkg": "^5.16.1",
     "concurrently": "^10.0.3",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.9.2"
+  },
+  "pkg": {
+    "assets": [
+      "build/**/*"
+    ],
+    "targets": [
+      "node18-macos-x64",
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
   }
 }

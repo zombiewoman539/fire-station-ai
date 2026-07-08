@@ -1,78 +1,46 @@
-import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import fs from 'fs';
 
-const DB_DIR = path.join(os.homedir(), 'Documents', 'FIRE Station');
-const DB_PATH = path.join(DB_DIR, 'firestation.db');
+export const DATA_DIR = path.join(os.homedir(), 'Documents', 'FIRE Station');
 
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-export const db = new Database(DB_PATH);
+function filePath(name: string): string {
+  return path.join(DATA_DIR, `${name}.json`);
+}
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+function readJson<T>(name: string, fallback: T): T {
+  const fp = filePath(name);
+  if (!fs.existsSync(fp)) return fallback;
+  try { return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch { return fallback; }
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS client_profiles (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    inputs TEXT NOT NULL DEFAULT '{}',
-    tags TEXT NOT NULL DEFAULT '[]',
-    meta TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    deleted_at TEXT
-  );
+function writeJson(name: string, data: unknown): void {
+  fs.writeFileSync(filePath(name), JSON.stringify(data, null, 2), 'utf8');
+}
 
-  CREATE TABLE IF NOT EXISTS saved_views (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    dashboard_kind TEXT NOT NULL DEFAULT 'advisor',
-    config TEXT NOT NULL DEFAULT '{}',
-    scope TEXT NOT NULL DEFAULT 'personal',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+// ── Collections ────────────────────────────────────────────────────────────────
 
-  CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    client_profile_id TEXT,
-    client_name TEXT,
-    notes TEXT NOT NULL DEFAULT '',
-    due_date TEXT,
-    status TEXT NOT NULL DEFAULT 'todo',
-    priority TEXT NOT NULL DEFAULT 'normal',
-    created_at TEXT NOT NULL,
-    completed_at TEXT
-  );
+export function readCollection(name: string): any[] {
+  return readJson<any[]>(name, []);
+}
 
-  CREATE TABLE IF NOT EXISTS task_templates (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    notes TEXT NOT NULL DEFAULT '',
-    interval_days INTEGER NOT NULL DEFAULT 30,
-    client_profile_id TEXT,
-    client_name TEXT,
-    priority TEXT NOT NULL DEFAULT 'normal',
-    last_generated_at TEXT,
-    created_at TEXT NOT NULL
-  );
+export function writeCollection(name: string, data: any[]): void {
+  writeJson(name, data);
+}
 
-  CREATE TABLE IF NOT EXISTS app_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
-`);
+// ── Settings (key-value store) ────────────────────────────────────────────────
 
 export function getSetting(key: string): string | null {
-  const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as { value: string } | undefined;
-  return row?.value ?? null;
+  const settings = readJson<Record<string, string>>('settings', {});
+  return settings[key] ?? null;
 }
 
 export function setSetting(key: string, value: string): void {
-  db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(key, value);
+  const settings = readJson<Record<string, string>>('settings', {});
+  settings[key] = value;
+  writeJson('settings', settings);
 }

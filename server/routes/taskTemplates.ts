@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { db } from '../db';
+import { readCollection, writeCollection } from '../db';
 import crypto from 'crypto';
 
 const router = Router();
+const COL = 'task_templates';
 
 function rowToTemplate(row: any): object {
   return {
@@ -22,77 +23,51 @@ function rowToTemplate(row: any): object {
 
 // GET /api/task-templates
 router.get('/', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM task_templates ORDER BY created_at DESC').all();
+  const rows = readCollection(COL).sort((a, b) => b.created_at.localeCompare(a.created_at));
   res.json(rows.map(rowToTemplate));
 });
 
 // POST /api/task-templates
 router.post('/', (req: Request, res: Response) => {
-  const { title, notes, intervalDays, clientProfileId, clientName, priority } = req.body as {
-    title?: string;
-    notes?: string;
-    intervalDays?: number;
-    clientProfileId?: string;
-    clientName?: string;
-    priority?: string;
-  };
+  const { title, notes, intervalDays, clientProfileId, clientName, priority } = req.body as any;
   if (!title) { res.status(400).json({ error: 'title required' }); return; }
-
-  const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-
-  db.prepare(`
-    INSERT INTO task_templates (id, title, notes, interval_days, client_profile_id, client_name, priority, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    title,
-    notes ?? '',
-    intervalDays ?? 30,
-    clientProfileId ?? null,
-    clientName ?? null,
-    priority ?? 'normal',
-    now,
-  );
-
-  const row = db.prepare('SELECT * FROM task_templates WHERE id = ?').get(id);
+  const row = {
+    id: crypto.randomUUID(), title,
+    notes: notes ?? '',
+    interval_days: intervalDays ?? 30,
+    client_profile_id: clientProfileId ?? null,
+    client_name: clientName ?? null,
+    priority: priority ?? 'normal',
+    last_generated_at: null,
+    created_at: new Date().toISOString(),
+  };
+  const all = readCollection(COL);
+  all.push(row);
+  writeCollection(COL, all);
   res.status(201).json(rowToTemplate(row));
 });
 
 // PUT /api/task-templates/:id
 router.put('/:id', (req: Request, res: Response) => {
-  const { title, notes, intervalDays, clientProfileId, clientName, priority, lastGeneratedAt } =
-    req.body as {
-      title?: string;
-      notes?: string;
-      intervalDays?: number;
-      clientProfileId?: string;
-      clientName?: string;
-      priority?: string;
-      lastGeneratedAt?: string | null;
-    };
-
-  const updates: string[] = [];
-  const values: unknown[] = [];
-
-  if (title !== undefined)           { updates.push('title = ?');              values.push(title); }
-  if (notes !== undefined)           { updates.push('notes = ?');              values.push(notes); }
-  if (intervalDays !== undefined)    { updates.push('interval_days = ?');      values.push(intervalDays); }
-  if (clientProfileId !== undefined) { updates.push('client_profile_id = ?'); values.push(clientProfileId); }
-  if (clientName !== undefined)      { updates.push('client_name = ?');        values.push(clientName); }
-  if (priority !== undefined)        { updates.push('priority = ?');           values.push(priority); }
-  if (lastGeneratedAt !== undefined) { updates.push('last_generated_at = ?'); values.push(lastGeneratedAt); }
-
-  if (updates.length === 0) { res.json({ ok: true }); return; }
-  values.push(req.params.id);
-
-  db.prepare(`UPDATE task_templates SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  const { title, notes, intervalDays, clientProfileId, clientName, priority, lastGeneratedAt } = req.body as any;
+  const all = readCollection(COL);
+  const row = all.find(r => r.id === req.params.id);
+  if (row) {
+    if (title !== undefined)           row.title = title;
+    if (notes !== undefined)           row.notes = notes;
+    if (intervalDays !== undefined)    row.interval_days = intervalDays;
+    if (clientProfileId !== undefined) row.client_profile_id = clientProfileId;
+    if (clientName !== undefined)      row.client_name = clientName;
+    if (priority !== undefined)        row.priority = priority;
+    if (lastGeneratedAt !== undefined) row.last_generated_at = lastGeneratedAt;
+    writeCollection(COL, all);
+  }
   res.json({ ok: true });
 });
 
 // DELETE /api/task-templates/:id
 router.delete('/:id', (req: Request, res: Response) => {
-  db.prepare('DELETE FROM task_templates WHERE id = ?').run(req.params.id);
+  writeCollection(COL, readCollection(COL).filter(r => r.id !== req.params.id));
   res.json({ ok: true });
 });
 

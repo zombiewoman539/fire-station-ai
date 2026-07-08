@@ -1,6 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import { exec } from 'child_process';
 import { requireAuth } from './auth';
 import { refreshLicenseIfDue } from './license';
 import { purgeExpiredDeletions } from './routes/profiles';
@@ -33,7 +34,10 @@ app.get('/*splat', (_req, res) => {
 });
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`FIRE Station running at http://localhost:${PORT}`);
+  const url = `http://localhost:${PORT}`;
+  console.log(`FIRE Station running at ${url}`);
   refreshLicenseIfDue().catch(() => {});
   purgeExpiredDeletions();
+  const cmd = process.platform === 'win32' ? `start ${url}` : process.platform === 'darwin' ? `open ${url}` : `xdg-open ${url}`;
+  exec(cmd, () => {});
 });

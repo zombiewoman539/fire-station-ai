@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { db } from '../db';
+import { readCollection, writeCollection } from '../db';
 import crypto from 'crypto';
 
 const router = Router();
+const COL = 'tasks';
 
 function rowToTask(row: any): object {
   return {
@@ -24,74 +25,51 @@ function rowToTask(row: any): object {
 
 // GET /api/tasks
 router.get('/', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all();
+  const rows = readCollection(COL).sort((a, b) => b.created_at.localeCompare(a.created_at));
   res.json(rows.map(rowToTask));
 });
 
 // POST /api/tasks
 router.post('/', (req: Request, res: Response) => {
-  const { title, clientProfileId, clientName, dueDate, notes, priority } = req.body as {
-    title?: string;
-    clientProfileId?: string;
-    clientName?: string;
-    dueDate?: string;
-    notes?: string;
-    priority?: string;
-  };
+  const { title, clientProfileId, clientName, dueDate, notes, priority } = req.body as any;
   if (!title) { res.status(400).json({ error: 'title required' }); return; }
-
-  const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-
-  db.prepare(`
-    INSERT INTO tasks (id, title, client_profile_id, client_name, notes, due_date, status, priority, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?)
-  `).run(
-    id,
-    title,
-    clientProfileId ?? null,
-    clientName ?? null,
-    notes ?? '',
-    dueDate ?? null,
-    priority ?? 'normal',
-    now,
-  );
-
-  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  const row = {
+    id: crypto.randomUUID(), title,
+    client_profile_id: clientProfileId ?? null,
+    client_name: clientName ?? null,
+    notes: notes ?? '',
+    due_date: dueDate ?? null,
+    status: 'todo',
+    priority: priority ?? 'normal',
+    created_at: new Date().toISOString(),
+    completed_at: null,
+  };
+  const all = readCollection(COL);
+  all.push(row);
+  writeCollection(COL, all);
   res.status(201).json(rowToTask(row));
 });
 
 // PUT /api/tasks/:id
 router.put('/:id', (req: Request, res: Response) => {
-  const { title, notes, dueDate, status, completedAt, priority } = req.body as {
-    title?: string;
-    notes?: string;
-    dueDate?: string;
-    status?: string;
-    completedAt?: string | null;
-    priority?: string;
-  };
-
-  const updates: string[] = [];
-  const values: unknown[] = [];
-
-  if (title !== undefined)       { updates.push('title = ?');        values.push(title); }
-  if (notes !== undefined)       { updates.push('notes = ?');        values.push(notes); }
-  if (dueDate !== undefined)     { updates.push('due_date = ?');     values.push(dueDate); }
-  if (status !== undefined)      { updates.push('status = ?');       values.push(status); }
-  if (completedAt !== undefined) { updates.push('completed_at = ?'); values.push(completedAt); }
-  if (priority !== undefined)    { updates.push('priority = ?');     values.push(priority); }
-
-  if (updates.length === 0) { res.json({ ok: true }); return; }
-  values.push(req.params.id);
-
-  db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  const { title, notes, dueDate, status, completedAt, priority } = req.body as any;
+  const all = readCollection(COL);
+  const row = all.find(r => r.id === req.params.id);
+  if (row) {
+    if (title !== undefined)       row.title = title;
+    if (notes !== undefined)       row.notes = notes;
+    if (dueDate !== undefined)     row.due_date = dueDate;
+    if (status !== undefined)      row.status = status;
+    if (completedAt !== undefined) row.completed_at = completedAt;
+    if (priority !== undefined)    row.priority = priority;
+    writeCollection(COL, all);
+  }
   res.json({ ok: true });
 });
 
 // DELETE /api/tasks/:id
 router.delete('/:id', (req: Request, res: Response) => {
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+  writeCollection(COL, readCollection(COL).filter(r => r.id !== req.params.id));
   res.json({ ok: true });
 });
 
