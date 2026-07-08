@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@supabase/supabase-js": "^2.100.1",
     "@tanstack/react-virtual": "^3.13.24",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -13,7 +12,7 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "bcryptjs": "^3.0.3",
+    "bcryptjs": "^2.4.3",
     "chart.js": "^4.5.1",
     "chartjs-plugin-annotation": "^3.1.0",
     "cookie-parser": "^1.4.7",
@@ -35,9 +34,9 @@
     "start:server": "PORT=3001 ts-node --project tsconfig.server.json server/index.ts",
     "start:local": "concurrently \"npm run start:server\" \"npm start\"",
     "build:local": "npm run build",
-    "build:server": "tsc -p tsconfig.server.json",
-    "package:mac": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-macos-x64 --output dist/firestation-mac --assets build/**",
-    "package:win": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-win-x64 --output dist/firestation-win.exe --assets build/**"
+    "build:server": "tsc -p tsconfig.server.json && node -e \"require('fs').writeFileSync('dist-server/package.json', JSON.stringify({name:'firestation-server',version:'1.0.0',pkg:{assets:['../build/**/*']}},null,2))\"",
+    "package:mac": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-macos-x64 --output dist/firestation-mac && cp -r build dist/build",
+    "package:win": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-win-x64 --output dist/firestation-win.exe && xcopy /E /I build dist\\build"
   },
   "eslintConfig": {
     "extends": [
