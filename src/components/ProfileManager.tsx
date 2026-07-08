@@ -12,11 +12,6 @@ import {
   listDeletedProfiles,
   restoreProfile,
 } from '../services/profileStorageSupabase';
-import { supabase } from '../services/supabaseClient';
-import { useSubscription } from '../contexts/SubscriptionContext';
-import { createCheckoutSession, PRICES } from '../services/subscriptionService';
-
-const STARTER_MAX = 3;
 
 export interface ProfileSummary {
   onTrack: boolean;
@@ -44,8 +39,6 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [showDeleted, setShowDeleted] = useState(false);
-  const { isPro } = useSubscription();
-  const atLimit = !isPro && profiles.length >= STARTER_MAX;
   const [deletedProfiles, setDeletedProfiles] = useState<(any)[]>([]);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,18 +76,6 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
   useEffect(() => { refresh(); }, [refresh]);
 
   const handleNew = async () => {
-    if (atLimit) {
-      const go = window.confirm(
-        `You've reached the ${STARTER_MAX}-client limit on the free plan.\n\nUpgrade to Pro for unlimited clients. Go to upgrade now?`
-      );
-      if (go) {
-        try {
-          const url = await createCheckoutSession(PRICES.pro_monthly);
-          window.location.href = url;
-        } catch { window.location.href = '/settings'; }
-      }
-      return;
-    }
     const name = prompt('Client name:');
     if (!name?.trim()) return;
     try {
@@ -204,11 +185,6 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
     e.target.value = '';
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
-
   const openRecentlyDeleted = async () => {
     const deleted = await listDeletedProfiles().catch(() => []);
     setDeletedProfiles(deleted);
@@ -283,9 +259,9 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
             </button>
             {/* New client */}
             <button onClick={handleNew}
-              title={atLimit ? `Free plan limit: ${STARTER_MAX} clients. Upgrade for unlimited.` : 'New client'}
-              style={{ background: atLimit ? '#4f46e5' : '#10b981', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600 }}>
-              {atLimit ? '⚡ Upgrade' : '+ New'}
+              title="New client"
+              style={{ background: '#10b981', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600 }}>
+              + New
             </button>
           </div>
         </div>
@@ -518,14 +494,17 @@ export default function ProfileManager({ activeProfile, onSelectProfile, onNewPr
           Edit Client Details
         </button>
         <button
-          onClick={handleLogout}
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.reload();
+          }}
           style={{
             width: '100%', marginTop: 6, padding: '7px 0', borderRadius: 8,
             background: 'none', border: '1px solid var(--border)',
             cursor: 'pointer', color: 'var(--text-4)', fontSize: 12,
           }}
         >
-          Sign Out
+          Lock
         </button>
       </div>
 

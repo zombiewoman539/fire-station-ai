@@ -1,6 +1,4 @@
 import React from 'react';
-import { useTeam } from '../../contexts/TeamContext';
-import { supabase } from '../../services/supabaseClient';
 import { ClientProfile } from '../../profileTypes';
 import { Task } from '../../services/taskService';
 import { EnrichedProfile, enrichProfile } from '../../enrichProfile';
@@ -80,21 +78,13 @@ const DEFAULT_CONFIG_FOR_KIND: Record<DashboardKind, ViewConfig> = {
 };
 
 export default function DashboardShell({ dashboardKind, profiles, tasks, onRowTaskClick }: Props) {
-  const { teamStatus } = useTeam();
   const { showError } = useToast();
-  const isManager = teamStatus?.role === 'manager';
-  const orgId = teamStatus?.orgId ?? null;
+  const isManager = false;
+  const orgId = null;
+  const currentUserId = 'local';
 
   // Sweep expired draft filters once on mount
   React.useEffect(() => { sweepExpiredDrafts(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Current user id — used by ClientTable to mark rows the manager owns.
-  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.id) setCurrentUserId(user.id);
-    });
-  }, []);
 
   // ─── View state ─────────────────────────────────────────────────────────────
   const [savedViews, setSavedViews] = React.useState<SavedView[]>([]);

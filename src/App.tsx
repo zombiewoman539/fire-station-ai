@@ -5,7 +5,6 @@ import { defaultInputs } from './defaults';
 import { calculate } from './calculations';
 import { ProfileSummary } from './components/ProfileManager';
 import { ClientProfile } from './profileTypes';
-import { supabase } from './services/supabaseClient';
 import {
   listProfilesPaged,
   createProfile,
@@ -23,25 +22,17 @@ import ScenarioPanel from './components/ScenarioPanel';
 import NavBar from './components/NavBar';
 import CoverageGapBar from './components/CoverageGapBar';
 import FamilyImpactPanel from './components/FamilyImpactPanel';
-import LandingPage from './components/LandingPage';
-import { TeamProvider, useTeam } from './contexts/TeamContext';
-import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
+import { LicenseProvider, useLicense } from './contexts/LicenseContext';
 import { useToast } from './contexts/ToastContext';
-import { createCheckoutSession, PRICES } from './services/subscriptionService';
-import type { Session } from '@supabase/supabase-js';
+import PasswordGate from './components/PasswordGate';
+import FirstRunWizard from './components/FirstRunWizard';
 
 // Route-level and conditionally-rendered components — code-split to reduce TTI
-const PresentationMode    = React.lazy(() => import('./components/PresentationMode'));
-const AdvisorDashboard    = React.lazy(() => import('./components/AdvisorDashboard'));
-const ManagerDashboardPage = React.lazy(() => import('./components/ManagerDashboardPage'));
-const ManagerDashboard    = React.lazy(() => import('./components/ManagerDashboard'));
-const SettingsPage        = React.lazy(() => import('./components/SettingsPage'));
-const PrivacyPolicy       = React.lazy(() => import('./components/PrivacyPolicy'));
-const PlansPage           = React.lazy(() => import('./components/PlansPage'));
-const TasksPage           = React.lazy(() => import('./components/TasksPage'));
-const TrackPage           = React.lazy(() => import('./pages/TrackPage'));
-const AdminPage           = React.lazy(() => import('./components/AdminPage'));
-const ClientView          = React.lazy(() => import('./pages/ClientView'));
+const PresentationMode = React.lazy(() => import('./components/PresentationMode'));
+const AdvisorDashboard = React.lazy(() => import('./components/AdvisorDashboard'));
+const SettingsPage     = React.lazy(() => import('./components/SettingsPage'));
+const PrivacyPolicy    = React.lazy(() => import('./components/PrivacyPolicy'));
+const TasksPage        = React.lazy(() => import('./components/TasksPage'));
 
 type BottomTab = 'none' | 'insights' | 'scenarios' | 'family';
 
@@ -64,41 +55,13 @@ function PageLoader() {
   );
 }
 
-function UpgradeBanner({ message, onUpgrade }: { message: string; onUpgrade: () => void }) {
-  return (
-    <div style={{
-      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-      zIndex: 500, background: '#1e1b4b', border: '1px solid #4f46e5',
-      borderRadius: 12, padding: '14px 20px', display: 'flex',
-      alignItems: 'center', gap: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-      maxWidth: 480, width: 'calc(100vw - 48px)',
-    }}>
-      <span style={{ fontSize: 20 }}>⚡</span>
-      <span style={{ flex: 1, fontSize: 13, color: '#c7d2fe', lineHeight: 1.5 }}>{message}</span>
-      <button
-        onClick={onUpgrade}
-        style={{
-          background: '#4f46e5', border: 'none', borderRadius: 8,
-          color: '#fff', fontSize: 12, fontWeight: 700,
-          padding: '8px 16px', cursor: 'pointer', whiteSpace: 'nowrap',
-        }}
-      >
-        Upgrade →
-      </button>
-    </div>
-  );
-}
-
 function Dashboard() {
   const [activeProfile, setActiveProfile] = useState<ClientProfile | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [presenting, setPresenting] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>('none');
   const [scenario, setScenario] = useState<Scenario>({ type: 'none', ageAtEvent: 35 });
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [upgradeBanner, setUpgradeBanner] = useState('');
-  const { isPro } = useSubscription();
   const { showError } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('fa-sidebar-open') !== 'true'
@@ -108,33 +71,11 @@ function Dashboard() {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
 
-  const isReadOnlyProfile = !!activeProfile?.userId
-    && !!currentUserId
-    && activeProfile.userId !== currentUserId;
-
-  const { saveStatus, scheduleSave, flushSave, resetStatus: resetSaveStatus } = useAutoSave(isReadOnlyProfile, showError);
+  const { saveStatus, scheduleSave, flushSave, resetStatus: resetSaveStatus } = useAutoSave(false, showError);
 
   // Load initial profile on mount
   useEffect(() => {
-    // Safety timeout: if Supabase hangs, unblock the loading screen after 6s
-    const timeout = setTimeout(() => setLoading(false), 6000);
-
     const loadProfiles = async () => {
-      // Capture current user id once — used by EditModal to detect read-only views
-      // (e.g. a manager viewing a teammate's client where RLS blocks writes).
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
-
-      // In local dev without auth session, delegate fully to localStorage backend
-      if (isLocalDev) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setCurrentUserId('local-dev');
-          // Falls through to the normal profile-loading path below, which now
-          // reads from localStorage via the patched profileStorageSupabase functions.
-        }
-      }
-
       try {
         const { data: profiles } = await listProfilesPaged(0);
         const lastActiveId = localStorage.getItem('fire-active-profile');
@@ -158,11 +99,9 @@ function Dashboard() {
         console.error('Failed to load profiles:', e);
         showError('Failed to load your clients. Please refresh the page.');
       }
-      clearTimeout(timeout);
       setLoading(false);
     };
     loadProfiles();
-    return () => clearTimeout(timeout);
   }, [showError]);
 
   const inputs = activeProfile?.inputs || defaultInputs;
@@ -367,16 +306,13 @@ function Dashboard() {
   const chartToolbar = (
     <>
       <button
-        onClick={() => {
-          if (!isPro) { setUpgradeBanner('Insights is a Pro feature — upgrade to unlock AI-powered financial insights for every client.'); return; }
-          toggleTab('insights');
-        }}
+        onClick={() => toggleTab('insights')}
         className="flex items-center gap-1.5"
         style={{
           background: bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.15)' : 'var(--surface)',
           border: `1px solid ${bottomTab === 'insights' ? 'rgba(16, 185, 129, 0.4)' : 'var(--border)'}`,
           borderRadius: 8,
-          color: bottomTab === 'insights' ? '#34d399' : isPro ? 'var(--text-2)' : 'var(--text-4)',
+          color: bottomTab === 'insights' ? '#34d399' : 'var(--text-2)',
           padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
@@ -384,7 +320,7 @@ function Dashboard() {
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
         </svg>
-        Insights{!isPro && ' ⚡'}
+        Insights
       </button>
       <button
         onClick={() => toggleTab('scenarios')}
@@ -421,21 +357,18 @@ function Dashboard() {
         Family
       </button>
       <button
-        onClick={() => {
-          if (!isPro) { setUpgradeBanner('Presentation mode is a Pro feature — upgrade to present client plans in full-screen mode.'); return; }
-          setPresenting(true);
-        }}
+        onClick={() => setPresenting(true)}
         className="flex items-center gap-1.5"
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-          color: isPro ? 'var(--text-2)' : 'var(--text-4)', padding: '8px 14px', fontSize: 12, fontWeight: 600,
+          color: 'var(--text-2)', padding: '8px 14px', fontSize: 12, fontWeight: 600,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
-        Present{!isPro && ' ⚡'}
+        Present
       </button>
       {/* Edit details — always accessible even when sidebar is hidden */}
       <button
@@ -561,7 +494,7 @@ function Dashboard() {
         onProfileMetaChange={handleProfileMetaChange}
         onSaveNow={() => flushSave(activeProfile)}
         saveStatus={saveStatus}
-        readOnly={isReadOnlyProfile}
+        readOnly={false}
       />
 
       {/* Right side: chart + toggleable bottom panel */}
@@ -671,27 +604,10 @@ function Dashboard() {
       </div>
     </div>
 
-    {/* Upgrade banner — shown when a starter user tries a Pro feature */}
-    {upgradeBanner && <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 499 }} onClick={() => setUpgradeBanner('')} />
-      <UpgradeBanner
-        message={upgradeBanner}
-        onUpgrade={async () => {
-          setUpgradeBanner('');
-          try {
-            const url = await createCheckoutSession(PRICES.pro_monthly);
-            window.location.href = url;
-          } catch { window.location.href = '/settings'; }
-        }}
-      />
-    </>}
     </>
   );
 }
 
-
-// Skip auth on localhost for dev/preview testing
-const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 export type Theme = 'dark' | 'light';
@@ -708,84 +624,14 @@ export function useTheme(): [Theme, () => void] {
   return [theme, toggle];
 }
 
-function ProRoute({ children }: { children: React.ReactNode }) {
-  const { isPro, loaded } = useSubscription();
-  if (!loaded) return null;
-  if (!isPro) {
-    return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100%', gap: 16, padding: 32, textAlign: 'center',
-        background: 'var(--bg)', color: 'var(--text-1)',
-      }}>
-        <span style={{ fontSize: 48 }}>⚡</span>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Pro feature</h2>
-        <p style={{ margin: 0, color: 'var(--text-3)', maxWidth: 360, lineHeight: 1.6 }}>
-          The Advisor Dashboard is available on Pro and Team plans.
-          Upgrade to unlock team analytics, client overviews, and more.
-        </p>
-        <button
-          onClick={() => window.location.href = '/settings'}
-          style={{
-            background: '#4f46e5', color: '#fff', border: 'none',
-            borderRadius: 8, padding: '10px 24px', fontSize: 14,
-            fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          View Plans →
-        </button>
-      </div>
-    );
-  }
-  return <>{children}</>;
-}
-
-const ADMIN_USER_ID = 'ef44569c-5216-4847-9b19-3b7797d13ea9';
-
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const [userId, setUserId] = React.useState<string | null | undefined>(undefined);
-  React.useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
-  }, []);
-  if (userId === undefined) return null; // loading
-  if (userId !== ADMIN_USER_ID) {
-    return (
-      <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Access denied</div>
-        </div>
-      </div>
-    );
-  }
-  return <>{children}</>;
-}
-
 function DashboardRoute() {
-  const { isManager, loaded } = useTeam();
-  const { loaded: subLoaded } = useSubscription();
-  if (!loaded || !subLoaded) return null;
-  if (isManager) return <ManagerDashboardPage />;
-  return <ProRoute><AdvisorDashboard /></ProRoute>;
+  return <AdvisorDashboard />;
 }
 
 function AppShell() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [checking, setChecking] = useState(true);
+  const { loaded, authenticated, firstRun } = useLicense();
   const location = useLocation();
   useTheme();
-  useTeam();
-
-  useEffect(() => {
-    const timeout = setTimeout(() => setChecking(false), 6000);
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION' && !session && window.location.hash.includes('access_token')) return;
-      setSession(session);
-      clearTimeout(timeout);
-      setChecking(false);
-    });
-    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
-  }, []);
 
   if (location.pathname === '/privacy') {
     return (
@@ -795,7 +641,7 @@ function AppShell() {
     );
   }
 
-  if (checking) {
+  if (!loaded) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#9ca3af' }}>
         <div style={{ fontSize: 40 }}>🔥</div>
@@ -803,9 +649,8 @@ function AppShell() {
     );
   }
 
-  if (!session) {
-    return <LandingPage />;
-  }
+  if (firstRun) return <FirstRunWizard />;
+  if (!authenticated) return <PasswordGate />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -815,13 +660,9 @@ function AppShell() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<DashboardRoute />} />
-            <Route path="/team" element={<ManagerDashboard />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/plans" element={<PlansPage />} />
             <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/track" element={<TrackPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           </Routes>
         </React.Suspense>
       </div>
@@ -832,20 +673,11 @@ function AppShell() {
 function App() {
   return (
     <BrowserRouter>
-      <React.Suspense fallback={<div style={{ minHeight: '100vh', background: '#0f172a' }} />}>
-        <Routes>
-          {/* Public client-view route — no auth required */}
-          <Route path="/client-view/:token" element={<ClientView />} />
-          {/* All advisor routes — auth handled inside AppShell */}
-          <Route path="/*" element={
-            <SubscriptionProvider>
-              <TeamProvider>
-                <AppShell />
-              </TeamProvider>
-            </SubscriptionProvider>
-          } />
-        </Routes>
-      </React.Suspense>
+      <LicenseProvider>
+        <React.Suspense fallback={<div style={{ minHeight: '100vh', background: '#0f172a' }} />}>
+          <AppShell />
+        </React.Suspense>
+      </LicenseProvider>
     </BrowserRouter>
   );
 }

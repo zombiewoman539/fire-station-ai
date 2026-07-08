@@ -1,10 +1,11 @@
-import { supabase } from './supabaseClient';
 import { DashboardKind, SavedView, ViewConfig } from '../savedViewsTypes';
+
+const BASE = '';
 
 function rowToView(row: any): SavedView {
   return {
     id: row.id,
-    ownerId: row.owner_id,
+    ownerId: row.owner_id ?? 'local',
     orgId: row.org_id ?? null,
     scope: row.scope,
     name: row.name,
@@ -15,14 +16,16 @@ function rowToView(row: any): SavedView {
   };
 }
 
-/** Returns own personal views + all team views in caller's org (RLS-enforced). */
+async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  const res = await fetch(`${BASE}${path}`, options);
+  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  return res;
+}
+
 export async function listSavedViews(): Promise<SavedView[]> {
-  const { data, error } = await supabase
-    .from('saved_views')
-    .select('*')
-    .order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(rowToView);
+  const res = await apiFetch('/api/saved-views');
+  const rows = await res.json();
+  return (rows as any[]).map(rowToView);
 }
 
 export async function createSavedView(params: {
@@ -30,45 +33,32 @@ export async function createSavedView(params: {
   dashboardKind: DashboardKind;
   config: ViewConfig;
   scope: 'personal' | 'team';
-  /** Required when scope === 'team'; ignored for personal. */
   orgId?: string | null;
 }): Promise<SavedView> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  const insertRow: Record<string, any> = {
-    owner_id: user.id,
-    name: params.name,
-    dashboard_kind: params.dashboardKind,
-    config: params.config,
-    scope: params.scope,
-  };
-  if (params.scope === 'team') {
-    if (!params.orgId) throw new Error('orgId required for team-scoped views');
-    insertRow.org_id = params.orgId;
-  }
-
-  const { data, error } = await supabase
-    .from('saved_views')
-    .insert(insertRow)
-    .select()
-    .single();
-  if (error) throw error;
-  return rowToView(data);
+  const res = await apiFetch('/api/saved-views', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: params.name,
+      dashboardKind: params.dashboardKind,
+      config: params.config,
+      scope: 'personal',
+    }),
+  });
+  return rowToView(await res.json());
 }
 
 export async function updateSavedView(
   id: string,
   updates: Partial<Pick<SavedView, 'name' | 'config'>>,
 ): Promise<void> {
-  const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
-  if (updates.name !== undefined) dbUpdates.name = updates.name;
-  if (updates.config !== undefined) dbUpdates.config = updates.config;
-  const { error } = await supabase.from('saved_views').update(dbUpdates).eq('id', id);
-  if (error) throw error;
+  await apiFetch(`/api/saved-views/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
 }
 
 export async function deleteSavedView(id: string): Promise<void> {
-  const { error } = await supabase.from('saved_views').delete().eq('id', id);
-  if (error) throw error;
+  await apiFetch(`/api/saved-views/${id}`, { method: 'DELETE' });
 }

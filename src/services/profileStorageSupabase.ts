@@ -1,26 +1,8 @@
-import { supabase } from './supabaseClient';
-import { checkLocalStorageMode } from './storageMode';
 import { ClientProfile, NoteEntry } from '../profileTypes';
 import { FireInputs, InsurancePolicy, Nominee } from '../types';
 import { defaultInputs } from '../defaults';
 
-// ─── Local-dev localStorage backend (no auth required) ───────────────────────
-
-const LOCAL_KEY = 'fire-local-profiles';
-
-function localLoad(): ClientProfile[] {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; }
-}
-function localSave(profiles: ClientProfile[]): void {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(profiles));
-}
-function localUpsert(profile: ClientProfile): void {
-  const all = localLoad();
-  const idx = all.findIndex(p => p.id === profile.id);
-  if (idx >= 0) all[idx] = profile; else all.unshift(profile);
-  localSave(all);
-}
-// ─────────────────────────────────────────────────────────────────────────────
+const BASE = '';
 
 function newId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -41,18 +23,12 @@ function parseNoteEntries(meta: any, fallbackTimestamp: string): NoteEntry[] {
         meetingDate: typeof e.meetingDate === 'string' ? e.meetingDate : undefined,
       }));
   }
-  // Legacy: a single notes string becomes one entry
   if (typeof meta?.notes === 'string' && meta.notes.trim().length > 0) {
-    return [{
-      id: newId(),
-      createdAt: fallbackTimestamp,
-      body: meta.notes,
-    }];
+    return [{ id: newId(), createdAt: fallbackTimestamp, body: meta.notes }];
   }
   return [];
 }
 
-// Migrate old profiles to new schema
 function migrateInputs(inputs: any): FireInputs {
   const assets = inputs.assets || {};
   const inc = inputs.income || {};
@@ -80,8 +56,6 @@ function migrateInputs(inputs: any): FireInputs {
     },
     policies: (inputs.policies || []).map((p: any): InsurancePolicy => ({
       ...p,
-      // Re-generate short integer IDs (legacy sequential counter) to UUIDs so
-      // keys are globally unique and don't collide across sessions.
       id: /^\d+$/.test(String(p.id ?? '')) ? crypto.randomUUID() : (p.id ?? crypto.randomUUID()),
       policyType: p.policyType ?? 'whole-life',
       deathSumAssured: p.deathSumAssured ?? 0,
@@ -128,24 +102,11 @@ function parseMeta(
   };
 }
 
-// Purge records that were soft-deleted more than 7 days ago.
-// Called on listProfiles / listProfilesPaged(page 0) so cleanup happens automatically over time.
-async function purgeExpiredDeletions(): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  await supabase
-    .from('client_profiles')
-    .delete()
-    .eq('user_id', user.id)
-    .lt('deleted_at', cutoff);
-}
-
 function mapRow(row: any): ClientProfile {
   return {
     id: row.id,
     name: row.name,
-    userId: row.user_id,
+    userId: row.user_id ?? 'local',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     inputs: migrateInputs(row.inputs as FireInputs),
@@ -154,136 +115,74 @@ function mapRow(row: any): ClientProfile {
   };
 }
 
+async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  const res = await fetch(`${BASE}${path}`, options);
+  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  return res;
+}
+
 export async function listProfiles(): Promise<ClientProfile[]> {
-  if (await checkLocalStorageMode()) return localLoad();
-  purgeExpiredDeletions().catch(() => {});
-
-  const { data, error } = await supabase
-    .from('client_profiles')
-    .select('*')
-    .is('deleted_at', null)
-    .order('updated_at', { ascending: false });
-
-  if (error) throw error;
-  return (data || []).map(mapRow);
+  const res = await apiFetch('/api/profiles');
+  const rows = await res.json();
+  return (rows as any[]).map(mapRow);
 }
 
 export async function listProfilesPaged(
   page: number = 0,
   pageSize: number = 50,
 ): Promise<{ data: ClientProfile[]; hasMore: boolean }> {
-  if (await checkLocalStorageMode()) {
-    const all = localLoad();
-    const slice = all.slice(page * pageSize, (page + 1) * pageSize);
-    return { data: slice, hasMore: all.length > (page + 1) * pageSize };
-  }
-  if (page === 0) purgeExpiredDeletions().catch(() => {});
-
-  const from = page * pageSize;
-  const { data, error, count } = await supabase
-    .from('client_profiles')
-    .select('*', { count: 'exact' })
-    .is('deleted_at', null)
-    .order('updated_at', { ascending: false })
-    .range(from, from + pageSize - 1);
-
-  if (error) throw error;
-  return {
-    data: (data || []).map(mapRow),
-    hasMore: (count ?? 0) > from + pageSize,
-  };
+  const res = await apiFetch(`/api/profiles/paged?page=${page}&pageSize=${pageSize}`);
+  const { data, hasMore } = await res.json();
+  return { data: (data as any[]).map(mapRow), hasMore };
 }
 
 export async function getProfile(id: string): Promise<ClientProfile | null> {
-  if (await checkLocalStorageMode()) return localLoad().find(p => p.id === id) ?? null;
-  const { data, error } = await supabase
-    .from('client_profiles')
-    .select('*')
-    .eq('id', id)
-    .is('deleted_at', null)
-    .single();
-
-  if (error || !data) return null;
-  return mapRow(data);
+  try {
+    const res = await fetch(`${BASE}/api/profiles/${id}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Failed: ${res.status}`);
+    return mapRow(await res.json());
+  } catch {
+    return null;
+  }
 }
 
 export async function saveProfile(profile: ClientProfile): Promise<void> {
-  if (await checkLocalStorageMode()) { localUpsert({ ...profile, updatedAt: new Date().toISOString() }); return; }
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) throw new Error('Not authenticated');
-
-  const { error } = await supabase.from('client_profiles').upsert({
-    id: profile.id,
-    user_id: user.id,
-    name: profile.name,
-    inputs: profile.inputs,
-    tags: profile.tags ?? [],
-    meta: {
-      lastMeetingDate: profile.lastMeetingDate ?? null,
-      nextReviewDate: profile.nextReviewDate ?? null,
-      noteEntries: profile.noteEntries ?? [],
-    },
-    updated_at: new Date().toISOString(),
+  await apiFetch(`/api/profiles/${profile.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: profile.name,
+      inputs: profile.inputs,
+      tags: profile.tags ?? [],
+      meta: {
+        lastMeetingDate: profile.lastMeetingDate ?? null,
+        nextReviewDate: profile.nextReviewDate ?? null,
+        noteEntries: profile.noteEntries ?? [],
+      },
+    }),
   });
-
-  if (error) throw error;
 }
 
 export async function createProfile(name: string, inputs?: FireInputs): Promise<ClientProfile> {
-  if (await checkLocalStorageMode()) {
-    const now = new Date().toISOString();
-    const profile: ClientProfile = {
-      id: newId(), name, userId: 'local-dev', createdAt: now, updatedAt: now,
-      inputs: inputs ? migrateInputs(inputs) : defaultInputs,
-      tags: [], lastMeetingDate: null, nextReviewDate: null, notes: '', noteEntries: [],
-    };
-    localUpsert(profile);
-    return profile;
-  }
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) throw new Error('Not authenticated');
-
-  const { data, error } = await supabase
-    .from('client_profiles')
-    .insert({
-      user_id: user.id,
-      name,
-      inputs: inputs || defaultInputs,
-      tags: [],
-      meta: {},
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return mapRow(data);
+  const res = await apiFetch('/api/profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, inputs: inputs || defaultInputs }),
+  });
+  return mapRow(await res.json());
 }
 
-// Soft delete: sets deleted_at timestamp instead of removing the row.
-// Records are permanently purged after 7 days via purgeExpiredDeletions().
 export async function deleteProfile(id: string): Promise<void> {
-  if (await checkLocalStorageMode()) { localSave(localLoad().filter(p => p.id !== id)); return; }
-  const { error } = await supabase
-    .from('client_profiles')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
-
-  if (error) throw error;
+  await apiFetch(`/api/profiles/${id}`, { method: 'DELETE' });
 }
 
 export async function renameProfile(id: string, newName: string): Promise<void> {
-  if (await checkLocalStorageMode()) {
-    const all = localLoad();
-    const p = all.find(x => x.id === id);
-    if (p) { p.name = newName; p.updatedAt = new Date().toISOString(); localSave(all); }
-    return;
-  }
-  const { error } = await supabase
-    .from('client_profiles')
-    .update({ name: newName, updated_at: new Date().toISOString() })
-    .eq('id', id);
-
-  if (error) throw error;
+  await apiFetch(`/api/profiles/${id}/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
 }
 
 export async function duplicateProfile(sourceId: string, newName: string): Promise<ClientProfile | null> {
@@ -292,32 +191,14 @@ export async function duplicateProfile(sourceId: string, newName: string): Promi
   return createProfile(newName, JSON.parse(JSON.stringify(source.inputs)));
 }
 
-/** List profiles soft-deleted within the last 7 days (recoverable). */
 export async function listDeletedProfiles(): Promise<(ClientProfile & { deletedAt: string })[]> {
-  if (await checkLocalStorageMode()) return [];
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('client_profiles')
-    .select('*')
-    .not('deleted_at', 'is', null)
-    .gte('deleted_at', cutoff)
-    .order('deleted_at', { ascending: false });
-
-  if (error) throw error;
-  return (data || []).map(row => ({
-    ...mapRow(row),
-    deletedAt: row.deleted_at,
-  }));
+  const res = await apiFetch('/api/profiles/deleted');
+  const rows = await res.json();
+  return (rows as any[]).map(row => ({ ...mapRow(row), deletedAt: row.deleted_at }));
 }
 
-/** Restore a soft-deleted profile by clearing its deleted_at timestamp. */
 export async function restoreProfile(id: string): Promise<void> {
-  if (await checkLocalStorageMode()) return;
-  const { error } = await supabase
-    .from('client_profiles')
-    .update({ deleted_at: null })
-    .eq('id', id);
-  if (error) throw error;
+  await apiFetch(`/api/profiles/${id}/restore`, { method: 'POST' });
 }
 
 export function exportProfile(profile: ClientProfile): string {

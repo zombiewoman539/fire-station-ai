@@ -1,14 +1,6 @@
-import { supabase } from './supabaseClient';
-import { checkLocalStorageMode } from './storageMode';
 import { createTask } from './taskService';
 
-const LOCAL_KEY = 'fire-local-task-templates';
-function localLoad(): TaskTemplate[] {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; }
-}
-function localSave(ts: TaskTemplate[]): void {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(ts));
-}
+const BASE = '';
 
 export interface TaskTemplate {
   id: string;
@@ -33,7 +25,7 @@ export const INTERVAL_OPTIONS: { label: string; days: number }[] = [
 function rowToTemplate(row: any): TaskTemplate {
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.user_id ?? 'local',
     title: row.title,
     notes: row.notes ?? '',
     intervalDays: row.interval_days,
@@ -50,14 +42,16 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  const res = await fetch(`${BASE}${path}`, options);
+  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  return res;
+}
+
 export async function listTemplates(): Promise<TaskTemplate[]> {
-  if (await checkLocalStorageMode()) return localLoad();
-  const { data, error } = await supabase
-    .from('task_templates')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(rowToTemplate);
+  const res = await apiFetch('/api/task-templates');
+  const rows = await res.json();
+  return (rows as any[]).map(rowToTemplate);
 }
 
 export async function createTemplate(params: {
@@ -68,72 +62,43 @@ export async function createTemplate(params: {
   clientName?: string;
   priority?: 'normal' | 'urgent';
 }): Promise<TaskTemplate> {
-  if (await checkLocalStorageMode()) {
-    const t: TaskTemplate = {
-      id: crypto.randomUUID?.() ?? `tpl-${Date.now()}`,
-      userId: 'local-dev',
+  const res = await apiFetch('/api/task-templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       title: params.title,
       notes: params.notes ?? '',
       intervalDays: params.intervalDays,
       clientProfileId: params.clientProfileId ?? null,
       clientName: params.clientName ?? null,
       priority: params.priority ?? 'normal',
-      lastGeneratedAt: null,
-      createdAt: new Date().toISOString(),
-    };
-    localSave([t, ...localLoad()]);
-    return t;
-  }
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  const { data, error } = await supabase
-    .from('task_templates')
-    .insert({
-      user_id: user.id,
-      title: params.title,
-      notes: params.notes ?? '',
-      interval_days: params.intervalDays,
-      client_profile_id: params.clientProfileId ?? null,
-      client_name: params.clientName ?? null,
-      priority: params.priority ?? 'normal',
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return rowToTemplate(data);
+    }),
+  });
+  return rowToTemplate(await res.json());
 }
 
 export async function updateTemplate(
   id: string,
   updates: Partial<Pick<TaskTemplate, 'title' | 'notes' | 'intervalDays' | 'clientProfileId' | 'clientName' | 'priority'>>,
 ): Promise<void> {
-  if (await checkLocalStorageMode()) {
-    const all = localLoad();
-    const t = all.find(x => x.id === id);
-    if (t) { Object.assign(t, updates); localSave(all); }
-    return;
-  }
-  const dbUpdates: Record<string, any> = {};
-  if (updates.title !== undefined)           dbUpdates.title = updates.title;
-  if (updates.notes !== undefined)           dbUpdates.notes = updates.notes;
-  if (updates.intervalDays !== undefined)    dbUpdates.interval_days = updates.intervalDays;
-  if (updates.clientProfileId !== undefined) dbUpdates.client_profile_id = updates.clientProfileId;
-  if (updates.clientName !== undefined)      dbUpdates.client_name = updates.clientName;
-  if (updates.priority !== undefined)        dbUpdates.priority = updates.priority;
-  const { error } = await supabase.from('task_templates').update(dbUpdates).eq('id', id);
-  if (error) throw error;
+  await apiFetch(`/api/task-templates/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: updates.title,
+      notes: updates.notes,
+      intervalDays: updates.intervalDays,
+      clientProfileId: updates.clientProfileId,
+      clientName: updates.clientName,
+      priority: updates.priority,
+    }),
+  });
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  if (await checkLocalStorageMode()) { localSave(localLoad().filter(t => t.id !== id)); return; }
-  const { error } = await supabase.from('task_templates').delete().eq('id', id);
-  if (error) throw error;
+  await apiFetch(`/api/task-templates/${id}`, { method: 'DELETE' });
 }
 
-/** Called on TasksPage mount. Creates a task for every template that is due,
- *  then updates last_generated_at. Only fires for future-from-creation templates
- *  (never retroactively). Returns the number of tasks generated. */
 export async function generateDueTasks(templates: TaskTemplate[]): Promise<number> {
   const today = todayISO();
   let count = 0;
@@ -154,16 +119,11 @@ export async function generateDueTasks(templates: TaskTemplate[]): Promise<numbe
       dueDate: today,
     });
 
-    if (await checkLocalStorageMode()) {
-      const all = localLoad();
-      const found = all.find(x => x.id === t.id);
-      if (found) { found.lastGeneratedAt = new Date().toISOString(); localSave(all); }
-    } else {
-      await supabase
-        .from('task_templates')
-        .update({ last_generated_at: new Date().toISOString() })
-        .eq('id', t.id);
-    }
+    await apiFetch(`/api/task-templates/${t.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lastGeneratedAt: new Date().toISOString() }),
+    });
 
     count++;
   }

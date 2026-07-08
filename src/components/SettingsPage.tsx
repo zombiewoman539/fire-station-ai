@@ -1,11 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabaseClient';
+import React, { useState } from 'react';
 import { useTheme } from '../App';
-import { useTeam } from '../contexts/TeamContext';
-import { useSubscription } from '../contexts/SubscriptionContext';
-import { createPortalSession } from '../services/subscriptionService';
-import { createOrganization, inviteAdvisor, leaveTeam, acceptPendingInvite, declinePendingInvite } from '../services/teamService';
+import { useLicense } from '../contexts/LicenseContext';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -25,240 +20,207 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({
-  label, description, children,
-}: {
-  label: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
+function Row({ label, description, children }: { label: string; description?: string; children?: React.ReactNode }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '14px 16px',
-      background: 'var(--surface)',
-      borderRadius: 10,
-      gap: 16,
+      padding: '14px 16px', background: 'var(--surface)', borderRadius: 10, gap: 16,
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: description ? 2 : 0 }}>
           {label}
         </div>
-        {description && (
-          <div style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.5 }}>{description}</div>
-        )}
+        {description && <div style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.5 }}>{description}</div>}
       </div>
-      <div style={{ flexShrink: 0 }}>{children}</div>
+      {children && <div style={{ flexShrink: 0 }}>{children}</div>}
     </div>
-  );
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      style={{
-        width: 44, height: 24, borderRadius: 12,
-        background: checked ? '#10b981' : 'var(--border)',
-        border: 'none', cursor: 'pointer', position: 'relative',
-        transition: 'background 0.2s',
-        flexShrink: 0,
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: 3,
-        left: checked ? 23 : 3,
-        width: 18, height: 18, borderRadius: '50%',
-        background: '#fff',
-        transition: 'left 0.2s',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-      }} />
-    </button>
   );
 }
 
 export default function SettingsPage() {
   const [theme, toggleTheme] = useTheme();
-  const [email, setEmail] = useState('');
-  const [signingOut, setSigningOut] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
-  const navigate = useNavigate();
-  const { teamStatus, pendingInvite, loaded: teamLoaded, refresh: refreshTeam } = useTeam();
-  const { tier, subscription, loaded: subLoaded } = useSubscription();
-
-  // Display preferences — stored in localStorage
-  const [showCash, setShowCashPref] = useState(
-    () => localStorage.getItem('fa-show-cash') !== 'false'
-  );
+  const { tier, licenseValid, expiresAt, loaded } = useLicense();
   const [sidebarOpen, setSidebarOpenPref] = useState(
     () => localStorage.getItem('fa-sidebar-open') === 'true'
   );
+  const [showCash, setShowCashPref] = useState(
+    () => localStorage.getItem('fa-show-cash') !== 'false'
+  );
 
-  // Team section state
-  const [teamView, setTeamView] = useState<'idle' | 'create'>('idle');
-  const [orgName, setOrgName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviting, setInviting] = useState(false);
-  const [inviteMsg, setInviteMsg] = useState('');
-  const [leaving, setLeaving] = useState(false);
-  const [accepting, setAccepting] = useState(false);
-  const [declining, setDeclining] = useState(false);
-  const [inviteActionError, setInviteActionError] = useState('');
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? '');
-    });
-  }, []);
-
-  const handleShowCash = (v: boolean) => {
-    setShowCashPref(v);
-    localStorage.setItem('fa-show-cash', v ? 'true' : 'false');
-  };
+  // Password change state
+  const [showPwForm, setShowPwForm] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
 
   const handleSidebarOpen = (v: boolean) => {
     setSidebarOpenPref(v);
     localStorage.setItem('fa-sidebar-open', v ? 'true' : 'false');
   };
 
-  const handleSignOut = async () => {
-    setSigningOut(true);
-    await supabase.auth.signOut();
-    window.location.href = '/';
+  const handleShowCash = (v: boolean) => {
+    setShowCashPref(v);
+    localStorage.setItem('fa-show-cash', v ? 'true' : 'false');
   };
 
-  const handleCreateTeam = async () => {
-    if (!orgName.trim()) { setCreateError('Enter a team name.'); return; }
-    setCreating(true);
-    setCreateError('');
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    if (newPw !== confirmPw) { setPwError('Passwords do not match'); return; }
+    if (newPw.length < 6) { setPwError('Password must be at least 6 characters'); return; }
+    setPwLoading(true);
     try {
-      await createOrganization(orgName.trim());
-      // Clear the solo-mode flag so the team tab appears in the navbar
-      localStorage.removeItem('fire-solo-mode');
-      await refreshTeam();
-      setTeamView('idle');
-      setOrgName('');
-    } catch (e: any) {
-      setCreateError(e.message || 'Something went wrong.');
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPwSuccess(true);
+        setCurrentPw(''); setNewPw(''); setConfirmPw('');
+        setTimeout(() => { setPwSuccess(false); setShowPwForm(false); }, 2000);
+      } else {
+        setPwError(data.error || 'Failed to change password');
+      }
+    } catch {
+      setPwError('Server error — please try again');
     } finally {
-      setCreating(false);
+      setPwLoading(false);
     }
   };
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
-    setInviting(true);
-    setInviteMsg('');
-    try {
-      await inviteAdvisor(inviteEmail.trim());
-      setInviteMsg(`Invite sent to ${inviteEmail.trim()}.`);
-      setInviteEmail('');
-    } catch (e: any) {
-      setInviteMsg(`Error: ${e.message}`);
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const handleAcceptInvite = async () => {
-    setAccepting(true);
-    setInviteActionError('');
-    try {
-      await acceptPendingInvite();
-      await refreshTeam();
-    } catch (e: any) {
-      setInviteActionError(e.message || 'Something went wrong.');
-      setAccepting(false);
-    }
-  };
-
-  const handleDeclineInvite = async () => {
-    setDeclining(true);
-    setInviteActionError('');
-    try {
-      await declinePendingInvite();
-      await refreshTeam();
-    } catch (e: any) {
-      setInviteActionError(e.message || 'Something went wrong.');
-      setDeclining(false);
-    }
-  };
-
-  const handleLeaveTeam = async () => {
-    if (!window.confirm(`Leave ${teamStatus?.orgName ?? 'your team'}? You will need to be re-invited to rejoin.`)) return;
-    setLeaving(true);
-    try {
-      await leaveTeam();
-      localStorage.removeItem('fire-solo-mode');
-      await refreshTeam();
-    } catch (e: any) {
-      alert(`Error: ${e.message}`);
-    } finally {
-      setLeaving(false);
-    }
-  };
+  const tierLabel = tier ? (tier.charAt(0).toUpperCase() + tier.slice(1)) : 'Pro';
 
   return (
-    <div style={{
-      flex: 1, overflowY: 'auto',
-      background: 'var(--bg)',
-      padding: '32px 0',
-    }}>
+    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)', padding: '32px 0' }}>
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 24px' }}>
-        {/* Page header */}
         <div style={{ marginBottom: 32 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', margin: 0, marginBottom: 4 }}>
             Settings
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-4)', margin: 0 }}>
-            Manage your account and app preferences.
+            Manage your license, password, and app preferences.
           </p>
         </div>
 
-        {/* Account */}
-        <Section title="Account">
+        {/* License */}
+        <Section title="License">
           <Row
-            label="Signed in as"
-            description={email || 'Loading...'}
+            label={`${tierLabel} plan`}
+            description={
+              licenseValid
+                ? expiresAt ? `Expires ${new Date(expiresAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Active'
+                : 'License not verified — check your internet connection'
+            }
           >
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              style={{
-                background: 'rgba(239,68,68,0.1)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: 8,
-                color: '#f87171',
-                fontSize: 12, fontWeight: 600,
-                padding: '7px 14px',
-                cursor: signingOut ? 'not-allowed' : 'pointer',
-                opacity: signingOut ? 0.6 : 1,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </button>
+            <span style={{
+              padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+              background: licenseValid ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.1)',
+              color: licenseValid ? '#34d399' : '#f87171',
+              border: `1px solid ${licenseValid ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+            }}>
+              {licenseValid ? 'Active' : 'Inactive'}
+            </span>
           </Row>
+        </Section>
+
+        {/* Security */}
+        <Section title="Security">
+          {!showPwForm ? (
+            <Row label="Password" description="Change your local access password">
+              <button
+                onClick={() => setShowPwForm(true)}
+                style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+                  padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                Change password
+              </button>
+            </Row>
+          ) : (
+            <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '20px 16px' }}>
+              <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <input
+                  type="password"
+                  value={currentPw}
+                  onChange={e => setCurrentPw(e.target.value)}
+                  placeholder="Current password"
+                  autoFocus
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                    color: 'var(--text-1)', outline: 'none',
+                  }}
+                />
+                <input
+                  type="password"
+                  value={newPw}
+                  onChange={e => setNewPw(e.target.value)}
+                  placeholder="New password (min 6 characters)"
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                    color: 'var(--text-1)', outline: 'none',
+                  }}
+                />
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={e => setConfirmPw(e.target.value)}
+                  placeholder="Confirm new password"
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                    color: 'var(--text-1)', outline: 'none',
+                  }}
+                />
+                {pwError && <div style={{ color: '#f87171', fontSize: 12 }}>{pwError}</div>}
+                {pwSuccess && <div style={{ color: '#34d399', fontSize: 12 }}>Password changed successfully</div>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button
+                    type="submit"
+                    disabled={pwLoading || !currentPw || !newPw || !confirmPw}
+                    style={{
+                      flex: 1, padding: '10px', borderRadius: 8, border: 'none',
+                      background: pwLoading ? 'rgba(16,185,129,0.4)' : '#10b981',
+                      color: '#fff', fontSize: 13, fontWeight: 700,
+                      cursor: pwLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {pwLoading ? 'Saving…' : 'Save password'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowPwForm(false); setPwError(''); setCurrentPw(''); setNewPw(''); setConfirmPw(''); }}
+                    style={{
+                      padding: '10px 16px', borderRadius: 8,
+                      background: 'transparent', border: '1px solid var(--border)',
+                      color: 'var(--text-3)', fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </Section>
 
         {/* Appearance */}
         <Section title="Appearance">
-          <Row
-            label="Theme"
-            description="Switch between dark and light mode."
-          >
+          <Row label="Theme" description="Switch between dark and light mode.">
             <button
               onClick={toggleTheme}
               style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                color: 'var(--text-2)',
-                fontSize: 12, fontWeight: 600,
-                padding: '7px 14px',
-                cursor: 'pointer',
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+                padding: '7px 14px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
@@ -267,262 +229,45 @@ export default function SettingsPage() {
           </Row>
         </Section>
 
-        {/* Subscription */}
-        <Section title="Subscription">
-          {!subLoaded ? (
-            <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-4)' }}>Loading…</div>
-          ) : (
-            <Row
-              label={`${tier.charAt(0).toUpperCase() + tier.slice(1)} plan`}
-              description={
-                subscription?.status === 'active' && subscription.currentPeriodEnd
-                  ? `Renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-SG', { day: 'numeric', month: 'long', year: 'numeric' })}`
-                  : tier === 'starter' ? 'Free — upgrade for unlimited clients and more features' : undefined
-              }
+        {/* Display */}
+        <Section title="Display">
+          <Row label="Show cash column" description="Show cash savings column in client table.">
+            <button
+              onClick={() => handleShowCash(!showCash)}
+              style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: showCash ? '#10b981' : 'var(--border)',
+                border: 'none', cursor: 'pointer', position: 'relative',
+                transition: 'background 0.2s', flexShrink: 0,
+              }}
             >
-              {tier === 'starter' ? (
-                <button
-                  onClick={() => navigate('/plans')}
-                  style={{
-                    background: 'rgba(79,70,229,0.12)', border: '1px solid rgba(79,70,229,0.3)',
-                    borderRadius: 8, color: '#a5b4fc', fontSize: 12, fontWeight: 700,
-                    padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
-                  }}
-                >
-                  ⚡ Upgrade
-                </button>
-              ) : (
-                <button
-                  onClick={async () => {
-                    setPortalLoading(true);
-                    try { await createPortalSession(`${window.location.origin}/settings`); }
-                    catch { navigate('/plans'); }
-                    finally { setPortalLoading(false); }
-                  }}
-                  disabled={portalLoading}
-                  style={{
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
-                    padding: '7px 14px', cursor: portalLoading ? 'not-allowed' : 'pointer',
-                    opacity: portalLoading ? 0.6 : 1, whiteSpace: 'nowrap',
-                  }}
-                >
-                  {portalLoading ? 'Loading…' : 'Manage billing →'}
-                </button>
-              )}
-            </Row>
-          )}
-        </Section>
-
-        {/* Team */}
-        <Section title="Team">
-          {/* Pending invite — shown instead of normal team status */}
-          {pendingInvite ? (
-            <div style={{
-              background: 'var(--surface)', border: '1px solid rgba(96,165,250,0.3)',
-              borderRadius: 12, padding: '20px 20px',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
-                Team invitation
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
-                You've been invited to join <strong style={{ color: '#60a5fa' }}>{pendingInvite.orgName}</strong> as a financial advisor.
-              </div>
-
-              {/* Warning */}
               <div style={{
-                background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)',
-                borderRadius: 9, padding: '11px 14px', marginBottom: 16,
-                fontSize: 12, color: '#fbbf24', lineHeight: 1.6,
-              }}>
-                ⚠️ If you accept, your manager will be able to view a summary of your client portfolios including names, FIRE status, and last activity. They cannot edit or delete your clients.
-              </div>
-
-              {inviteActionError && (
-                <div style={{ color: '#f87171', fontSize: 12, marginBottom: 12 }}>{inviteActionError}</div>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={handleAcceptInvite}
-                  disabled={accepting || declining}
-                  style={{
-                    flex: 1, padding: '10px 0', borderRadius: 9, border: 'none',
-                    background: accepting ? 'rgba(16,185,129,0.4)' : '#10b981',
-                    color: '#fff', fontSize: 13, fontWeight: 700,
-                    cursor: accepting || declining ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {accepting ? 'Joining…' : 'Accept'}
-                </button>
-                <button
-                  onClick={handleDeclineInvite}
-                  disabled={accepting || declining}
-                  style={{
-                    flex: 1, padding: '10px 0', borderRadius: 9,
-                    background: 'transparent', border: '1px solid rgba(239,68,68,0.3)',
-                    color: '#f87171', fontSize: 13, fontWeight: 600,
-                    cursor: accepting || declining ? 'not-allowed' : 'pointer',
-                    opacity: accepting || declining ? 0.6 : 1,
-                  }}
-                >
-                  {declining ? 'Declining…' : 'Decline'}
-                </button>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-5)', marginTop: 10 }}>
-                Declining removes the invite. You can continue using FIRE Station independently.
-              </div>
-            </div>
-          ) : !teamLoaded ? (
-            <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-4)' }}>Loading…</div>
-          ) : !teamStatus ? (
-            /* ── Solo: offer to create a team ── */
-            teamView === 'create' ? (
-              <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '16px' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>Name your team</div>
-                <input
-                  type="text"
-                  value={orgName}
-                  onChange={e => setOrgName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
-                  placeholder="e.g. Zenith Advisory"
-                  autoFocus
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-                    borderRadius: 8, padding: '10px 12px', fontSize: 13,
-                    color: 'var(--text-1)', outline: 'none', marginBottom: 8,
-                  }}
-                />
-                {createError && <div style={{ color: '#f87171', fontSize: 12, marginBottom: 10 }}>{createError}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={handleCreateTeam}
-                    disabled={creating}
-                    style={{
-                      flex: 1, padding: '9px 0', borderRadius: 8,
-                      background: creating ? 'rgba(16,185,129,0.4)' : '#10b981',
-                      border: 'none', color: '#fff', fontSize: 13, fontWeight: 700,
-                      cursor: creating ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {creating ? 'Creating…' : 'Create Team'}
-                  </button>
-                  <button
-                    onClick={() => { setTeamView('idle'); setOrgName(''); setCreateError(''); }}
-                    style={{
-                      padding: '9px 16px', borderRadius: 8, background: 'none',
-                      border: '1px solid var(--border)', color: 'var(--text-4)',
-                      fontSize: 13, cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <Row label="Team" description="You're currently using FIRE Station solo.">
-                <button
-                  onClick={() => setTeamView('create')}
-                  style={{
-                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
-                    borderRadius: 8, color: '#34d399', fontSize: 12, fontWeight: 600,
-                    padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
-                  }}
-                >
-                  Create a Team
-                </button>
-              </Row>
-            )
-          ) : teamStatus.role === 'manager' ? (
-            /* ── Manager: show org + quick invite ── */
-            <>
-              <Row label={teamStatus.orgName} description="You are the manager of this team.">
-                <button
-                  onClick={() => navigate('/team')}
-                  style={{
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
-                    padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
-                  }}
-                >
-                  Manage team →
-                </button>
-              </Row>
+                position: 'absolute', top: 3,
+                left: showCash ? 23 : 3,
+                width: 18, height: 18, borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }} />
+            </button>
+          </Row>
+          <Row label="Sidebar open by default" description="Auto-open the client sidebar on load.">
+            <button
+              onClick={() => handleSidebarOpen(!sidebarOpen)}
+              style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: sidebarOpen ? '#10b981' : 'var(--border)',
+                border: 'none', cursor: 'pointer', position: 'relative',
+                transition: 'background 0.2s', flexShrink: 0,
+              }}
+            >
               <div style={{
-                background: 'var(--surface)', borderRadius: 10, padding: '14px 16px', marginTop: 2,
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 8 }}>Quick invite</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={e => setInviteEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleInvite()}
-                    placeholder="advisor@example.com"
-                    style={{
-                      flex: 1, background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-                      borderRadius: 8, padding: '8px 12px', color: 'var(--text-1)', fontSize: 13, outline: 'none',
-                    }}
-                  />
-                  <button
-                    onClick={handleInvite}
-                    disabled={inviting}
-                    style={{
-                      padding: '8px 16px', background: '#10b981', border: 'none', borderRadius: 8,
-                      color: '#fff', fontSize: 12, fontWeight: 700,
-                      cursor: inviting ? 'not-allowed' : 'pointer', opacity: inviting ? 0.6 : 1,
-                    }}
-                  >
-                    {inviting ? '…' : 'Invite'}
-                  </button>
-                </div>
-                {inviteMsg && (
-                  <div style={{
-                    marginTop: 8, fontSize: 12,
-                    color: inviteMsg.startsWith('Error') ? '#f87171' : '#34d399',
-                  }}>{inviteMsg}</div>
-                )}
-              </div>
-            </>
-          ) : (
-            /* ── Advisor: show org + leave ── */
-            <Row label={teamStatus.orgName} description="You are an advisor in this team.">
-              <button
-                onClick={handleLeaveTeam}
-                disabled={leaving}
-                style={{
-                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                  borderRadius: 8, color: '#f87171', fontSize: 12, fontWeight: 600,
-                  padding: '7px 14px', cursor: leaving ? 'not-allowed' : 'pointer',
-                  opacity: leaving ? 0.6 : 1, whiteSpace: 'nowrap',
-                }}
-              >
-                {leaving ? 'Leaving…' : 'Leave team'}
-              </button>
-            </Row>
-          )}
-          </Section>
-
-        {/* Display preferences */}
-        <Section title="Display Preferences">
-          <Row
-            label="Show cash savings on chart"
-            description="When on, the Cash Savings bar is visible by default when you open a client."
-          >
-            <Toggle checked={showCash} onChange={handleShowCash} />
-          </Row>
-          <Row
-            label="Start with client list open"
-            description="When on, the left sidebar shows on load. Turn off to maximise the chart area by default."
-          >
-            <Toggle checked={sidebarOpen} onChange={handleSidebarOpen} />
-          </Row>
-        </Section>
-
-        {/* About */}
-        <Section title="About">
-          <Row label="App" description="FIRE Station — Singapore Financial Planning Tool">
-            <span style={{ fontSize: 12, color: 'var(--text-5)' }}>v1.0</span>
+                position: 'absolute', top: 3,
+                left: sidebarOpen ? 23 : 3,
+                width: 18, height: 18, borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }} />
+            </button>
           </Row>
         </Section>
       </div>

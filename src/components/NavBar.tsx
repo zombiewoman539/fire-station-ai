@@ -1,7 +1,5 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { useTeam } from '../contexts/TeamContext';
-import { useSubscription } from '../contexts/SubscriptionContext';
 
 const tabs = [
   {
@@ -31,15 +29,6 @@ const tabs = [
       </svg>
     ),
   },
-  {
-    to: '/track',
-    label: 'Track',
-    icon: (
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 14l4-4 4 4 5-5" />
-      </svg>
-    ),
-  },
 ];
 
 const settingsTab = {
@@ -53,19 +42,7 @@ const settingsTab = {
   ),
 };
 
-const ADMIN_USER_ID = 'ef44569c-5216-4847-9b19-3b7797d13ea9';
-
 export default function NavBar() {
-  const { isManager, teamStatus } = useTeam();
-  const { tier, loaded: subLoaded } = useSubscription();
-  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    import('../services/supabaseClient').then(({ supabase }) => {
-      supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
-    });
-  }, []);
-
   return (
     <div style={{
       height: 48, flexShrink: 0,
@@ -75,7 +52,6 @@ export default function NavBar() {
       borderBottom: '1px solid var(--border)',
       zIndex: 100,
     }}>
-      {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 16 }}>
         <span style={{ fontSize: 18 }}>🔥</span>
         <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>
@@ -83,7 +59,6 @@ export default function NavBar() {
         </span>
       </div>
 
-      {/* Left tabs */}
       {tabs.map(tab => (
         <NavLink
           key={tab.to}
@@ -105,66 +80,8 @@ export default function NavBar() {
         </NavLink>
       ))}
 
-      {/* Team tab — managers only */}
-      {isManager && (
-        <NavLink
-          to="/team"
-          style={({ isActive }) => ({
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 12px', borderRadius: 8,
-            fontSize: 13, fontWeight: 600,
-            textDecoration: 'none',
-            background: isActive ? 'rgba(16,185,129,0.12)' : 'transparent',
-            color: isActive ? '#34d399' : 'var(--text-3)',
-            border: `1px solid ${isActive ? 'rgba(16,185,129,0.3)' : 'transparent'}`,
-            transition: 'background 0.15s, color 0.15s',
-          })}
-        >
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-          {teamStatus?.orgName ?? 'Team'}
-        </NavLink>
-      )}
-
-      {/* Admin link — only visible to admin user */}
-      {currentUserId === ADMIN_USER_ID && (
-        <NavLink
-          to="/admin"
-          style={({ isActive }) => ({
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 12px', borderRadius: 8,
-            fontSize: 13, fontWeight: 600,
-            textDecoration: 'none',
-            background: isActive ? 'rgba(239,68,68,0.12)' : 'transparent',
-            color: isActive ? '#f87171' : 'var(--text-4)',
-            border: `1px solid ${isActive ? 'rgba(239,68,68,0.3)' : 'transparent'}`,
-          })}
-        >
-          🔐 Admin
-        </NavLink>
-      )}
-
-      {/* Upgrade pill — Starter users only */}
       <div style={{ flex: 1 }} />
-      {subLoaded && tier === 'starter' && (
-        <NavLink
-          to="/plans"
-          style={({ isActive }) => ({
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '6px 12px', borderRadius: 8,
-            fontSize: 13, fontWeight: 700,
-            textDecoration: 'none',
-            background: isActive ? 'rgba(79,70,229,0.2)' : 'rgba(79,70,229,0.1)',
-            color: '#a5b4fc',
-            border: '1px solid rgba(79,70,229,0.3)',
-          })}
-        >
-          ⚡ Upgrade
-        </NavLink>
-      )}
 
-      {/* Settings */}
       <NavLink
         to={settingsTab.to}
         style={({ isActive }) => ({
