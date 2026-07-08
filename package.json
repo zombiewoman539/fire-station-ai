@@ -35,8 +35,8 @@
     "start:local": "concurrently \"npm run start:server\" \"npm start\"",
     "build:local": "npm run build",
     "build:server": "tsc -p tsconfig.server.json && node -e \"require('fs').writeFileSync('dist-server/package.json', JSON.stringify({name:'firestation-server',version:'1.0.0',pkg:{assets:['../build/**/*']}},null,2))\"",
-    "package:mac": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-macos-x64 --output dist/firestation-mac && cp -r build dist/build",
-    "package:win": "npm run build && npm run build:server && pkg dist-server/index.js --targets node18-win-x64 --output dist/firestation-win.exe && xcopy /E /I build dist\\build"
+    "package:mac": "npm run build && npm run build:server && mkdir -p FireStation && pkg dist-server/index.js --targets node18-macos-x64 --output FireStation/FireStation && cp -r build FireStation/build",
+    "package:win": "npm run build && npm run build:server && mkdir FireStation & pkg dist-server/index.js --targets node18-win-x64 --output FireStation\\FireStation.exe && xcopy /E /I build FireStation\\build"
   },
   "eslintConfig": {
     "extends": [
