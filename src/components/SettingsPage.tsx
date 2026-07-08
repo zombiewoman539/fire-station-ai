@@ -6,6 +6,10 @@ import { useTeam } from '../contexts/TeamContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { createPortalSession } from '../services/subscriptionService';
 import { createOrganization, inviteAdvisor, leaveTeam, acceptPendingInvite, declinePendingInvite } from '../services/teamService';
+import { listProfiles } from '../services/profileStorageSupabase';
+import { listSavedViews } from '../services/savedViewsService';
+import { listTasks } from '../services/taskService';
+import { listTemplates } from '../services/taskTemplateService';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -106,6 +110,40 @@ export default function SettingsPage() {
   const [accepting, setAccepting] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [inviteActionError, setInviteActionError] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportForLocal = async () => {
+    setExporting(true);
+    try {
+      const [profiles, savedViews, tasks, taskTemplates] = await Promise.all([
+        listProfiles(),
+        listSavedViews(),
+        listTasks(),
+        listTemplates(),
+      ]);
+      const backup = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        data: {
+          profiles,
+          'saved-views': savedViews,
+          tasks,
+          'task-templates': taskTemplates,
+        },
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `firestation-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Export failed — please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -516,6 +554,27 @@ export default function SettingsPage() {
             description="When on, the left sidebar shows on load. Turn off to maximise the chart area by default."
           >
             <Toggle checked={sidebarOpen} onChange={handleSidebarOpen} />
+          </Row>
+        </Section>
+
+        {/* Data */}
+        <Section title="Data">
+          <Row
+            label="Export for local version"
+            description="Download all your client data as a backup file. Use this to migrate to the FireStation desktop app."
+          >
+            <button
+              onClick={handleExportForLocal}
+              disabled={exporting}
+              style={{
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 8, color: 'var(--text-2)', fontSize: 12, fontWeight: 600,
+                padding: '7px 14px', cursor: exporting ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap', opacity: exporting ? 0.6 : 1,
+              }}
+            >
+              {exporting ? 'Exporting…' : 'Export data'}
+            </button>
           </Row>
         </Section>
 
