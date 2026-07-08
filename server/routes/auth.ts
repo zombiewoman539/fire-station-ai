@@ -8,6 +8,7 @@ import { verifyLicenseKey, getLicenseTier, getLicenseExpiry, isLicenseValid } fr
 import { getSetting } from '../db';
 
 const router = Router();
+const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
 
 router.get('/status', (req: Request, res: Response) => {
   const token = req.cookies?.session as string | undefined;
@@ -89,7 +90,5 @@ router.post('/change-password', async (req: Request, res: Response) => {
   await setPassword(newPassword);
   res.json({ ok: true });
 });
-
-const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
 
 export default router;
