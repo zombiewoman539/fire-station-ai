@@ -1,7 +1,26 @@
-import React from 'react';
-import { FireInputs, FireResults } from '../types';
-import { calculate, formatSGD, CI_COST_DATA } from '../calculations';
+import React, { useState, useEffect } from 'react';
+import { FireInputs, FireResults, Scenario } from '../types';
+import { formatSGD, CI_COST_DATA } from '../calculations';
 import { useIsDark } from '../useIsDark';
+
+function useScenarioResults(inputs: FireInputs, scenario: Scenario): FireResults | null {
+  const [result, setResult] = useState<FireResults | null>(null);
+  const key = JSON.stringify({ inputs, scenario });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inputs, scenario }),
+    })
+      .then(r => r.json())
+      .then(data => { if (!cancelled) setResult(data.results ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return result;
+}
 
 interface Props {
   inputs: FireInputs;
@@ -62,12 +81,7 @@ function IncomeReplacementPanel({
   const currentAge = personal.currentAge;
   const yearsNeeded = personal.lifeExpectancy - currentAge;
 
-  // Run scenario at current age
-  const scenarioResults = React.useMemo(
-    () => calculate(inputs, { type, ageAtEvent: currentAge }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(inputs), type, currentAge],
-  );
+  const scenarioResults = useScenarioResults(inputs, { type, ageAtEvent: currentAge });
 
   // In-force coverage only
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
@@ -78,8 +92,7 @@ function IncomeReplacementPanel({
   // Current wealth at this moment (year 0 of baseline)
   const currentWealth = results.yearlyData[0]?.totalNetWorth ?? 0;
 
-  // Years secured: from scenario calculation (most accurate)
-  const securedToAge = scenarioResults.moneyRunsOutAge ?? personal.lifeExpectancy;
+  const securedToAge = scenarioResults?.moneyRunsOutAge ?? personal.lifeExpectancy;
   const yearsSecured = Math.max(0, securedToAge - currentAge);
   const pct = Math.min(100, Math.round((yearsSecured / yearsNeeded) * 100));
   const color = yearsColor(pct);
@@ -96,7 +109,7 @@ function IncomeReplacementPanel({
   const gapYears = Math.max(0, yearsNeeded - yearsSecured);
   const gapSGD   = Math.round(gapYears * income.annualExpenses);
 
-  const isFullyCovered = scenarioResults.moneyRunsOutAge === undefined;
+  const isFullyCovered = scenarioResults ? scenarioResults.moneyRunsOutAge === undefined : true;
 
   return (
     <div>
@@ -137,7 +150,7 @@ function IncomeReplacementPanel({
 
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-5)' }}>
           <span>Today (age {currentAge})</span>
-          {!isFullyCovered && scenarioResults.moneyRunsOutAge && (
+          {!isFullyCovered && scenarioResults?.moneyRunsOutAge && (
             <span style={{ color: fclr.red, fontWeight: 700 }}>
               Money runs out: age {scenarioResults.moneyRunsOutAge}
             </span>
@@ -236,11 +249,7 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
   const currentAge = personal.currentAge;
   const ciData = CI_COST_DATA[ciType];
 
-  const ciResults = React.useMemo(
-    () => calculate(inputs, { type: 'critical-illness', ageAtEvent: currentAge, ciType, ciStage }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(inputs), currentAge, ciType, ciStage],
-  );
+  const ciResults = useScenarioResults(inputs, { type: 'critical-illness', ageAtEvent: currentAge, ciType, ciStage });
 
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
   const totalCI = inForce.reduce((s, p) => s + (ciStage === 'early' ? (p.eciSumAssured || 0) : (p.ciSumAssured || 0)), 0);
@@ -253,7 +262,7 @@ function CIImpactPanel({ inputs, results }: { inputs: FireInputs; results: FireR
   const gapSGD = Math.max(0, totalFinancialHit - totalCI);
   const color = yearsColor(coveragePct);
 
-  const wealthImpact = ciResults.wealthAtRetirement - results.wealthAtRetirement;
+  const wealthImpact = (ciResults?.wealthAtRetirement ?? results.wealthAtRetirement) - results.wealthAtRetirement;
   const isFullyCovered = totalCI >= totalFinancialHit;
 
   return (

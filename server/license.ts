@@ -3,7 +3,7 @@ import os from 'os';
 import crypto from 'crypto';
 
 const APP_VERSION = '1.0.0';
-const LICENSE_SERVER = 'https://license.firestation.app/verify';
+const LICENSE_SERVER = 'https://firestation-license.vercel.app/verify';
 const GRACE_DAYS = 7;
 
 function getMachineId(): string {

@@ -1,4 +1,6 @@
-import { calculate } from './calculations';
+// calculate() has moved to server/lib/calculations.ts — tests need to be rewritten as server-side tests.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { calculate } = require('../server/lib/calculations');
 import { FireInputs, InsurancePolicy, HospitalPlan } from './types';
 
 // ─── Minimal predictable inputs ───────────────────────────────────────────────
@@ -325,7 +327,7 @@ test('lump sum purchase appears in purchaseLabels at the correct age', () => {
     purchases: [{ id: 'car', name: 'Car', age: 35, lumpSum: 80000, recurringCost: 0, recurringYears: 0, repeatEveryYears: 0 }],
   };
   const r = calculate(inputs);
-  const yr = r.yearlyData.find(y => y.age === 35);
+  const yr = r.yearlyData.find((y: any) => y.age === 35);
   expect(yr).toBeDefined();
   expect(yr!.purchaseLabels).toContain('Car');
 });

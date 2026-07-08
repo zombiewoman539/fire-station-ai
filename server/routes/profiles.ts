@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { readCollection, writeCollection } from '../db';
+import { calculate } from '../lib/calculations';
+import { computeInsurance } from '../lib/insuranceCompute';
 import crypto from 'crypto';
 
 const router = Router();
@@ -26,9 +28,33 @@ function rowToProfile(row: any): object {
   };
 }
 
+function enrichRow(row: any): object {
+  const base = rowToProfile(row) as any;
+  let _computed = null;
+  try {
+    const inputs = base.inputs;
+    if (inputs?.personal) {
+      const r = calculate(inputs);
+      const daysSinceUpdate = row.updated_at
+        ? Math.floor((Date.now() - new Date(row.updated_at).getTime()) / 86400000)
+        : 0;
+      const insurance = computeInsurance(inputs, daysSinceUpdate);
+      _computed = {
+        onTrack: r.onTrack,
+        yearsToBuild: r.yearsToBuild,
+        wealthAtRetirement: r.wealthAtRetirement,
+        fireNumber: r.fireNumber,
+        moneyRunsOutAge: r.moneyRunsOutAge,
+        insurance,
+      };
+    }
+  } catch {}
+  return { ...base, _computed };
+}
+
 // GET /api/profiles
 router.get('/', (_req: Request, res: Response) => {
-  res.json(active(readCollection(COL)).map(rowToProfile));
+  res.json(active(readCollection(COL)).map(enrichRow));
 });
 
 // GET /api/profiles/paged?page=0&pageSize=50
@@ -37,7 +63,7 @@ router.get('/paged', (req: Request, res: Response) => {
   const pageSize = parseInt(String(req.query.pageSize ?? '50'), 10);
   const all = active(readCollection(COL));
   const slice = all.slice(page * pageSize, (page + 1) * pageSize);
-  res.json({ data: slice.map(rowToProfile), hasMore: all.length > (page + 1) * pageSize });
+  res.json({ data: slice.map(enrichRow), hasMore: all.length > (page + 1) * pageSize });
 });
 
 // GET /api/profiles/deleted

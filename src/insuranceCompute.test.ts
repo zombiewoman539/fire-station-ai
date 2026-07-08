@@ -1,4 +1,7 @@
-import { computeInsurance, resolveRecommended, INSURANCE_BENCHMARK } from './insuranceCompute';
+// computeInsurance() has moved to server/lib/insuranceCompute.ts.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { computeInsurance } = require('../server/lib/insuranceCompute');
+import { resolveRecommended, INSURANCE_BENCHMARK } from './insuranceCompute';
 import { defaultInputs } from './defaults';
 import { FireInputs, InsurancePolicy } from './types';
 

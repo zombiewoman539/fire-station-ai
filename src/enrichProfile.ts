@@ -1,47 +1,37 @@
 import { ClientProfile } from './profileTypes';
-import { calculate } from './calculations';
 import { FireResults } from './types';
-import { computeInsurance, InsuranceSummary } from './insuranceCompute';
+import { InsuranceSummary } from './insuranceCompute';
 import { Task } from './services/taskService';
 import { daysUntilNext, isPremiumActive, nextOccurrence } from './premiumUtils';
 
-/** Anything we can derive from a profile that filters / columns might need. Computed once per profile. */
 export interface EnrichedProfile {
   profile: ClientProfile;
   results: FireResults;
 
-  // Demographics
   liveAge: number;
   annualIncome: number;
 
-  // FIRE
   fireOnTrack: boolean;
-  fireGap: number | null;        // null if on-track
-  fireSurplus: number | null;    // null if shortfall
+  fireGap: number | null;
+  fireSurplus: number | null;
   wealthAtRetirement: number;
 
-  // Insurance summary (death/CI/ECI/TPD gaps + signal score etc.)
   insurance: InsuranceSummary;
   totalDeathSA: number;
   totalPremiumPA: number;
   hasMissingInsurance: boolean;
   hasMissingEstate: boolean;
 
-  // Activity
-  daysSinceMeeting: number | null;     // null if never met
-  daysUntilReview: number | null;      // null if no nextReviewDate; negative = overdue
+  daysSinceMeeting: number | null;
+  daysUntilReview: number | null;
   reviewOverdue: boolean;
   hasOpenTask: boolean;
   hasNotes: boolean;
   meetingCount: number;
 
-  // Premiums (for the "due-soon" built-in)
-  nearestDueDays: number | null;       // min daysUntil across in-force premiums in the next 90d
+  nearestDueDays: number | null;
+  daysSinceUpdate: number;
 
-  // Source metadata for sorting
-  daysSinceUpdate: number;             // since profile.updatedAt
-
-  // Manager-view extras (only present when viewed from ManagerDashboardPage)
   advisorUserId?: string;
   advisorEmail?: string;
 }
@@ -58,20 +48,72 @@ function getLiveAge(profile: ClientProfile): number {
   return profile.inputs.personal?.currentAge ?? 0;
 }
 
-function daysSince(iso: string | null | undefined): number | null {
+export function daysSince(iso: string | null | undefined): number | null {
   if (!iso) return null;
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
 const FREQ_MULT: Record<string, number> = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 };
 
+const NULL_RESULTS: FireResults = {
+  yearlyData: [],
+  wealthAtRetirement: 0,
+  fireNumber: 0,
+  fireNumberBreakdown: {
+    grossRetirementExpenses: 0,
+    inflatedRetirementExpenses: 0,
+    inflationRate: 2.5,
+    yearsToRetirement: 0,
+    streamIncomeAtRetirement: 0,
+    netDrawdownNeeded: 0,
+    withdrawalRate: 3.5,
+    inflationBuffer: 10,
+  },
+  yearsToBuild: null,
+  onTrack: false,
+};
+
+const NULL_INSURANCE: InsuranceSummary = {
+  totalDeath: 0, totalTPD: 0, totalCI: 0, totalECI: 0,
+  deathGap: 0, tpdGap: 0, ciGap: 0, eciGap: 0,
+  coverageTargetSource: { death: 'benchmark', tpd: 'benchmark', ci: 'benchmark', eci: 'benchmark' },
+  recommended: { death: 0, tpd: 0, ci: 0, eci: 0 },
+  annualPremium: 0,
+  signalScore: 0,
+  hasMSL: null, hasISP: null, hasRider: null, ispWardClass: '',
+};
+
 interface EnrichOptions {
-  /** Tasks for this caller; filtered to clientProfileId === profile.id when looking up hasOpenTask. */
   tasks: Task[];
 }
 
-export function enrichProfile(profile: ClientProfile, opts: EnrichOptions): EnrichedProfile {
-  const results = calculate(profile.inputs);
+// _computed is injected by the server's GET /api/profiles response
+interface ProfileWithComputed extends ClientProfile {
+  _computed?: {
+    onTrack: boolean;
+    yearsToBuild: number | null;
+    wealthAtRetirement: number;
+    fireNumber: number;
+    moneyRunsOutAge?: number;
+    insurance: InsuranceSummary;
+  } | null;
+}
+
+export function enrichProfile(profile: ProfileWithComputed, opts: EnrichOptions): EnrichedProfile {
+  const c = (profile as ProfileWithComputed)._computed;
+
+  const results: FireResults = c ? {
+    yearlyData: [],
+    wealthAtRetirement: c.wealthAtRetirement,
+    fireNumber: c.fireNumber,
+    fireNumberBreakdown: NULL_RESULTS.fireNumberBreakdown,
+    yearsToBuild: c.yearsToBuild,
+    onTrack: c.onTrack,
+    moneyRunsOutAge: c.moneyRunsOutAge,
+  } : NULL_RESULTS;
+
+  const insurance: InsuranceSummary = c?.insurance ?? NULL_INSURANCE;
+
   const liveAge = getLiveAge(profile);
   const policies = profile.inputs.policies ?? [];
   const inForce = policies.filter(p => p.policyStatus === 'in-force');
@@ -102,7 +144,6 @@ export function enrichProfile(profile: ClientProfile, opts: EnrichOptions): Enri
   const nearestDueDays = inForceDates.length > 0 ? Math.min(...inForceDates) : null;
 
   const daysSinceUpdate = daysSince(profile.updatedAt) ?? 0;
-  const insurance = computeInsurance(profile.inputs, daysSinceUpdate);
 
   return {
     profile,
@@ -131,9 +172,8 @@ export function enrichProfile(profile: ClientProfile, opts: EnrichOptions): Enri
   };
 }
 
-export function enrichProfiles(profiles: ClientProfile[], opts: EnrichOptions): EnrichedProfile[] {
+export function enrichProfiles(profiles: ProfileWithComputed[], opts: EnrichOptions): EnrichedProfile[] {
   return profiles.map(p => enrichProfile(p, opts));
 }
 
-// Re-export shared helpers other components may want
-export { getLiveAge, daysSince, nextOccurrence };
+export { getLiveAge, daysSince as daysSinceDate, nextOccurrence };

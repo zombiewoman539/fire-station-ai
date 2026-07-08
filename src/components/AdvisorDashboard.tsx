@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listProfiles } from '../services/profileStorageSupabase';
 import { listMyTasks, Task } from '../services/taskService';
-import { calculate } from '../calculations';
 import { ClientProfile } from '../profileTypes';
 import { daysUntilNext, isPremiumActive, nextOccurrence } from '../premiumUtils';
 import DashboardShell from './Dashboard/DashboardShell';
@@ -236,5 +235,3 @@ export default function AdvisorDashboard() {
   );
 }
 
-// Re-export calculate so other files that import from here keep working (none in repo today, but kept for safety).
-export { calculate };

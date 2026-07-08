@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { FireInputs, Scenario } from './types';
 import { defaultInputs } from './defaults';
-import { calculate } from './calculations';
+import { useCalculate } from './hooks/useCalculate';
 import { ProfileSummary } from './components/ProfileManager';
 import { ClientProfile } from './profileTypes';
 import {
@@ -88,11 +88,13 @@ function Dashboard() {
         setActiveProfile(profile);
         localStorage.setItem('fire-active-profile', profile.id);
 
-        // Pre-compute on-track status for the first page of profiles
+        // Read pre-computed on-track status from server (included in profiles list response)
         const summaries: Record<string, ProfileSummary> = {};
         for (const p of profiles) {
-          const r = calculate(p.inputs);
-          summaries[p.id] = { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement };
+          const computed = (p as any)._computed;
+          if (computed) {
+            summaries[p.id] = { onTrack: computed.onTrack, wealthAtRetirement: computed.wealthAtRetirement };
+          }
         }
         setProfileSummaries(summaries);
       } catch (e) {
@@ -122,28 +124,6 @@ function Dashboard() {
     policies: inputs.policies.filter(p => !excludedIds.has(p.id)),
   }), [inputs, excludedIds]);
 
-  const results = useMemo(() => calculate(effectiveInputs), [effectiveInputs]);
-
-  // Detect an unconfigured client (still showing default values)
-  const isDefaultClient = !activeProfile ||
-    Math.abs(new Date(activeProfile.updatedAt).getTime() - new Date(activeProfile.createdAt).getTime()) < 5000;
-
-  // Keep active client's on-track badge in sync as inputs change
-  useEffect(() => {
-    if (!activeProfile) return;
-    const r = calculate(inputs); // use full inputs, not filtered
-    setProfileSummaries(prev => ({
-      ...prev,
-      [activeProfile.id]: { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement },
-    }));
-  }, [activeProfile, inputs]);
-
-  // Scenario results (recalculated when scenario or inputs change)
-  const scenarioResults = useMemo(() => {
-    if (scenario.type === 'none') return null;
-    return calculate(effectiveInputs, scenario);
-  }, [effectiveInputs, scenario]);
-
   // Proposed plan — flip proposed policies to in-force for before/after toggle
   const proposedInputs = useMemo(() => {
     const hasProposed = effectiveInputs.policies.some(p => p.policyStatus === 'proposed');
@@ -156,26 +136,32 @@ function Dashboard() {
     };
   }, [effectiveInputs]);
 
-  const proposedResults = useMemo(() =>
-    proposedInputs ? calculate(proposedInputs) : null,
-    [proposedInputs]
+  const daysSinceUpdate = useMemo(() => {
+    if (!activeProfile?.updatedAt) return 0;
+    return Math.floor((Date.now() - new Date(activeProfile.updatedAt).getTime()) / 86400000);
+  }, [activeProfile?.updatedAt]);
+
+  // Batched API call — base + scenario + proposed + extra tiers in one round-trip
+  const { results, scenarioResults, proposedResults, extraInvestmentTiers } = useCalculate(
+    effectiveInputs,
+    scenario,
+    proposedInputs,
+    daysSinceUpdate,
   );
 
-  // Pre-compute +$X/month investment impact tiers for InsightsPanel
-  const extraInvestmentTiers = useMemo(() =>
-    ([200, 500, 1000] as const).map(extra => {
-      const modInputs = {
-        ...effectiveInputs,
-        income: {
-          ...effectiveInputs.income,
-          annualInvestmentContribution: effectiveInputs.income.annualInvestmentContribution + extra * 12,
-        },
-      };
-      const r = calculate(modInputs);
-      return { extra, yearsToBuild: r.yearsToBuild, onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement };
-    }),
-    [effectiveInputs]
-  );
+  // Detect an unconfigured client (still showing default values)
+  const isDefaultClient = !activeProfile ||
+    Math.abs(new Date(activeProfile.updatedAt).getTime() - new Date(activeProfile.createdAt).getTime()) < 5000;
+
+  // Keep active client's on-track badge in sync when calculation results arrive
+  useEffect(() => {
+    if (!activeProfile) return;
+    setProfileSummaries(prev => ({
+      ...prev,
+      [activeProfile.id]: { onTrack: results.onTrack, wealthAtRetirement: results.wealthAtRetirement },
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile?.id, results.onTrack, results.wealthAtRetirement]);
 
   const proposedMonthlyPremium = useMemo(() => {
     if (!proposedInputs) return 0;
@@ -237,8 +223,10 @@ function Dashboard() {
       const next = { ...prev };
       for (const p of newProfiles) {
         if (!next[p.id]) {
-          const r = calculate(p.inputs);
-          next[p.id] = { onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement };
+          const computed = (p as any)._computed;
+          if (computed) {
+            next[p.id] = { onTrack: computed.onTrack, wealthAtRetirement: computed.wealthAtRetirement };
+          }
         }
       }
       return next;

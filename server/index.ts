@@ -12,6 +12,7 @@ import profilesRouter from './routes/profiles';
 import savedViewsRouter from './routes/savedViews';
 import tasksRouter from './routes/tasks';
 import taskTemplatesRouter from './routes/taskTemplates';
+import calculateRouter from './routes/calculate';
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -27,6 +28,7 @@ app.use('/api/profiles', requireAuth, profilesRouter);
 app.use('/api/saved-views', requireAuth, savedViewsRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);
 app.use('/api/task-templates', requireAuth, taskTemplatesRouter);
+app.use('/api/calculate', requireAuth, calculateRouter);
 
 // In a pkg binary, __dirname is a virtual snapshot path; the real build folder
 // sits next to the executable on disk.
