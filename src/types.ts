@@ -104,7 +104,7 @@ export interface InsurancePolicy {
   // Policy management fields
   insurer: string;               // insurance company name
   policyNumber: string;          // contract/policy number
-  policyStatus: 'in-force' | 'lapsed' | 'surrendered' | 'claimed' | 'matured';
+  policyStatus: 'in-force' | 'lapsed' | 'surrendered' | 'claimed' | 'matured' | 'proposed';
   commencementDate: string | null; // YYYY-MM-DD — when policy started
   maturityDate: string | null;     // YYYY-MM-DD — when policy ends (term/endowment)
   fundAllocations: FundAllocation[]; // ILP sub-fund breakdown (empty for non-ILP)

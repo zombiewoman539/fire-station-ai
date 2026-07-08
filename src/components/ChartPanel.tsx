@@ -31,6 +31,10 @@ interface Props {
   isDark?: boolean;
   /** Optional breakdown of today's retirement expenses, shown in the FIRE-number popup. */
   retirementExpenseItems?: ExpenseLineItem[];
+  proposedResults?: FireResults | null;
+  proposedMonthlyPremium?: number;
+  showProposed?: boolean;
+  onToggleProposed?: () => void;
 }
 
 function FireRow({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
@@ -51,7 +55,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
   );
 }
 
-export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults, isDark = true, retirementExpenseItems }: Props) {
+export default function ChartPanel({ results, retirementAge, toolbar, scenarioResults, isDark = true, retirementExpenseItems, proposedResults, proposedMonthlyPremium = 0, showProposed = false, onToggleProposed }: Props) {
   // Theme-aware color tokens
   const clr = {
     bg:         isDark ? '#111827' : '#eef2f7',
@@ -193,6 +197,19 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
           above: 'rgba(239, 68, 68, 0.0)',
           below: 'rgba(239, 68, 68, 0.18)',
         },
+        order: 0,
+      }] : []),
+      ...(showProposed && proposedResults ? [{
+        type: 'line' as const,
+        label: 'With Proposed',
+        data: proposedResults.yearlyData.map(d => visibleTotal(d)),
+        borderColor: '#3b82f6',
+        borderWidth: 2,
+        borderDash: [5, 3],
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        fill: false,
         order: 0,
       }] : []),
     ],
@@ -347,7 +364,12 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
     { color: '#f472b6', label: scenarioResults ? 'Baseline (No Event)' : 'Net Worth', type: scenarioResults ? 'dash' as const : 'line' as const },
     { color: 'rgba(251, 146, 60, 0.8)', label: 'Retirement', type: 'dash' as const },
     ...(scenarioResults ? [{ color: '#ef4444', label: 'With Event', type: 'line' as const }] : []),
+    ...(showProposed && proposedResults ? [{ color: '#3b82f6', label: 'With Proposed', type: 'dash' as const }] : []),
   ];
+
+  const proposedWealthDelta = proposedResults
+    ? proposedResults.wealthAtRetirement - results.wealthAtRetirement
+    : 0;
 
   const numMetricCols = 4;
 
@@ -519,8 +541,63 @@ export default function ChartPanel({ results, retirementAge, toolbar, scenarioRe
           >
             {hideInsurance ? '+ Insurance' : '− Insurance'}
           </button>
+          {proposedResults && onToggleProposed && (
+            <button
+              onClick={onToggleProposed}
+              title={showProposed ? 'Hide proposed policies overlay' : 'Show how proposed policies affect your FIRE plan'}
+              style={{
+                background: showProposed ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                border: `1px solid ${showProposed ? 'rgba(59, 130, 246, 0.5)' : clr.border}`,
+                borderRadius: 6,
+                color: showProposed ? '#60a5fa' : clr.text4,
+                padding: '3px 8px',
+                fontSize: 10,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {showProposed ? '✓ Proposed' : '+ Proposed'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Proposed plan delta banner */}
+      {showProposed && proposedResults && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          borderRadius: 8, padding: '6px 12px', marginBottom: 6, flexShrink: 0,
+        }}>
+          <span style={{ color: '#3b82f6', fontSize: 10, fontWeight: 700 }}>PROPOSED PLAN</span>
+          <span style={{ color: 'var(--text-4)', fontSize: 10 }}>
+            Retirement wealth:&nbsp;
+            <span style={{ color: proposedWealthDelta >= 0 ? '#34d399' : '#f87171', fontWeight: 700 }}>
+              {formatSGD(proposedResults.wealthAtRetirement)}
+            </span>
+            &nbsp;(
+            {proposedWealthDelta >= 0 ? '+' : ''}{formatSGD(proposedWealthDelta)}
+            )
+          </span>
+          {proposedMonthlyPremium > 0 && (
+            <span style={{ color: 'var(--text-5)', fontSize: 10 }}>
+              · Additional premium: {formatSGD(proposedMonthlyPremium)}/mo
+            </span>
+          )}
+          {!proposedResults.onTrack && results.onTrack && (
+            <span style={{ color: '#f87171', fontSize: 10, fontWeight: 700, marginLeft: 4 }}>
+              ⚠ May miss FIRE target
+            </span>
+          )}
+          {proposedResults.onTrack && !results.onTrack && (
+            <span style={{ color: '#34d399', fontSize: 10, fontWeight: 700, marginLeft: 4 }}>
+              ✓ Now on track with proposed
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Chart */}
       <div

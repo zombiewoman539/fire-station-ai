@@ -88,9 +88,12 @@ export function InsuranceSection({ inputs, onChange, currentProfileId }: { input
       </div>
 
       <HospitalPlanSection inputs={inputs} onChange={onChange} />
-      {inputs.policies.map(p => (
+      {inputs.policies.map(p => {
+        const isProposed = p.policyStatus === 'proposed';
+        return (
         <div key={p.id} style={{
-          background: 'var(--inset)', border: '1px solid var(--border)',
+          background: isProposed ? 'rgba(59,130,246,0.05)' : 'var(--inset)',
+          border: `1px ${isProposed ? 'dashed' : 'solid'} ${isProposed ? 'rgba(59,130,246,0.45)' : 'var(--border)'}`,
           borderRadius: 12, padding: '16px', marginBottom: 16, position: 'relative',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -103,6 +106,14 @@ export function InsuranceSection({ inputs, onChange, currentProfileId }: { input
                 color: 'var(--text-1)', outline: 'none',
               }}
             />
+            {isProposed && (
+              <span style={{
+                background: 'rgba(59,130,246,0.15)', color: '#3b82f6',
+                fontSize: 9, fontWeight: 800, letterSpacing: '0.08em',
+                padding: '3px 7px', borderRadius: 5, textTransform: 'uppercase',
+                flexShrink: 0,
+              }}>Proposed</span>
+            )}
             <button onClick={() => update(inputs.policies.filter(x => x.id !== p.id))}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', fontSize: 16, padding: 4 }}
               title="Remove policy">✕</button>
@@ -155,6 +166,7 @@ export function InsuranceSection({ inputs, onChange, currentProfileId }: { input
               label="Status"
               value={p.policyStatus}
               options={[
+                { value: 'proposed', label: 'Proposed' },
                 { value: 'in-force', label: 'In Force' },
                 { value: 'lapsed', label: 'Lapsed' },
                 { value: 'surrendered', label: 'Surrendered' },
@@ -454,7 +466,8 @@ export function InsuranceSection({ inputs, onChange, currentProfileId }: { input
             </button>
           </div>
         </div>
-      ))}
+      );
+      })}
 
       <button onClick={addPolicy}
         style={{

@@ -205,6 +205,54 @@ function Dashboard() {
     return calculate(effectiveInputs, scenario);
   }, [effectiveInputs, scenario]);
 
+  // Proposed plan — flip proposed policies to in-force for before/after toggle
+  const proposedInputs = useMemo(() => {
+    const hasProposed = effectiveInputs.policies.some(p => p.policyStatus === 'proposed');
+    if (!hasProposed) return null;
+    return {
+      ...effectiveInputs,
+      policies: effectiveInputs.policies.map(p =>
+        p.policyStatus === 'proposed' ? { ...p, policyStatus: 'in-force' as const } : p
+      ),
+    };
+  }, [effectiveInputs]);
+
+  const proposedResults = useMemo(() =>
+    proposedInputs ? calculate(proposedInputs) : null,
+    [proposedInputs]
+  );
+
+  // Pre-compute +$X/month investment impact tiers for InsightsPanel
+  const extraInvestmentTiers = useMemo(() =>
+    ([200, 500, 1000] as const).map(extra => {
+      const modInputs = {
+        ...effectiveInputs,
+        income: {
+          ...effectiveInputs.income,
+          annualInvestmentContribution: effectiveInputs.income.annualInvestmentContribution + extra * 12,
+        },
+      };
+      const r = calculate(modInputs);
+      return { extra, yearsToBuild: r.yearsToBuild, onTrack: r.onTrack, wealthAtRetirement: r.wealthAtRetirement };
+    }),
+    [effectiveInputs]
+  );
+
+  const proposedMonthlyPremium = useMemo(() => {
+    if (!proposedInputs) return 0;
+    return effectiveInputs.policies
+      .filter(p => p.policyStatus === 'proposed')
+      .reduce((sum, p) => {
+        const annual = p.premiumFrequency === 'monthly' ? p.premiumAmount * 12
+          : p.premiumFrequency === 'quarterly' ? p.premiumAmount * 4
+          : p.premiumFrequency === 'semi-annual' ? p.premiumAmount * 2
+          : p.premiumAmount;
+        return sum + annual;
+      }, 0) / 12;
+  }, [effectiveInputs, proposedInputs]);
+
+  const [showProposed, setShowProposed] = useState(false);
+
   // Keep scenario age in range when profile changes
   useEffect(() => {
     if (inputs.personal.currentAge > scenario.ageAtEvent) {
@@ -563,6 +611,10 @@ function Dashboard() {
             scenarioResults={scenarioResults}
             isDark={theme === 'dark'}
             retirementExpenseItems={inputs.income.retirementExpenseItems}
+            proposedResults={proposedResults}
+            proposedMonthlyPremium={proposedMonthlyPremium}
+            showProposed={showProposed}
+            onToggleProposed={() => setShowProposed(v => !v)}
           />
         </div>
 
@@ -588,7 +640,14 @@ function Dashboard() {
             {bottomTab === 'insights' && (
               <div style={{ display: 'flex', height: '100%' }}>
                 <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-                  <InsightsPanel inputs={inputs} results={results} />
+                  <InsightsPanel
+                    inputs={inputs}
+                    results={results}
+                    proposedResults={proposedResults}
+                    hasProposed={proposedInputs !== null}
+                    proposedMonthlyPremium={proposedMonthlyPremium}
+                    extraInvestmentTiers={extraInvestmentTiers}
+                  />
                 </div>
                 <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid var(--border)', overflowY: 'auto' }}>
                   <MilestoneTracker inputs={inputs} results={results} />

@@ -43,10 +43,11 @@ export default function ScenarioPanel({ inputs, results, scenarioResults, scenar
     amberBorder: isDark ? 'rgba(251,191,36,0.4)': 'rgba(180,83,9,0.4)',
   };
 
-  const totalDeathSA = inputs.policies.reduce((s, p) => s + p.deathSumAssured, 0);
-  const totalTpdSA = inputs.policies.reduce((s, p) => s + p.tpdSumAssured, 0);
-  const totalEciSA    = inputs.policies.reduce((s, p) => s + (p.eciSumAssured || 0), 0);
-  const totalMajorCiSA = inputs.policies.reduce((s, p) => s + (p.ciSumAssured || 0), 0);
+  const inForce = inputs.policies.filter(p => p.policyStatus === 'in-force');
+  const totalDeathSA = inForce.reduce((s, p) => s + p.deathSumAssured, 0);
+  const totalTpdSA = inForce.reduce((s, p) => s + p.tpdSumAssured, 0);
+  const totalEciSA    = inForce.reduce((s, p) => s + (p.eciSumAssured || 0), 0);
+  const totalMajorCiSA = inForce.reduce((s, p) => s + (p.ciSumAssured || 0), 0);
   const ciStage = scenario.ciStage ?? 'early';
   const totalCiSA = ciStage === 'early' ? totalEciSA : totalMajorCiSA;
 

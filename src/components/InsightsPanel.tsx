@@ -3,10 +3,20 @@ import { FireInputs, FireResults } from '../types';
 import { formatSGD } from '../calculations';
 import UrgencyTimeline from './UrgencyTimeline';
 import { useIsDark } from '../useIsDark';
+import { INSURANCE_BENCHMARK } from '../insuranceCompute';
 
 interface Props {
   inputs: FireInputs;
   results: FireResults;
+  proposedResults?: FireResults | null;
+  hasProposed?: boolean;
+  proposedMonthlyPremium?: number;
+  extraInvestmentTiers?: Array<{
+    extra: number;
+    yearsToBuild: number | null;
+    onTrack: boolean;
+    wealthAtRetirement: number;
+  }>;
 }
 
 interface Insight {
@@ -17,118 +27,181 @@ interface Insight {
   action?: string;
 }
 
-function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
+function generateInsights(
+  inputs: FireInputs,
+  results: FireResults,
+  extraTiers: Props['extraInvestmentTiers'],
+  proposedResults: FireResults | null | undefined,
+  hasProposed: boolean,
+  proposedMonthlyPremium: number,
+): Insight[] {
   const insights: Insight[] = [];
   const { personal, income, policies, purchases } = inputs;
-  const { wealthAtRetirement, fireNumber, onTrack, yearlyData } = results;
+  const { wealthAtRetirement, fireNumber, onTrack, yearlyData, yearsToBuild } = results;
 
   const yearsToRetirement = personal.retirementAge - personal.currentAge;
   const yearsInRetirement = personal.lifeExpectancy - personal.retirementAge;
   const savingsRate = income.annualIncome > 0
     ? ((income.annualIncome - income.annualExpenses) / income.annualIncome * 100)
     : 0;
+  const fireAge = yearsToBuild != null ? personal.currentAge + Math.round(yearsToBuild) : null;
 
-  // 1. FIRE shortfall urgency
+  // 1. FIRE status
   if (!onTrack) {
     const gap = fireNumber - wealthAtRetirement;
     const monthlyExtra = gap / (yearsToRetirement * 12);
     insights.push({
       type: 'danger',
       icon: '🚨',
-      title: `${formatSGD(gap)} shortfall at retirement`,
-      detail: `At current trajectory, there won't be enough to sustain ${yearsInRetirement} years in retirement. ${formatSGD(income.retirementExpenses)}/yr burn rate will deplete savings.`,
-      action: `Saving an extra ${formatSGD(monthlyExtra)}/month or increasing investment returns by 1-2% could close this gap.`,
+      title: `${formatSGD(gap)} short of FIRE at retirement`,
+      detail: `At retirement you'll have ${formatSGD(wealthAtRetirement)} — ${formatSGD(gap)} below the ${formatSGD(fireNumber)} needed to sustain ${yearsInRetirement} years at ${formatSGD(income.retirementExpenses)}/yr.`,
+      action: `An extra ${formatSGD(monthlyExtra)}/month invested, or a 1–2% return improvement, would close this gap.`,
     });
   } else {
     const surplus = wealthAtRetirement - fireNumber;
+    const fireLabel = fireAge != null && fireAge < personal.retirementAge
+      ? `Hits FIRE number at age ${fireAge} — ${personal.retirementAge - fireAge} years early.`
+      : `On track to retire at ${personal.retirementAge}.`;
     insights.push({
       type: 'success',
       icon: '🎯',
-      title: 'FIRE target achievable!',
-      detail: `Projected ${formatSGD(surplus)} surplus at retirement — enough for an additional ${Math.round(surplus / income.retirementExpenses)} years of expenses.`,
+      title: `${formatSGD(wealthAtRetirement)} at retirement — on track`,
+      detail: `${fireLabel} That's ${formatSGD(surplus)} above the FIRE number, covering an extra ${Math.round(surplus / income.retirementExpenses)} years of expenses.`,
     });
   }
 
-  // 2. Savings rate check
+  // 2. +$X/month investment impact
+  if (extraTiers && extraTiers.length > 0) {
+    const baseline = yearsToBuild;
+    const hit = extraTiers.find(t => {
+      if (!onTrack && t.onTrack) return true;
+      if (baseline != null && t.yearsToBuild != null && baseline - t.yearsToBuild >= 1) return true;
+      return false;
+    });
+    if (hit) {
+      const yearDiff = baseline != null && hit.yearsToBuild != null
+        ? Math.round(baseline - hit.yearsToBuild)
+        : null;
+      const flipText = !onTrack && hit.onTrack
+        ? `puts you back on track for retirement`
+        : yearDiff != null
+          ? `moves your FIRE date ${yearDiff} year${yearDiff !== 1 ? 's' : ''} earlier`
+          : `improves your retirement position`;
+      insights.push({
+        type: 'info',
+        icon: '💰',
+        title: `Invest ${formatSGD(hit.extra)}/mo more → retire earlier`,
+        detail: `Adding just ${formatSGD(hit.extra)}/month to investments ${flipText} — retirement wealth rises to ${formatSGD(hit.wealthAtRetirement)}.`,
+        action: 'Automating a standing instruction on paydays is the most frictionless way to do this.',
+      });
+    }
+  }
+
+  // 3. Proposed coverage summary
+  if (hasProposed && proposedResults) {
+    const proposedPolicies = policies.filter(p => p.policyStatus === 'proposed');
+    const totalDeathSA = proposedPolicies.reduce((s, p) => s + p.deathSumAssured, 0);
+    const totalCiSA = proposedPolicies.reduce((s, p) => s + p.ciSumAssured + p.eciSumAssured, 0);
+    const wealthDelta = proposedResults.wealthAtRetirement - wealthAtRetirement;
+    const coverageParts = [
+      totalDeathSA > 0 && `Death: ${formatSGD(totalDeathSA)}`,
+      totalCiSA > 0 && `CI: ${formatSGD(totalCiSA)}`,
+    ].filter(Boolean).join(' · ');
+    insights.push({
+      type: 'info',
+      icon: '📋',
+      title: `${proposedPolicies.length} proposed polic${proposedPolicies.length === 1 ? 'y' : 'ies'} — ${formatSGD(proposedMonthlyPremium)}/mo`,
+      detail: `${coverageParts ? `Coverage added: ${coverageParts}. ` : ''}With these policies, retirement wealth is ${formatSGD(proposedResults.wealthAtRetirement)} (${wealthDelta >= 0 ? '+' : ''}${formatSGD(wealthDelta)} vs current).`,
+      action: `Toggle "Proposed" on the chart above to show the client the before/after impact.`,
+    });
+  }
+
+  // 4. Savings rate
   if (savingsRate < 20) {
     insights.push({
       type: 'danger',
       icon: '💸',
-      title: `Savings rate is only ${savingsRate.toFixed(0)}%`,
-      detail: `Spending ${formatSGD(income.annualExpenses)} of ${formatSGD(income.annualIncome)} annual income. FIRE typically requires 40-60% savings rate.`,
-      action: 'Identify expense categories to optimize. Even 5% improvement compounds significantly over decades.',
+      title: `Saving only ${savingsRate.toFixed(0)}% of income`,
+      detail: `${formatSGD(income.annualExpenses)} in annual spending leaves little to invest. FIRE typically requires 40–60% savings rate.`,
+      action: 'Even a 5% cut in lifestyle spending frees up meaningful capital over 20 years.',
     });
   } else if (savingsRate < 40) {
     insights.push({
       type: 'warning',
       icon: '📊',
-      title: `Savings rate at ${savingsRate.toFixed(0)}%`,
-      detail: `Decent but below the 40%+ sweet spot for aggressive FIRE timelines.`,
-      action: 'Consider automating an extra 5-10% into index fund investments each month.',
+      title: `${savingsRate.toFixed(0)}% savings rate — room to grow`,
+      detail: `Decent base, but 40%+ is the sweet spot for hitting FIRE before 60. Bump by 5% and watch the timeline compress.`,
+      action: 'Try automating an extra 5–10% of each paycheck directly to investments.',
     });
   } else {
     insights.push({
       type: 'success',
       icon: '🏆',
-      title: `Strong ${savingsRate.toFixed(0)}% savings rate`,
-      detail: `Well above average — this discipline is the #1 driver of reaching FIRE.`,
+      title: `${savingsRate.toFixed(0)}% savings rate — exceptional`,
+      detail: `Top-percentile savings discipline. Compound interest is doing heavy lifting on your behalf.`,
     });
   }
 
-  // 3. Insurance coverage analysis
-  const totalInsuranceCashValue = policies.filter(p => p.policyStatus === 'in-force').reduce((s, p) => s + p.cashValue, 0);
-  const incomeMultiple = income.annualIncome > 0 ? totalInsuranceCashValue / income.annualIncome : 0;
+  // 5. Insurance coverage analysis (sum assured vs benchmark)
+  const inForce = policies.filter(p => p.policyStatus === 'in-force');
+  const totalDeathSA  = inForce.reduce((s, p) => s + p.deathSumAssured, 0);
+  const totalCiSA     = inForce.reduce((s, p) => s + p.ciSumAssured, 0);
+  const targetDeath   = income.annualIncome * INSURANCE_BENCHMARK.death;
+  const targetCi      = income.annualIncome * INSURANCE_BENCHMARK.ci;
+  const deathCoverage = targetDeath > 0 ? totalDeathSA / targetDeath : 0;
+  const ciCoverage    = targetCi > 0 ? totalCiSA / targetCi : 0;
 
-  if (policies.length === 0) {
+  if (inForce.length === 0) {
     insights.push({
       type: 'danger',
       icon: '🛡️',
-      title: 'No life insurance coverage',
-      detail: `With ${formatSGD(income.annualIncome)} annual income and major commitments ahead, there's zero safety net for dependents.`,
-      action: 'A term life policy covering 10x annual income is the minimum recommended protection.',
+      title: 'No active insurance coverage',
+      detail: `Dependents have zero protection. A CI event or premature death would wipe out savings and derail FIRE entirely.`,
+      action: `Minimum: term life at ${formatSGD(targetDeath)} death coverage + ${formatSGD(targetCi)} CI. Start with term — it's cheap.`,
     });
-  } else if (incomeMultiple < 3) {
+  } else if (ciCoverage < 0.5) {
     insights.push({
       type: 'warning',
       icon: '🛡️',
-      title: `Insurance covers only ${incomeMultiple.toFixed(1)}x annual income`,
-      detail: `Current cash value of ${formatSGD(totalInsuranceCashValue)} provides less than 3 years of income replacement.`,
-      action: `Consider increasing coverage to 5-10x income (${formatSGD(income.annualIncome * 5)} - ${formatSGD(income.annualIncome * 10)}).`,
+      title: `CI coverage at ${(ciCoverage * 100).toFixed(0)}% of recommended`,
+      detail: `Current CI sum assured: ${formatSGD(totalCiSA)}. Benchmark for this income level is ${formatSGD(targetCi)} (5× annual income). Cancer alone costs $200–400k in SG.`,
+      action: `A top-up CI rider or standalone CI plan could close the ${formatSGD(targetCi - totalCiSA)} gap.`,
+    });
+  } else if (deathCoverage >= 0.8 && ciCoverage >= 0.8) {
+    insights.push({
+      type: 'success',
+      icon: '🛡️',
+      title: `Well-covered — ${(deathCoverage * 100).toFixed(0)}% death, ${(ciCoverage * 100).toFixed(0)}% CI`,
+      detail: `Death coverage: ${formatSGD(totalDeathSA)} · CI coverage: ${formatSGD(totalCiSA)}. Both comfortably above Singapore benchmarks.`,
     });
   }
 
-  // 4. Major purchase impact
-  const totalPurchaseCost = purchases.reduce((s, p) => {
-    let cost = p.lumpSum;
-    cost += p.recurringCost * p.recurringYears;
-    return s + cost;
-  }, 0);
-
+  // 6. Major purchase impact
+  const totalPurchaseCost = purchases.reduce((s, p) => s + p.lumpSum + p.recurringCost * p.recurringYears, 0);
   if (totalPurchaseCost > income.annualIncome * 15) {
     insights.push({
       type: 'warning',
       icon: '🏠',
-      title: `Major purchases total ${formatSGD(totalPurchaseCost)}`,
-      detail: `That's ${(totalPurchaseCost / income.annualIncome).toFixed(0)}x annual income committed to life purchases. These create significant dips in wealth accumulation.`,
-      action: 'Review timing of major purchases. Spacing them out reduces compound interest lost.',
+      title: `${formatSGD(totalPurchaseCost)} in major life purchases`,
+      detail: `${(totalPurchaseCost / income.annualIncome).toFixed(0)}× annual income committed to purchases — these create significant compound-interest drag.`,
+      action: 'Spacing out major purchases reduces the dips in wealth accumulation.',
     });
   }
 
-  // 6. Investment return rate check
+  // 7. Investment return rate check
   if (inputs.assets.investmentReturnRate < 4) {
     insights.push({
       type: 'warning',
       icon: '📈',
-      title: `Conservative ${inputs.assets.investmentReturnRate}% return assumption`,
-      detail: `At this rate, investments grow slowly. The historical S&P 500 averages 7-10% nominal.`,
-      action: 'Consider a diversified equity-heavy portfolio for the accumulation phase.',
+      title: `${inputs.assets.investmentReturnRate}% return — very conservative`,
+      detail: `At this rate wealth grows slowly. Historically the S&P 500 averages 7–10% nominal, and a global index ETF (VWRA, CSPX) tracks that.`,
+      action: 'Consider shifting accumulation-phase investments equity-heavy. Review in retirement.',
     });
   }
 
-  // 7. Wealth depletion warning
+  // 8. Wealth depletion warning
   const lastYear = yearlyData[yearlyData.length - 1];
   if (lastYear && lastYear.totalNetWorth < income.retirementExpenses) {
-    // Find the age where money runs out
     const depleteAge = yearlyData.find((d, i) =>
       i > 0 && d.totalNetWorth < income.retirementExpenses && d.age >= personal.retirementAge
     );
@@ -136,21 +209,21 @@ function generateInsights(inputs: FireInputs, results: FireResults): Insight[] {
       insights.push({
         type: 'danger',
         icon: '⏰',
-        title: `Funds may run out by age ${depleteAge.age}`,
-        detail: `At current drawdown rate, savings could be depleted ${personal.lifeExpectancy - depleteAge.age} years before life expectancy.`,
-        action: 'This is the most critical risk. Consider reducing retirement expenses or extending working years.',
+        title: `Funds run out at age ${depleteAge.age}`,
+        detail: `At current drawdown, savings are depleted ${personal.lifeExpectancy - depleteAge.age} years before life expectancy. The last years have no financial buffer.`,
+        action: 'Reduce retirement expenses, delay retirement, or add income streams (annuity, rental) to fix this.',
       });
     }
   }
 
-  // 8. Retirement age insight
+  // 9. Short runway urgent action
   if (yearsToRetirement < 10 && !onTrack) {
     insights.push({
       type: 'danger',
       icon: '⚡',
-      title: `Only ${yearsToRetirement} years to retirement`,
-      detail: `With a ${formatSGD(fireNumber - wealthAtRetirement)} gap and limited runway, aggressive action is needed now.`,
-      action: 'Delaying retirement by even 3-5 years can dramatically improve the outcome through continued compounding.',
+      title: `${yearsToRetirement} years left — urgent gap of ${formatSGD(fireNumber - wealthAtRetirement)}`,
+      detail: `Limited runway means aggressive action is needed now. Every year of delay costs compounding power.`,
+      action: `Delaying retirement by 3–5 years or doubling investment contributions are the fastest levers.`,
     });
   }
 
@@ -171,11 +244,21 @@ const lightTypeStyles: Record<string, { bg: string; border: string; titleColor: 
   info:   { bg: 'rgba(37, 99, 235, 0.09)',  border: 'rgba(37, 99, 235, 0.35)', titleColor: '#1d4ed8', accent: 'rgba(37, 99, 235, 0.65)'  },
 };
 
-export default function InsightsPanel({ inputs, results }: Props) {
+export default function InsightsPanel({
+  inputs,
+  results,
+  proposedResults,
+  hasProposed = false,
+  proposedMonthlyPremium = 0,
+  extraInvestmentTiers,
+}: Props) {
   const isDark = useIsDark();
   const typeStyles = isDark ? darkTypeStyles : lightTypeStyles;
 
-  const insights = generateInsights(inputs, results);
+  const insights = generateInsights(
+    inputs, results, extraInvestmentTiers,
+    proposedResults, hasProposed, proposedMonthlyPremium,
+  );
 
   const dangerCount = insights.filter(i => i.type === 'danger').length;
   const warningCount = insights.filter(i => i.type === 'warning').length;
