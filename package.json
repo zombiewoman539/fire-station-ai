@@ -32,7 +32,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "start:server": "ts-node --project tsconfig.server.json server/index.ts",
+    "start:server": "PORT=3001 ts-node --project tsconfig.server.json server/index.ts",
     "start:local": "concurrently \"npm run start:server\" \"npm start\"",
     "build:local": "npm run build",
     "build:server": "tsc -p tsconfig.server.json",
@@ -45,6 +45,7 @@
       "react-app/jest"
     ]
   },
+  "proxy": "http://localhost:3001",
   "browserslist": {
     "production": [
       ">0.2%",
