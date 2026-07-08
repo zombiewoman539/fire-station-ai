@@ -15,6 +15,7 @@ router.get('/status', (req: Request, res: Response) => {
   res.json({
     authenticated: isValidSession(token),
     firstRun: isFirstRun(),
+    hasLicense: getSetting('license_key') !== null,
     licenseValid: isLicenseValid(),
     tier: getLicenseTier(),
     expiresAt: getLicenseExpiry(),

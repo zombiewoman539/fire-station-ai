@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useLicense } from '../contexts/LicenseContext';
 
 type Step = 'license' | 'password';
 
 export default function FirstRunWizard() {
-  const [step, setStep] = useState<Step>('license');
+  const { hasLicense } = useLicense();
+  const [step, setStep] = useState<Step>(hasLicense ? 'password' : 'license');
   const [licenseKey, setLicenseKey] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

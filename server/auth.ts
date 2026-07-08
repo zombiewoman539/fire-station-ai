@@ -43,7 +43,7 @@ export function hasPassword(): boolean {
 }
 
 export function isFirstRun(): boolean {
-  return getSetting('license_key') === null;
+  return getSetting('license_key') === null || getSetting('password_hash') === null;
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {

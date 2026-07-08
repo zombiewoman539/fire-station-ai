@@ -4,6 +4,7 @@ interface LicenseState {
   loaded: boolean;
   authenticated: boolean;
   firstRun: boolean;
+  hasLicense: boolean;
   licenseValid: boolean;
   tier: string;
   isPro: boolean;
@@ -14,6 +15,7 @@ const LicenseContext = createContext<LicenseState>({
   loaded: false,
   authenticated: false,
   firstRun: false,
+  hasLicense: false,
   licenseValid: false,
   tier: 'pro',
   isPro: false,
@@ -25,6 +27,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
     loaded: false,
     authenticated: false,
     firstRun: false,
+    hasLicense: false,
     licenseValid: false,
     tier: 'pro',
     isPro: false,
@@ -34,11 +37,12 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetch('/api/auth/status')
       .then(r => r.json())
-      .then((data: { authenticated: boolean; firstRun: boolean; licenseValid: boolean; tier: string; expiresAt: string | null }) => {
+      .then((data: { authenticated: boolean; firstRun: boolean; hasLicense: boolean; licenseValid: boolean; tier: string; expiresAt: string | null }) => {
         setState({
           loaded: true,
           authenticated: data.authenticated,
           firstRun: data.firstRun,
+          hasLicense: data.hasLicense ?? false,
           licenseValid: data.licenseValid,
           tier: data.tier ?? 'pro',
           isPro: true,
