@@ -59,7 +59,8 @@ EOF
 printf 'APPL????' > "${APP_NAME}.app/Contents/PkgInfo"
 
 echo "→ Signing .app bundle..."
-codesign --deep --force --sign "${IDENTITY}" --options runtime "${APP_NAME}.app"
+codesign --deep --force --sign "${IDENTITY}" --options runtime \
+  --entitlements scripts/entitlements.plist "${APP_NAME}.app"
 
 echo "→ Creating DMG with drag-to-Applications UI..."
 rm -rf dmg-staging
