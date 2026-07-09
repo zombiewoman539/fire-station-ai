@@ -35,8 +35,11 @@ rm -rf "${APP_NAME}.app"
 mkdir -p "${APP_NAME}.app/Contents/MacOS"
 mkdir -p "${APP_NAME}.app/Contents/Resources"
 
-echo "→ Packaging binary..."
-npx pkg dist-server/index.js --targets node18-macos-x64 --output "${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+echo "→ Packaging universal binary (Intel + Apple Silicon)..."
+npx pkg dist-server/index.js --targets node18-macos-x64 --output /tmp/FireStation-x64
+npx pkg dist-server/index.js --targets node18-macos-arm64 --output /tmp/FireStation-arm64
+lipo -create -output "${APP_NAME}.app/Contents/MacOS/${APP_NAME}" /tmp/FireStation-x64 /tmp/FireStation-arm64
+rm /tmp/FireStation-x64 /tmp/FireStation-arm64
 
 echo "→ Copying React build and icon..."
 cp -r build "${APP_NAME}.app/Contents/MacOS/build"
@@ -80,14 +83,50 @@ echo "→ Signing .app bundle..."
 codesign --deep --force --sign "${IDENTITY}" --options runtime \
   --entitlements scripts/entitlements.plist "${APP_NAME}.app"
 
-echo "→ Creating DMG with drag-to-Applications UI..."
-rm -rf dmg-staging
-mkdir dmg-staging
-cp -r "${APP_NAME}.app" dmg-staging/
-ln -s /Applications dmg-staging/Applications
+echo "→ Creating DMG with drag-to-Applications layout..."
+# Render background image
+qlmanage -t -s 1080 -o /tmp/ scripts/dmg-background.svg 2>/dev/null
+mv /tmp/dmg-background.svg.png /tmp/dmg-bg.png
+
+# Build read-write DMG for layout setup
+rm -f /tmp/rw.dmg
+hdiutil create -size 200m -fs HFS+ -volname "FIRE Station" -o /tmp/rw.dmg >/dev/null
+hdiutil attach /tmp/rw.dmg -mountpoint /Volumes/FIRE\ Station >/dev/null
+
+cp -r "${APP_NAME}.app" /Volumes/FIRE\ Station/
+ln -s /Applications /Volumes/FIRE\ Station/Applications
+mkdir -p "/Volumes/FIRE Station/.background"
+cp /tmp/dmg-bg.png "/Volumes/FIRE Station/.background/background.png"
+
+# Position icons and set background via Finder AppleScript
+osascript << 'APPLESCRIPT'
+tell application "Finder"
+  tell disk "FIRE Station"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set bounds of container window to {400, 100, 940, 480}
+    set theViewOptions to icon view options of container window
+    set arrangement of theViewOptions to not arranged
+    set icon size of theViewOptions to 100
+    set background picture of theViewOptions to file ".background:background.png"
+    set position of item "FireStation.app" to {175, 200}
+    set position of item "Applications" to {365, 200}
+    close
+    open
+    update without registering applications
+    delay 2
+    close
+  end tell
+end tell
+APPLESCRIPT
+
+# Unmount and convert to compressed read-only
+hdiutil detach /Volumes/FIRE\ Station >/dev/null
 rm -f "${APP_NAME}.dmg"
-hdiutil create -volname "FIRE Station" -srcfolder dmg-staging -ov -format UDZO -o "${APP_NAME}.dmg"
-rm -rf dmg-staging
+hdiutil convert /tmp/rw.dmg -format UDZO -o "${APP_NAME}.dmg" >/dev/null
+rm /tmp/rw.dmg
 
 echo "→ Signing DMG..."
 codesign --sign "${IDENTITY}" "${APP_NAME}.dmg"
