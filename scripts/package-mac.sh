@@ -61,9 +61,14 @@ printf 'APPL????' > "${APP_NAME}.app/Contents/PkgInfo"
 echo "→ Signing .app bundle..."
 codesign --deep --force --sign "${IDENTITY}" --options runtime "${APP_NAME}.app"
 
-echo "→ Creating DMG..."
+echo "→ Creating DMG with drag-to-Applications UI..."
+rm -rf dmg-staging
+mkdir dmg-staging
+cp -r "${APP_NAME}.app" dmg-staging/
+ln -s /Applications dmg-staging/Applications
 rm -f "${APP_NAME}.dmg"
-hdiutil create -volname "${APP_NAME}" -srcfolder "${APP_NAME}.app" -ov -format UDZO -o "${APP_NAME}.dmg"
+hdiutil create -volname "FIRE Station" -srcfolder dmg-staging -ov -format UDZO -o "${APP_NAME}.dmg"
+rm -rf dmg-staging
 
 echo "→ Signing DMG..."
 codesign --sign "${IDENTITY}" "${APP_NAME}.dmg"
