@@ -15,6 +15,21 @@ npm run build
 echo "→ Building server..."
 npm run build:server
 
+echo "→ Generating app icon..."
+rm -rf /tmp/FireStation.iconset
+mkdir -p /tmp/FireStation.iconset
+qlmanage -t -s 1024 -o /tmp/ scripts/app-icon.svg 2>/dev/null
+mv /tmp/app-icon.svg.png /tmp/icon-1024.png
+for size in 16 32 64 128 256 512; do
+  sips -z $size $size /tmp/icon-1024.png --out /tmp/FireStation.iconset/icon_${size}x${size}.png >/dev/null
+done
+sips -z 32 32    /tmp/icon-1024.png --out /tmp/FireStation.iconset/icon_16x16@2x.png   >/dev/null
+sips -z 64 64    /tmp/icon-1024.png --out /tmp/FireStation.iconset/icon_32x32@2x.png   >/dev/null
+sips -z 256 256  /tmp/icon-1024.png --out /tmp/FireStation.iconset/icon_128x128@2x.png >/dev/null
+sips -z 512 512  /tmp/icon-1024.png --out /tmp/FireStation.iconset/icon_256x256@2x.png >/dev/null
+cp /tmp/icon-1024.png /tmp/FireStation.iconset/icon_512x512@2x.png
+iconutil -c icns /tmp/FireStation.iconset -o scripts/AppIcon.icns
+
 echo "→ Creating .app bundle structure..."
 rm -rf "${APP_NAME}.app"
 mkdir -p "${APP_NAME}.app/Contents/MacOS"
@@ -23,8 +38,9 @@ mkdir -p "${APP_NAME}.app/Contents/Resources"
 echo "→ Packaging binary..."
 npx pkg dist-server/index.js --targets node18-macos-x64 --output "${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
 
-echo "→ Copying React build..."
+echo "→ Copying React build and icon..."
 cp -r build "${APP_NAME}.app/Contents/MacOS/build"
+cp scripts/AppIcon.icns "${APP_NAME}.app/Contents/Resources/AppIcon.icns"
 
 echo "→ Writing Info.plist..."
 cat > "${APP_NAME}.app/Contents/Info.plist" << EOF
@@ -52,6 +68,8 @@ cat > "${APP_NAME}.app/Contents/Info.plist" << EOF
     <true/>
     <key>LSUIElement</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
 </dict>
 </plist>
 EOF
