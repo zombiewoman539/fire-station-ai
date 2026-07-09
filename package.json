@@ -35,7 +35,7 @@
     "start:local": "concurrently \"npm run start:server\" \"npm start\"",
     "build:local": "npm run build",
     "build:server": "tsc -p tsconfig.server.json && node -e \"require('fs').writeFileSync('dist-server/package.json', JSON.stringify({name:'firestation-server',version:'1.0.0',pkg:{assets:['../build/**/*']}},null,2))\"",
-    "package:mac": "npm run build && npm run build:server && mkdir -p FireStation && pkg dist-server/index.js --targets node18-macos-x64 --output FireStation/FireStation && cp -r build FireStation/build",
+    "package:mac": "npm run build && npm run build:server && mkdir -p FireStation && pkg dist-server/index.js --targets node18-macos-x64 --output FireStation/FireStation && cp -r build FireStation/build && codesign --deep --force --sign 'Developer ID Application: Adian-Scott Ee Chew Veroff (W5ZA4GK2AT)' --options runtime FireStation/FireStation && rm -f FireStation.dmg && hdiutil create -volname FireStation -srcfolder FireStation -ov -format UDZO -o FireStation.dmg && codesign --sign 'Developer ID Application: Adian-Scott Ee Chew Veroff (W5ZA4GK2AT)' FireStation.dmg && xcrun notarytool submit FireStation.dmg --key ~/Downloads/AuthKey_H38D4YWJV7.p8 --key-id H38D4YWJV7 --issuer 735708d9-3cd7-4134-9271-a18ba3e8f7b8 --wait && xcrun stapler staple FireStation.dmg",
     "package:win": "npm run build && npm run build:server && mkdir FireStation & pkg dist-server/index.js --targets node18-win-x64 --output FireStation\\FireStation.exe && xcopy /E /I build FireStation\\build"
   },
   "eslintConfig": {
