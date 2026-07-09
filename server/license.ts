@@ -20,10 +20,12 @@ function getMachineId(): string {
 }
 
 export function isLicenseValid(): boolean {
-  const valid = getSetting('license_valid');
-  if (valid === 'true') return true;
+  // Explicitly revoked or invalidated by server — never grant access
+  if (getSetting('license_valid') === 'false') return false;
 
-  // Grace period: if we have a key and checked within GRACE_DAYS, still valid
+  if (getSetting('license_valid') === 'true') return true;
+
+  // No confirmed status yet — allow only within grace period (offline first-run)
   const lastChecked = getSetting('license_last_checked');
   if (lastChecked && getSetting('license_key')) {
     const daysSince = (Date.now() - new Date(lastChecked).getTime()) / 86400000;
@@ -86,12 +88,14 @@ export async function verifyLicenseKey(
 
 export async function refreshLicenseIfDue(): Promise<void> {
   const key = getSetting('license_key');
-  if (!key) return;
+  if (!key || key.trim().toUpperCase() === 'DEV-LOCAL') return;
 
+  // Always check on startup — only skip if checked within the last hour
+  // (prevents hammering the server on rapid restarts)
   const lastChecked = getSetting('license_last_checked');
   if (lastChecked) {
-    const daysSince = (Date.now() - new Date(lastChecked).getTime()) / 86400000;
-    if (daysSince < GRACE_DAYS) return;
+    const hoursSince = (Date.now() - new Date(lastChecked).getTime()) / 3600000;
+    if (hoursSince < 1) return;
   }
 
   try {
@@ -100,9 +104,11 @@ export async function refreshLicenseIfDue(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, machineId: getMachineId(), version: APP_VERSION }),
     });
-    if (!res.ok) return;
+    if (!res.ok) return; // Server error — keep cached status, try again next startup
 
     const data = (await res.json()) as { valid: boolean; tier: string; expiresAt: string | null };
+
+    // Always write the result — if revoked, this sets license_valid='false' immediately
     setSetting('license_valid', String(data.valid));
     if (data.tier) setSetting('license_tier', data.tier);
     if (data.expiresAt) setSetting('license_expires_at', data.expiresAt);
